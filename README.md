@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Talk anywhere. Type nowhere.</strong></p>
 
-<p align="center">Local-first voice dictation for your Mac, Android and iPhone — speech recognition runs on your own Mac, and nothing is retained.</p>
+<p align="center">Local-first voice dictation for your Mac, Android and iPhone — speech recognition runs on your own Mac. Your words stay yours.</p>
 
 <p align="center"><a href="https://araa47.github.io/chirp/">Website</a> · <a href="#get-it-running">Get it running</a> · <a href="#how-fast">How fast</a> · <a href="docs/README.md">Docs</a></p>
 
@@ -25,7 +25,7 @@ Press a hotkey on your Mac, or the mic key on your phone, and talk. Your words a
 
 | | Chirp |
 |---|---|
-| **Private by design** | Audio never leaves your Mac. Nothing is recorded or kept by default, nothing about what you said is logged, and there's no telemetry. |
+| **Your data stays yours** | Everything runs on devices you own. There's no Chirp cloud, no account and no telemetry, so your audio and text are never sent to us or anyone else. You decide what's kept: no history at all (the default), or an encrypted history on your phone for 24 hours, 7 days or 30 days. |
 | **No subscription, no account** | Open source models (Parakeet for speech, an optional Qwen model for clean-up) run on your Apple Silicon Mac. |
 | **Your phone too** | An Android keyboard and an iPhone/iPad app use the same Mac, so you get the same accuracy and the same clean-up styles on every device. |
 | **Notes, not just dictation** | Live Notes turns a long conversation into headings, bullets, to-dos and decisions you can edit while it writes. |
@@ -120,7 +120,14 @@ For iPhone or iPad, point the agent at [ios/README.md](ios/README.md) → Instal
 
 ## Privacy
 
-Audio stays on your Mac. Nothing is recorded or kept unless you turn on history or debug retention, and both are clearly shown when they're on. The server listens only on loopback, phones reach it only through your tailnet, and every client is paired with a secret token. Per-device tokens can be revoked. Clean-up runs on the same Mac unless you point it at another endpoint yourself, and then the clients say so. Details: [docs/privacy.md](docs/privacy.md).
+**Your data stays yours.** Chirp has no servers of its own: your Mac is the server. Audio and transcripts travel only between your own devices, over your own private Tailscale network, and are never sent to us or any third party. There's no account and no telemetry.
+
+**You choose what's kept.**
+- **Nothing** — the default. Audio and text live in memory for one dictation, then they're gone.
+- **Recent history on your phone** — turn it on to reinsert past dictations; it's encrypted on the device and kept for 24 hours, 7 days or 30 days, up to 200 entries. Clear it any time.
+- **Live Notes** stay in the window until you save or copy them; a crash-recovery copy on your Mac (on by default, deleted when you save) means a crash doesn't cost you a meeting.
+
+**Under the hood.** The speech server listens only on your Mac's loopback address, phones reach it only through your tailnet, and every device is paired with a secret token that you can revoke per device. Clean-up runs on the same Mac; if you deliberately point it at another endpoint, every client says where text is going. A debug mode that keeps recordings exists for troubleshooting, is off unless you start it, and shows a red warning everywhere while it's on. Full details: [docs/privacy.md](docs/privacy.md).
 
 ## Repository and docs
 
