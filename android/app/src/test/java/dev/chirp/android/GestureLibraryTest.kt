@@ -50,6 +50,7 @@ class GestureLibraryTest {
         assertFalse(installed.exists())
         assertFalse(context.protectedPrefs().contains(Settings.PREF_LIBRARY_CHECKSUM))
         assertEquals(GestureLibrary.Status.NONE, GestureLibrary.status(context, loaded = false))
+        assertEquals("Loaded with no added file: the APK's own library", GestureLibrary.Status.BUILT_IN, GestureLibrary.status(context, loaded = true))
     }
 
     @Test fun `picked documents are staged privately and rejected files are deleted`() {

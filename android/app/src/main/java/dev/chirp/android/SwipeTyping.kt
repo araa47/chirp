@@ -31,18 +31,21 @@ import java.io.File
 
 /**
  * Swipe typing through HeliBoard's user-supplied gesture library loader ([JniUtils]).
- * Chirp never downloads or bundles a library; the user picks a file and Chirp verifies it the same way HeliBoard does.
+ * Chirp never downloads a library and published builds bundle none; the user picks a file and Chirp verifies it
+ * the same way HeliBoard does. A personal build made with `-Pchirp.gestureLib` packages one ([Status.BUILT_IN]).
  */
 internal object GestureLibrary {
     const val MAX_BYTES = 64L * 1024 * 1024
-    enum class Status { ACTIVE, NOT_LOADED, NONE }
+    enum class Status { ACTIVE, BUILT_IN, NOT_LOADED, NONE }
     enum class Check { KNOWN, UNKNOWN, NOT_LIBRARY, WRONG_ABI }
 
     fun file(context: Context) = File(context.filesDir, JniUtils.JNI_LIB_IMPORT_FILE_NAME)
     fun abi(): String = Build.SUPPORTED_ABIS[0]
 
+    /** [JniUtils] loads an added file first; loaded without one means the APK's (or system's) library. */
     fun status(context: Context, loaded: Boolean = JniUtils.sHaveGestureLib) = when {
-        loaded -> Status.ACTIVE
+        loaded && file(context).isFile -> Status.ACTIVE
+        loaded -> Status.BUILT_IN
         file(context).isFile -> Status.NOT_LOADED
         else -> Status.NONE
     }
@@ -119,6 +122,7 @@ internal fun restartChirp(activity: Activity) {
 
 internal fun swipeTypingSummary(context: Context) = when (GestureLibrary.status(context)) {
     GestureLibrary.Status.ACTIVE -> "Swipe typing: on, using the gesture library you added"
+    GestureLibrary.Status.BUILT_IN -> "Swipe typing: on, built into this build of Chirp"
     GestureLibrary.Status.NOT_LOADED -> "Swipe typing: the added library did not load"
     GestureLibrary.Status.NONE -> "Swipe typing: optional. Add a gesture library in Chirp settings → Keyboard → Swipe typing"
 }
@@ -153,6 +157,9 @@ internal fun SwipeTypingSettings() {
                 }, summary = "Using the gesture library you added. Trail and preview options are in Keyboard layouts & settings → Gesture typing.")
                 ActionRow("Remove gesture library", { confirmRemove = true }, destructive = true)
             }
+            GestureLibrary.Status.BUILT_IN -> SwitchRow("Swipe to type", enabled, {
+                enabled = it; prefs.edit { putBoolean(Settings.PREF_GESTURE_INPUT, it) }
+            }, summary = "Built into this build of Chirp. Trail and preview options are in Keyboard layouts & settings → Gesture typing.")
             GestureLibrary.Status.NOT_LOADED -> {
                 SettingsItem {
                     Text("The library you added did not load on this phone ($abi). Remove it, then add a compatible file.",

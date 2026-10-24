@@ -2,14 +2,14 @@
 
 The **Chirp** app (Notes, Scratchpad, history and settings) and **Chirp Keyboard**, a full HeliBoard keyboard for the Galaxy Z Fold with a microphone key that streams your voice to the `chirp-server` on your Mac — over Tailscale, from any app. Live text appears underlined in the focused field while you speak; the final replaces it. An optional clean-up pass on the Mac polishes the final text, and an opt-in history keeps recent dictations on the phone, encrypted.
 
-The launcher, Settings → Apps and notifications call the app **Chirp**; Android's keyboard picker and keyboard settings list the input method as **Chirp Keyboard**. The application ID and IME component stay `dev.chirp.android` / `dev.chirp.android/.ChirpImeService`, so a signed APK installs as an **update** and preserves your pairing (the token is encrypted under an Android Keystore key). Current version: **0.7.2**, version code 14.
+The launcher, Settings → Apps and notifications call the app **Chirp**; Android's keyboard picker and keyboard settings list the input method as **Chirp Keyboard**. The application ID and IME component stay `dev.chirp.android` / `dev.chirp.android/.ChirpImeService`, so a signed APK installs as an **update** and preserves your pairing (the token is encrypted under an Android Keystore key). Current version: **0.7.3**, version code 15.
 
 | At a glance | |
 |---|---|
 | Keyboard base | HeliBoard 4.2 (GPL-3.0), vendored and patched — see [Upstream](#upstream) |
 | Looks | **Gboard-like** default, a **Samsung-like** option, three classic HeliBoard looks |
 | Fold layout | Phone-style function keys on the inner screen, number row ≥ 600 dp, split landscape |
-| Swipe typing | Not bundled; you can load a user-supplied library — see [Keyboard](#keyboard) |
+| Swipe typing | Not bundled; you can load a user-supplied library, or build it into a personal APK — see [Keyboard](#keyboard) |
 | Clean-up | On by default after pairing when the Mac cleans up locally; external endpoints need explicit opt-in |
 | History | Opt-in, on-device only, AES-GCM encrypted under an Android Keystore key |
 | Retention | No audio and no dictated text written by default; unsaved Notes keep an encrypted recovery copy; diagnostics hold numbers-only timings and crash frames |
@@ -280,6 +280,8 @@ HeliBoard's gesture typing needs a native decoder, and HeliBoard 4.2 ships none.
 3. A matching checksum shows **Verified gesture library**. Anything else shows **Unknown library**, with the start of its hash and a warning, and needs an explicit **Use anyway**. A wrong ABI or a non-library file is rejected and deleted.
 4. Chirp installs the file exactly where HeliBoard's loader expects it (read-only `files/libjni_latinime.so`, checksum in `lib_checksum`) and restarts, because native code loads once per process. HeliBoard's Gesture typing settings then appear.
 5. When the library is active, the card offers a **Swipe to type** switch and **Remove gesture library**. A file that fails to load is reported, with a Remove action.
+
+**Personal build with the library built in.** To skip the import, build your own APK with the library packaged: `./gradlew assembleRelease -Pchirp.gestureLib=/path/to/libjni_latinimegoogle.so` (the arm64 file; the build refuses anything but HeliBoard's known arm64 SHA-256). It goes in as `lib/arm64-v8a/libjni_latinimegoogle.so`, which HeliBoard's loader picks up at start (`System.loadLibrary`), so swipe typing works on first launch and the card shows **Built into this build of Chirp** with the **Swipe to type** switch. A library you added earlier still loads first and can be removed; the built-in one then takes over. **Never publish or share such an APK** — it contains Google's proprietary code; published builds and release smoke stay library-free. The library is 64 KB-aligned, so the 16 KB alignment gate passes.
 
 The card warns that the library runs inside Chirp with Chirp's permissions, including network access — use only a file from a source you trust — and that a user-supplied library may not be built for 16 KB memory pages and so can fail to load on Android 15+ devices that use them (Chirp's own packaged libraries are checked for 16 KB alignment at every build). Release smoke still asserts that no `libjni_latinimegoogle` file is packaged.
 

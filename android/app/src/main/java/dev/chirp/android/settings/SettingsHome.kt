@@ -43,6 +43,7 @@ internal fun SettingsHome(state: SetupState, actions: SettingsActions, history: 
             NavRow("Look", { open(SettingsPage.Look) }, summary = currentKeyboardLook(prefs)?.label ?: "Custom")
             NavRow("Swipe typing", { open(SettingsPage.SwipeTyping) }, summary = when (GestureLibrary.status(context)) {
                 GestureLibrary.Status.ACTIVE -> "On"
+                GestureLibrary.Status.BUILT_IN -> "On · built in"
                 GestureLibrary.Status.NOT_LOADED -> "Library didn't load"
                 GestureLibrary.Status.NONE -> "Not added"
             })
