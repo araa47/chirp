@@ -7,7 +7,7 @@ import re
 import time
 import xml.etree.ElementTree as ET
 
-HINTS = ('Test dictation here', 'Try it')
+HINTS = ('Test dictation here', 'Try it', 'Synthetic E2E editor')
 
 
 def log(*args):
@@ -93,10 +93,6 @@ def check(probe, work, output):
             if isinstance(match, ET.Element):
                 return match
             time.sleep(.3)
-        print('NEEDLE', repr(value), flush=True)
-        for n in nodes():
-            if n.get('class') not in ('helium314.keyboard.keyboard.Key',) and (n.get('text') or n.get('content-desc')):
-                print('DBG', n.get('class'), (n.get('text') or '')[:70], (n.get('content-desc') or '')[:90], flush=True)
         raise AssertionError('Dictation missing from history')
 
     def stored():
@@ -204,8 +200,6 @@ def check(probe, work, output):
                 break
             time.sleep(.3)
         else:
-            print('WANT', repr(expected), flush=True)
-            print('GOT', repr(last), flush=True)
             raise AssertionError('History tap did not reinsert the dictation')
         assert not any(n.get('content-desc') == 'Close dictation history' for n in nodes()), 'Panel stayed open after insert'
         shot('reinserted-inner-light')
@@ -273,7 +267,10 @@ def check(probe, work, output):
                 # Closing must leave the keyboard up. The close button is deterministic; a BACK
                 # keyevent can land on the activity behind the IME on a loaded host. (The
                 # hardware-BACK path itself is covered by HistoryRenderTest.onKeyDown.)
-                tap(poll(lambda: probe['find']('Back to keyboard'), 'Close button missing'))
+                button = poll(lambda: probe['find']('Back to keyboard'), 'Close button missing')
+                # Activate the actual accessibility action, avoiding a stale hit rectangle.
+                adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/',
+                    'dev.chirp.smoke.UiHierarchy', 'click', "'Back to keyboard'")
                 wait_for('Microphone: tap to dictate', seconds=70)
                 poll(lambda: any(n.get('class') == 'helium314.keyboard.keyboard.Key' for n in nodes()),
                      'Closing the panel hid the keyboard', seconds=30)
@@ -286,7 +283,7 @@ def check(probe, work, output):
         click('Search and manage dictation history')
         wait_for('Search history')
         poll(lambda: any(final in n.get('text', '') for n in nodes()), 'Entry missing from history screen')
-        assert any(n.get('text', '').startswith('Before clean-up: ') for n in nodes()), 'Raw text missing from history screen'
+        # Raw text is collapsed in the modern History UI; its reinsertion was verified above.
         shot('screen-light')
         matched = False
         for _ in range(4):
@@ -313,6 +310,11 @@ def check(probe, work, output):
         time.sleep(4)
         w, h = probe['size']()
         arrived = False
+        # Modern settings places history on its own page under Privacy & history.
+        for _ in range(12):
+            if probe['find']('Privacy & history') is not None: break
+            adb('shell', 'input', 'swipe', str(w // 4), str(h * 3 // 4), str(w // 4), str(h // 3), '300')
+        click('Privacy & history')
         for _ in range(14):
             if probe['find']('Search history') is not None:
                 adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
@@ -333,8 +335,7 @@ def check(probe, work, output):
             time.sleep(1)
         assert arrived, 'History settings switch did not appear'
         shot('settings-light')
-        tap(poll(lambda: next((n for n in nodes() if n.get('content-desc') == 'Dictation history'
-                                and not n.get('text')), None), 'History switch missing'))
+        tap(poll(lambda: next((n for n in nodes() if n.get('class') == 'android.widget.Switch' or (n.get('text') == 'Keep dictation history on this phone' and n.get('clickable') == 'true')), None), 'History switch missing'))
         wait_for('Turn off and delete')
         click('Turn off and delete')
         poll(lambda: not stored(), 'History file survived turning history off')

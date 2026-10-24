@@ -26,6 +26,13 @@ public final class UiHierarchy {
             AccessibilityServiceInfo info = automation.getServiceInfo();
             info.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
             automation.setServiceInfo(info);
+            if (args.length > 0 && (args[0].equals("dictation-cycle") || args[0].equals("click") || args[0].equals("long-click") || args[0].equals("tap") || args[0].equals("append-notes"))) {
+                try { automation.waitForIdle(200, 2000); } catch (java.util.concurrent.TimeoutException ignored) { }
+            }
+            if (args.length == 5 && args[0].equals("dictation-cycle")) {
+                dictationCycle(automation, args[1], Float.parseFloat(args[2]), Float.parseFloat(args[3]), args[4]);
+                return;
+            }
             if (args.length == 4 && args[0].equals("stop-case")) {
                 stopCase(automation, args[1], Float.parseFloat(args[2]), Float.parseFloat(args[3]));
                 return;
@@ -57,7 +64,10 @@ public final class UiHierarchy {
             if (args.length == 1 && args[0].equals("append-notes")) {
                 for (AccessibilityWindowInfo window : automation.getWindows()) {
                     AccessibilityNodeInfo target = find(window.getRoot(), "Notes (Markdown)");
-                    while (target != null && !target.isEditable()) target = target.getParent();
+                    while (target != null && !target.isEditable() && !"android.widget.EditText".contentEquals(target.getClassName())) {
+                        AccessibilityNodeInfo editable = editable(target);
+                        target = editable != null ? editable : target.getParent();
+                    }
                     if (target == null) continue;
                     android.os.Bundle value = new android.os.Bundle();
                     value.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
@@ -152,6 +162,15 @@ public final class UiHierarchy {
             thread.quitSafely();
         }
     }
+    private static AccessibilityNodeInfo editable(AccessibilityNodeInfo node) {
+        if (node == null) return null;
+        if (node.isEditable() || "android.widget.EditText".contentEquals(node.getClassName())) return node;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo result = editable(node.getChild(i));
+            if (result != null) return result;
+        }
+        return null;
+    }
     private static AccessibilityNodeInfo find(AccessibilityNodeInfo node, String label) {
         if (node == null || !node.isVisibleToUser()) return null;
         if (java.util.Arrays.asList(safe(node.getText()).split("\n")).contains(label) || safe(node.getContentDescription()).startsWith(label)) return node;
@@ -206,6 +225,54 @@ public final class UiHierarchy {
             android.os.SystemClock.sleep(16);
         }
         throw new IllegalStateException("Stop scenario state missing: " + label);
+    }
+    private static String editorText(UiAutomation automation) {
+        for (AccessibilityWindowInfo window : automation.getWindows()) {
+            AccessibilityNodeInfo field = editable(window.getRoot());
+            if (field != null) return safe(field.getText());
+        }
+        throw new IllegalStateException("Editor accessibility root unavailable");
+    }
+    private static void screenshot(UiAutomation automation, String path) throws Exception {
+        android.graphics.Bitmap capture = automation.takeScreenshot();
+        if (capture == null) throw new IllegalStateException("Screenshot unavailable");
+        try (FileOutputStream output = new FileOutputStream(path)) {
+            capture.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output);
+        } finally { capture.recycle(); }
+    }
+    private static void dictationCycle(UiAutomation automation, String mode, float x, float y, String path) throws Exception {
+        String before = editorText(automation);
+        long down = android.os.SystemClock.uptimeMillis();
+        boolean hold = mode.equals("hold");
+        if (hold) {
+            android.view.MotionEvent event = android.view.MotionEvent.obtain(down, down, 0, x, y, 0);
+            event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
+            automation.injectInputEvent(event, true); event.recycle();
+        } else tap(automation, x, y);
+        try {
+            await(automation, "Listening…");
+            // This connection watches the actual transient state, rather than
+            // starting another shell JVM after a short utterance has finished.
+            screenshot(automation, path);
+            long deadline = android.os.SystemClock.uptimeMillis() + 12000;
+            boolean partial = false;
+            while (android.os.SystemClock.uptimeMillis() < deadline && has(automation, "Listening…")) {
+                if (!editorText(automation).equals(before)) { partial = true; break; }
+                android.os.SystemClock.sleep(100);
+            }
+            if (!partial) throw new IllegalStateException("No composing partial while listening");
+            if (has(automation, "Listening…")) screenshot(automation, path);
+            if (!hold) tap(automation, x, y);
+        } finally {
+            if (hold) {
+                android.view.MotionEvent event = android.view.MotionEvent.obtain(down, android.os.SystemClock.uptimeMillis(), 1, x, y, 0);
+                event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
+                automation.injectInputEvent(event, true); event.recycle();
+            }
+        }
+        await(automation, "Use raw");
+        if (editorText(automation).equals(before)) throw new IllegalStateException("No final committed");
+        System.out.println("PASS: " + mode + " composing partial, stop, cleaned final");
     }
     private static void stopCase(UiAutomation automation, String mode, float x, float y) {
         AccessibilityNodeInfo status = null;
