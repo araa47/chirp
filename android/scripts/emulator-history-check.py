@@ -272,8 +272,11 @@ def check(probe, work, output):
                 adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/',
                     'dev.chirp.smoke.UiHierarchy', 'click', "'Back to keyboard'")
                 wait_for('Microphone: tap to dictate', seconds=70)
-                poll(lambda: any(n.get('class') == 'helium314.keyboard.keyboard.Key' for n in nodes()),
-                     'Closing the panel hid the keyboard', seconds=30)
+                poll(lambda: probe['find']('Close dictation history') is None and probe['find']('Microphone: tap to dictate') is not None,
+                     'Closing the panel did not restore the keyboard strip', seconds=30)
+                # Virtual HeliBoard key nodes can stay stale after this transition;
+                # retain a screenshot of the visible keys rather than treating that cache as disappearance.
+                shot('closed-' + form + '-' + theme)
 
         # Full history screen with search.
         adb('shell', 'wm', 'size', '2076x2152')

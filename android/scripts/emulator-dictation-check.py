@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """Native watcher for real IME tap/hold, partial/final, Ripple evidence and typing."""
-import shlex
 
 
 def check(p, work, output):
     adb = p['adb']
+    failures = []
     for theme in ('light', 'dark'):
         adb('shell', 'cmd', 'uimode', 'night', 'yes' if theme == 'dark' else 'no')
         p['fresh_editor']()
         for mode in ('tap', 'hold'):
             if mode == 'hold':
                 p['click']('More keys')
-                target = p['wait_for']('Voice input')
+                try:
+                    target = p['wait_for']('Voice input', 10)
+                except AssertionError:
+                    data = adb('exec-out', 'screencap', '-p')
+                    (output / (theme + '-hold-control-missing.png')).write_bytes(data[data.index(b'\x89PNG'):])
+                    failures.append(theme + ': no accessible Voice input hold target')
+                    print('FAIL:', failures[-1], flush=True)
+                    continue
             else:
                 target = p['wait_for']('Microphone: tap to dictate')
             x, y = p['center'](target)
@@ -31,3 +38,4 @@ def check(p, work, output):
             assert len(p['editor_text']()) > len(before), 'Typing after dictation failed'
             print('PASS:', theme, mode, 'partial/final and typing; listening screenshot captured on device', flush=True)
     p['crash_check']()
+    assert not failures, '; '.join(failures)

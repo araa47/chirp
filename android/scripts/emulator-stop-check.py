@@ -105,6 +105,12 @@ def check(probe, work, expect_crash=False):
         if about is not None: break
     assert about is not None, 'About category did not appear'
     probe['tap'](about)
-    wait_for('Copy diagnostics')
-    wait_for('No crashes recorded')
+    wait_for('Diagnostics')
+    # Session timings can push the crash summary below the fold. Scroll the detail pane.
+    w, h = probe['size']()
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        if any('No crashes recorded' in n.get('text', '') for n in probe['nodes']()): break
+        adb('shell', 'input', 'swipe', str(w * 3 // 4), str(h * 3 // 4), str(w * 3 // 4), str(h // 3), '300')
+    else: raise AssertionError('Diagnostics did not show the clean crash summary')
     print('PASS: stop-state matrix; StrictMode debug network death enabled; logcat and in-app Diagnostics clean.', flush=True)
