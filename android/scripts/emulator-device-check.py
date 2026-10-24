@@ -16,6 +16,7 @@ def onboarding(p):
     adb('shell', 'ime', 'disable', p['IME'])
     adb('shell', 'am', 'start', '-n', package + '/.SetupActivity')
     wait('Dictate anywhere'); click('Get started')
+    wait('How you’ll dictate'); click('Use Chirp Keyboard'); click('Continue')
     wait('Turn on Chirp Keyboard'); click('Enable Chirp Keyboard')
     wait('Keyboard apps')
     adb('shell', 'ime', 'enable', p['IME']); adb('shell', 'ime', 'set', p['IME'])
@@ -70,14 +71,19 @@ def check(p, work, output):
 
     def floating():
         p['fresh_editor']()
+        # The bubble deliberately hides while Chirp Keyboard is selected.
+        adb('shell', 'ime', 'set', 'com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME')
         enable(FLOATING)
-        # Refocus after service connection so an input-focus event is delivered.
-        p['focus_editor']()
-        label = 'Chirp microphone: tap to dictate, hold to talk'
+        field = next(n for n in nodes() if n.get('class') == 'android.widget.EditText')
+        x1, y1, x2, y2 = p['bounds'](field)
+        adb('shell', 'input', 'tap', str(x1 + 80), str(y1 + 80))
+        label = 'Chirp microphone:'
         bubble = wait(label)
         before = p['editor_text']()
         p['tap'](bubble)
-        wait('Listening…')
+        adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/',
+            'dev.chirp.smoke.UiHierarchy', 'watch', 'Listening…', '/sdcard/chirp-floating-listening.png')
+        adb('pull', '/sdcard/chirp-floating-listening.png', str(output / 'floating-listening.png'))
         # Accessibility insertion commits on final, rather than composing in the target.
         time.sleep(4)
         # The expanded panel has its own stop mic; avoid the IME window.
