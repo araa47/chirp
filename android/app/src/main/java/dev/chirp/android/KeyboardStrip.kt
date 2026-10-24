@@ -372,7 +372,9 @@ private class RippleArcs(context: Context) : View(context) {
         paint.strokeWidth = stroke
         // Arcs radiate from the mic at the row's end: centres on the right edge, bulging left over the status.
         val centreX = width.toFloat() + stroke
-        val span = width * 1.15f
+        // The meter is much wider than it is tall. A width-sized radius
+        // puts the left side of every steady arc outside this short viewport.
+        val span = minOf(width * .45f, height * .44f)
         if (animate) {
             val period = ripplePeriod(level)
             for (index in 0..2) {

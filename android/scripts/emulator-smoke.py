@@ -18,7 +18,7 @@ SERIAL = emulator_serial()
 PACKAGE = 'dev.chirp.android'
 IME = PACKAGE + '/.ChirpImeService'
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'docs/screenshots/android'
+OUT = Path(os.environ.get('CHIRP_E2E_OUTPUT', ROOT / 'docs/screenshots/android'))
 
 
 def adb(*args):
@@ -29,7 +29,12 @@ def adb(*args):
 
 
 def nodes():
-    adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/', 'dev.chirp.smoke.UiHierarchy')
+    for attempt in range(2):
+        try:
+            adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/', 'dev.chirp.smoke.UiHierarchy')
+            break
+        except RuntimeError:
+            if attempt: raise
     return list(ET.fromstring(adb('shell', 'cat', '/sdcard/chirp-windows.xml')).iter('node'))
 
 
@@ -52,6 +57,10 @@ def tap(node):
 
 
 def find(label, hierarchy=None):
+    hierarchy = nodes() if hierarchy is None else hierarchy
+    if label == 'Microphone: tap to dictate':
+        ime = [n for n in hierarchy if n.get('content-desc', '').startswith(label + ',') and visible(n)]
+        if ime: return ime[-1]
     matches = [n for n in (nodes() if hierarchy is None else hierarchy)
                if visible(n) and (label in n.get('text', '').split('\n') or label in n.get('content-desc', ''))]
     return matches[-1] if matches else None
@@ -62,7 +71,8 @@ def size():
 
 
 def click(label):
-    for _ in range(7):
+    started = time.monotonic()
+    for _ in range(12):
         hierarchy = nodes()
         matches = [n for n in hierarchy if visible(n) and (label in n.get('text', '').split('\n') or label in n.get('content-desc', ''))]
         actionable = [n for n in matches if n.get('clickable') == 'true' or any(
@@ -70,6 +80,8 @@ def click(label):
         if actionable:
             tap(actionable[-1])
             return
+        if time.monotonic() - started < 12:
+            continue  # Let a popup finish opening; a scroll would dismiss it.
         w, h = size()
         adb('shell', 'input', 'swipe', str(w // 2), str(h * 4 // 5), str(w // 2), str(h // 3), '250')
     raise AssertionError('Missing accessible action: ' + label)
@@ -106,7 +118,7 @@ def focus_editor():
                 # boundsInScreen is not clipped to the viewport: a mostly-below-fold field
                 # still reports its full height, and its centre tap lands off screen. Only
                 # tap when the centre is comfortably inside the visible area.
-                x1, y1, x2, y2 = [int(v) for v in editor.get('bounds').strip('[]').replace('][', ',').split(',')]
+                x1, y1, x2, y2 = bounds(editor)
                 cy = (y1 + y2) // 2
                 if 100 < cy < h - 120:
                     x, y = center(editor)
@@ -118,17 +130,32 @@ def focus_editor():
     raise AssertionError('Test editor is not visible')
 
 
+def wait_for_editor():
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        if any(n.get('class') == 'android.widget.EditText' for n in nodes()): return
+    raise AssertionError('Scratchpad editor did not open')
+
+
 def fresh_editor():
+    if os.environ.get('CHIRP_E2E_NATIVE_EDITOR') == '1':
+        adb('shell', 'am', 'force-stop', PACKAGE)
+        adb('shell', 'ime', 'enable', IME)
+        adb('shell', 'ime', 'set', IME)
+        adb('shell', 'am', 'start', '-n', PACKAGE + '/.E2eEditorActivity')
+        wait_for_editor()
+        focus_editor()
+        return
     adb('shell', 'cmd', 'statusbar', 'collapse')
     adb('shell', 'am', 'force-stop', PACKAGE)
     # Android falls back to Gboard when the selected IME package is force-stopped.
     adb('shell', 'ime', 'enable', IME)
     adb('shell', 'ime', 'set', IME)
     adb('shell', 'am', 'start', '-n', PACKAGE + '/.SetupActivity', '--es', 'section', 'try')
-    # Notes is the launcher destination; its Dictate action opens the Scratchpad editor.
+    # Notes is the launcher destination; Dictate opens Scratchpad.
     wait_for('Dictate', 60)
     click('Dictate')
-    wait_for('Dictate, then edit here', 60)
+    wait_for_editor()
     focus_editor()
 
 

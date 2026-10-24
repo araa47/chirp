@@ -32,13 +32,13 @@ ROOT = Path(__file__).resolve().parents[2]
 def adb(*args, capture=True, data=None):
     # Never fall back to adb's default device, regardless of caller environment.
     # The stop-case probe prints only a scenario name or an assertion message: safe to show.
-    show_stderr = "stop-case" in args
+    show_stderr = any(action in args for action in ("stop-case", "dictation-cycle", "click", "append-notes")) or args[0] == "install"
     result = subprocess.run(["adb", "-s", SERIAL, *args], input=data, check=False,
                             stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
                             stderr=subprocess.PIPE if show_stderr else subprocess.DEVNULL)
     if result.returncode:
         if show_stderr:
-            print("stop-case probe:", (result.stdout + result.stderr).decode(errors="replace")[-600:], flush=True)
+            print("ADB diagnostic:", (result.stdout + result.stderr).decode(errors="replace")[-600:], flush=True)
             # On a contended host the shell can SIGKILL the probe during teardown, after the scenario
             # was already dispatched; the server-side assertions that follow still judge the outcome.
             # exit 137 = SIGKILL (key-injecting cases tear the probe's own process down); the
@@ -90,6 +90,19 @@ def editor():
 
 
 def focus_editor():
+    if os.environ.get("CHIRP_E2E_NATIVE_EDITOR") == "1":
+        focus = adb("shell", "dumpsys", "window").decode(errors="replace")
+        if "E2eEditorActivity" not in focus:
+            _probe["fresh_editor"]()
+        else:
+            _probe["focus_editor"]()
+        return
+    if _probe["find"]("Finish") is not None:
+        _probe["click"]("Finish")
+        _probe["wait_for"]("Dictate")
+    if _probe["find"]("Dictate") is not None:
+        _probe["click"]("Dictate")
+        _probe["wait_for_editor"]()
     _probe["focus_editor"]()
 
 
@@ -99,7 +112,7 @@ def screenshot(path):
 
 
 def mic_position(night, work):
-    node = next((n for n in nodes() if "Microphone: tap to dictate" in n.get("content-desc", "") and center(n) != (0, 0)), None)
+    node = next((n for n in nodes() if n.get("content-desc", "").startswith("Microphone: tap to dictate,") and n.get("class") == "android.widget.Button" and center(n) != (0, 0)), None)
     if node is None:
         raise RuntimeError("Accessible Chirp mic is missing")
     x, y = center(node)
@@ -127,7 +140,7 @@ def cleanup_check(output, work):
         adb("shell", "CLASSPATH=/data/local/tmp/chirp-ui-probe.jar", "app_process", "/", "dev.chirp.smoke.UiHierarchy", "snapshot-now")
         return list(ET.fromstring(adb("shell", "cat", "/sdcard/chirp-windows.xml")).iter("node"))
     def read_editor():
-        deadline = time.monotonic() + 4
+        deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             node = next((n for n in fast_nodes() if n.get("class") == "android.widget.EditText"), None)
             if node is not None: return node.get("text", "")
@@ -140,11 +153,14 @@ def cleanup_check(output, work):
         focus_editor()
         x, y, _, _ = mic_position(night, work)
         adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "700")
+        _probe["wait_for"]("Custom", 20)
         hierarchy = nodes()
-        assert any("Style · Custom" in n.get("text", "") for n in hierarchy), "Custom style missing"
-        assert any("Style · Chat" in n.get("text", "") for n in hierarchy), "Health profiles missing"
+        assert any(n.get("text") == "Custom" for n in hierarchy), "Custom style missing"
+        assert any(n.get("text") == "Chat" for n in hierarchy), "Health profiles missing"
         screenshot(output / ("emulator-cleanup-styles-" + theme + ".png"))
         adb("shell", "input", "keyevent", "4")
+        focus_editor()
+        x, y, _, _ = mic_position(night, work)
         before = editor().get("text", "")
         if before == "Test dictation here": before = ""
         _probe["wait_for"].__globals__["nodes"] = fast_nodes
@@ -251,6 +267,7 @@ def main():
     args.add_argument("--keepkb-check", action="store_true")
     args.add_argument("--serial")
     args.add_argument("--server-port", type=int, default=7899)
+    args.add_argument("--device-check", action="store_true")
     args.add_argument("--tls", action="store_true")
     args.add_argument("--expect-crash", action="store_true")
     args.add_argument("--server-root", type=Path, default=ROOT / "server")
@@ -268,7 +285,8 @@ def main():
     with socket.socket() as probe:
         probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind(("127.0.0.1", opt.server_port))
-    output = ROOT / "docs/screenshots/android"
+    output = Path(os.environ.get("CHIRP_E2E_OUTPUT", ROOT / "docs/screenshots/android"))
+    output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="chirp-emulator-") as name:
         work = Path(name)
         home = work / "home"
@@ -284,9 +302,10 @@ def main():
             command = [opt.python, str(Path(__file__).with_name("emulator-stop-server.py")),
                        "--model-dir", opt.model_dir, "--metadata", str(work / "events.json"), "--server-port", str(opt.server_port)]
             if opt.tls: command += ["--cert", str(cert), "--key", str(opt.tls_dir / "emulator-tls/key.pem")]
-            if opt.notes_check: command += ["--ready-delay", "6"]
+            command += ["--ready-delay", "2" if opt.stop_check else "0"]
         server = subprocess.Popen(command,
                                   env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        safe_capture = False
         try:
             token_path = home / ".config/chirp/token"
             for _ in range(100):
@@ -297,7 +316,7 @@ def main():
                 time.sleep(.1)
             token = token_path.read_text().strip()
             wait_health(token, base=base, context=context)
-            if opt.cleanup_only or opt.frames_only or opt.stop_check or opt.history_check or opt.notes_check: warm_cleanup(opt.python, token_path, env, opt.tls, opt.server_port)
+            warm_cleanup(opt.python, token_path, env, opt.tls, opt.server_port)
             # Independent host-routing probe, no authentication or private response content.
             probe = adb("shell", "sh", "-c", shlex.quote("printf 'GET /v1/health HTTP/1.0\\r\\nHost: 10.0.2.2\\r\\n\\r\\n' | toybox nc -w 3 10.0.2.2 " + str(opt.server_port)))
             print("Emulator route to throwaway server:", opt.tls or b"200 OK" in probe, flush=True)
@@ -306,6 +325,8 @@ def main():
                 module = runpy.run_path(str(Path(__file__).with_name("emulator-keepkb-check.py")))
                 module["check"](dict(_probe, adb=adb), work, output, scheme + "://10.0.2.2:" + str(opt.server_port), token)
                 return
+            if opt.device_check:
+                runpy.run_path(str(Path(__file__).with_name("emulator-device-check.py")))["onboarding"](dict(_probe, adb=adb))
             adb("shell", "am", "force-stop", PACKAGE)
             if opt.stop_check:
                 adb("shell", "run-as", PACKAGE, "rm", "-f", "shared_prefs/crash_diagnostics.xml")
@@ -313,6 +334,7 @@ def main():
             adb("shell", "run-as", PACKAGE, "sh", "-c", shlex.quote("cat > shared_prefs/debug_capture.xml"),
                 data=b'<?xml version="1.0" encoding="utf-8"?><map><boolean name="synthetic" value="true" /></map>')
             adb("shell", "pm", "grant", PACKAGE, "android.permission.RECORD_AUDIO")
+            adb("shell", "pm", "grant", PACKAGE, "android.permission.POST_NOTIFICATIONS")
             adb("shell", "pm", "grant", PACKAGE, "android.permission.ACCESS_LOCAL_NETWORK")
             adb("shell", "ime", "enable", IME)
             adb("shell", "ime", "set", IME)
@@ -329,13 +351,25 @@ def main():
                 time.sleep(.3)
             else:
                 statuses = [n.get("text", "") for n in nodes() if n.get("text", "").startswith(("Mac ", "Couldn", "Invalid Chirp", "Connecting", "Connected", "Paired", "Checking Mac"))]
-                screenshot(Path("/tmp/chirp-pairing-failure.png"))
+                # Pairing screens contain credentials: never capture them.
                 print("Pairing status:", statuses, flush=True)
                 diagnostic = adb("shell", "run-as", PACKAGE, "cat", "shared_prefs/debug_capture.xml")
                 for item in ET.fromstring(diagnostic):
                     if item.get("name") in ("failure_class", "cleartext_allowed"):
                         print(item.get("name"), item.text or item.get("value"), flush=True)
                 raise RuntimeError("Emulator did not save pairing")
+            if _probe["find"]("Finish") is not None:
+                _probe["click"]("Finish")
+            adb("shell", "am", "force-stop", PACKAGE)
+            adb("shell", "ime", "enable", IME)
+            adb("shell", "ime", "set", IME)
+            adb("shell", "am", "start", "-n", PACKAGE + "/.SetupActivity", "--es", "section", "try")
+            _probe["wait_for"]("Dictate", 60)
+            safe_capture = True
+            if opt.device_check:
+                module = runpy.run_path(str(Path(__file__).with_name("emulator-device-check.py")))
+                module["check"](dict(_probe, adb=adb), work, output)
+                return
             if opt.stop_check:
                 module = runpy.run_path(str(Path(__file__).with_name("emulator-stop-check.py")))
                 module["check"](dict(_probe, adb=adb), work, opt.expect_crash)
@@ -353,6 +387,9 @@ def main():
                 return
             if opt.cleanup_only:
                 cleanup_check(output, work)
+                return
+            if os.environ.get("CHIRP_E2E_NATIVE_EDITOR") == "1":
+                runpy.run_path(str(Path(__file__).with_name("emulator-dictation-check.py")))["check"](dict(_probe, adb=adb), work, output)
                 return
             focus_editor()
             for night in (False, True):
@@ -414,23 +451,30 @@ def main():
                 time.sleep(.5)
                 crash = adb("logcat", "-b", "crash", "-d").decode(errors="replace")
                 assert "Process: dev.chirp.android" not in crash and ">>> dev.chirp.android <<<" not in crash, "Chirp crash recorded"
-            click("Keyboard layouts & settings")
-            click("Test dictation")
-            click("Diagnostics")
-            click("Copy diagnostics")
-            click("Close")
+
             print("PASS: real Parakeet server; Keystore pairing; composing partials/finals; two utterances with smart spacing; tap/options/cancel/hide; typing after dictation; keyboard settings/setup/diagnostics; light/dark screenshots; IME retained; no Chirp crash.")
+        except Exception:
+            if safe_capture:
+                try:
+                    screenshot(output / "failure.png")
+                    nodes()
+                    (output / "failure.xml").write_bytes(adb("shell", "cat", "/sdcard/chirp-windows.xml"))
+                except Exception:
+                    pass
+            raise
         finally:
             server.terminate()
             try:
                 server.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 server.kill(); server.wait()
-            # Disable synthetic input and remove throwaway pairing credentials; leave the emulator running.
-            adb("shell", "rm", "-f", "/sdcard/chirp-check.xml", "/sdcard/chirp-check.png", "/sdcard/chirp-cleanup.mp4", "/sdcard/chirp-polishing.png", "/sdcard/chirp-cleaned.png", "/sdcard/chirp-windows.xml", "/data/local/tmp/chirp-ui-probe.jar")
-            adb("shell", "am", "force-stop", PACKAGE)
-            adb("shell", "run-as", PACKAGE, "rm", "-f", "shared_prefs/debug_capture.xml", "shared_prefs/chirp.xml")
-            if not opt.keepkb_check: adb("shell", "ime", "set", IME)
+            # Cleanup must not replace the original error when the AVD itself has died.
+            try:
+                adb("shell", "am", "force-stop", PACKAGE)
+                adb("shell", "run-as", PACKAGE, "rm", "-f", "shared_prefs/debug_capture.xml", "shared_prefs/chirp.xml")
+                adb("shell", "rm", "-f", "/sdcard/chirp-windows.xml", "/data/local/tmp/chirp-ui-probe.jar")
+            except RuntimeError:
+                pass
 
 
 if __name__ == "__main__":

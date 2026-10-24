@@ -39,7 +39,7 @@ def check(probe, work, expect_crash=False):
             data=('<map><boolean name="synthetic" value="true"/><long name="initial_frame_delay_ms" value="' +
                   ('4000' if case == 'immediate' else '0') + '"/></map>').encode())
         probe['fresh_editor']()
-        mic = wait_for('Microphone: tap to dictate')
+        mic = next(n for n in probe['nodes']() if n.get('content-desc', '').startswith('Microphone: tap to dictate,') and n.get('class') == 'android.widget.Button')
         before = probe['editor_text']()
         x, y = probe['center'](mic)
         # The first menu item must expose the default without toggling it on.
@@ -50,8 +50,13 @@ def check(probe, work, expect_crash=False):
             if off is not None: probe['tap'](off)
             else: adb('shell', 'input', 'keyevent', '4')
         else:
-            wait_for('Clean-up: on ✓')
+            switch = wait_for('Clean-up, Correction on Mac')
+            assert switch.get('checked') == 'true', 'Clean-up was not on by default'
             adb('shell', 'input', 'keyevent', '4')
+        probe["focus_editor"]()
+        mic = next(n for n in probe["nodes"]() if n.get("content-desc", "").startswith("Microphone: tap to dictate,") and n.get("class") == "android.widget.Button")
+        x, y = probe["center"](mic)
+        (work / "events.json").write_text("{}")
         try:
             adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/',
                 'dev.chirp.smoke.UiHierarchy', 'stop-case', case, str(x), str(y))
@@ -92,7 +97,20 @@ def check(probe, work, expect_crash=False):
     assert not expect_crash, 'Baseline did not reproduce the reported TLS crash'
     # A new task drops the test editor's focus/scroll state before opening Diagnostics (Chirp settings → About).
     adb('shell', 'am', 'start', '-f', '0x10008000', '-n', package + '/.SetupActivity', '--es', 'section', 'settings')
+    # About also prefixes the recogniser's info button. Match the category text exactly.
+    deadline = time.monotonic() + 60
+    about = None
+    while time.monotonic() < deadline:
+        about = next((n for n in probe['nodes']() if n.get('text') == 'About'), None)
+        if about is not None: break
+    assert about is not None, 'About category did not appear'
+    probe['tap'](about)
     wait_for('Diagnostics')
-    click('Diagnostics')
-    wait_for('No crashes recorded')
+    # Session timings can push the crash summary below the fold. Scroll the detail pane.
+    w, h = probe['size']()
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        if any('No crashes recorded' in n.get('text', '') for n in probe['nodes']()): break
+        adb('shell', 'input', 'swipe', str(w * 3 // 4), str(h * 3 // 4), str(w * 3 // 4), str(h // 3), '300')
+    else: raise AssertionError('Diagnostics did not show the clean crash summary')
     print('PASS: stop-state matrix; StrictMode debug network death enabled; logcat and in-app Diagnostics clean.', flush=True)
