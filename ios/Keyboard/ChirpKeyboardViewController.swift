@@ -432,6 +432,11 @@ final class ChirpKeyboardViewController: UIInputViewController {
         fallback = "Open Chirp manually if iOS refuses. Return here using Back to app or the app switcher."
         render()
         guard let url = URL(string: "chirp://session/start") else { return }
+        if openThroughApplication(url) {
+            fallback = "Set up the session in Chirp, then return using the app switcher."
+            render()
+            return
+        }
         // The completion's thread is unspecified; @Sendable keeps it free of main-actor isolation checks.
         extensionContext?.open(url, completionHandler: { @Sendable [weak self] opened in
             Task { @MainActor [weak self] in
@@ -441,6 +446,23 @@ final class ChirpKeyboardViewController: UIInputViewController {
                 self?.render()
             }
         })
+    }
+    /// `extensionContext.open` always fails for keyboards (it serves Today widgets only). The UIApplication at
+    /// the end of the responder chain still opens URLs, but its `open(_:options:)` is extension-unavailable,
+    /// so it is called through its selector. Personal-install only: an App Store review risk (see README).
+    private func openThroughApplication(_ url: URL) -> Bool {
+        let selector = NSSelectorFromString("openURL:options:completionHandler:")
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let application = current as? UIApplication, application.responds(to: selector) {
+                typealias Open = @convention(c) (AnyObject, Selector, NSURL, NSDictionary, (@convention(block) (Bool) -> Void)?) -> Void
+                let open = unsafeBitCast(application.method(for: selector), to: Open.self)
+                open(application, selector, url as NSURL, [:] as NSDictionary, nil)
+                return true
+            }
+            responder = current.next
+        }
+        return false
     }
 
     // MARK: Delete press-and-hold

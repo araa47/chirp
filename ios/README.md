@@ -14,14 +14,20 @@ never used.
 This is a **personal install** target. No App Store distribution, TestFlight or
 ad-hoc readiness is claimed or tested.
 
-## Status: runs end to end on iPhone and iPad simulators; not yet on a device (2026-10-24)
+## Status: runs end to end on iPhone and iPad simulators; first iPad install done (2026-10-25)
 
 The app, keyboard and widgets **build** with full Xcode, and the unit and UI
 tests **pass on an iPhone and an iPad simulator**. The UI tests include a
 **live run against a real local chirp-server** (throwaway HOME, port 7899,
 real Parakeet model, spoken `say` audio) and the **real installed Chirp
-Keyboard** dictating into Messages. **Nothing has been installed, signed for or
-run on a physical iPhone or iPad yet.**
+Keyboard** dictating into Messages.
+
+**First device install (2026-10-25):** an iPad Pro 13-inch (M4) on iPadOS 26.7.1,
+free Personal Team signing, installed with `xcrun devicectl device install app`.
+The app launched and paired, Chirp Keyboard turned on with Full Access, and
+the keyboard's **Open Chirp to start session** button opened Chirp and armed a
+session. On-device dictation quality, Live Notes and an iPhone install are
+still unchecked.
 
 | Check (2026-10-24, iOS 27.0 simulators) | Result |
 |---|---|
@@ -643,16 +649,19 @@ ios/
   locked, the Live Activity and Dynamic Island buttons, call interruptions and
   battery use need an operator check on an iPhone and an iPad; the simulator
   covers the flows with synthetic and file audio only.
-- **Not yet run on a device.** Simulator build, unit, UI and live-server gates
-  pass on iPhone and iPad; signing, provisioning, the real microphone and every
-  on-device check are still operator steps.
+- **Only one device install so far.** One iPad (see Status); no iPhone yet,
+  and most on-device checks (real microphone quality, Live Notes, background
+  survival) are still operator steps.
 - **Secure fields hide Chirp Keyboard for the whole screen** (seen on the
   iOS 27.0 simulator): while a password field is visible, iOS uses Apple's
   keyboard for the screen's other fields too.
 - **Personal install only.** No App Store readiness; the keyboard's URL-open
   handoff is a known App Store review risk.
 - **The keyboard has no microphone, ever** (Apple sandbox). A session must be
-  armed in the app; the first-tap handoff can fail and needs a manual open.
+  armed in the app. `extensionContext.open` always fails for keyboards, so the
+  keyboard opens `chirp://session/start` through the UIApplication in its
+  responder chain (works on iPadOS 26.7.1); if iOS ever refuses it, the keyboard
+  says so and Chirp must be opened by hand.
 - **No automatic return** to your editor and no guaranteed cold/background
   microphone start from companion controls.
 - **"Never" session length is not forever**: iOS may suspend or terminate the
