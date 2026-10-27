@@ -147,11 +147,12 @@ for g in $GATES; do
     log=$OUT/$g.log
     override=CHIRP_GATE_CMD_$(printf '%s' "$g" | tr '[:lower:]' '[:upper:]')
     cmd=${!override:-$(gate_command "$g")}
+    lock=$(gate_lock "$g")
+    [ -z "${!override:-}" ] || lock=  # a stubbed gate needs no lease
     post_status pending "$ctx" "Running on $(hostname -s)"
     echo "== $g: $cmd"
     start=$(date +%s)
     state=success
-    lock=$(gate_lock "$g")
     if [ -n "$lock" ] && ! acquire_lease "$lock"; then
         echo "could not get the $lock lease within 2 hours" >"$log"
         state=error
