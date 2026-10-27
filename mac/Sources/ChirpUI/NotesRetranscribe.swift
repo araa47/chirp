@@ -432,7 +432,7 @@ final class NotesRetranscribeController {
         let health = deps.health()
         let withAudio = Set(document.audio.map(\.id))
         let spoken = document.segments.filter { !$0.isGap && !$0.text.isEmpty }
-        let leaves = health?.correctionLeavesMachine == true && deps.settings.correction
+        let leaves = health?.correctionLeavesMachine == true && deps.settings.permitsCorrection(health: health)
         deps.window.retranscribeOffer = NotesRetranscribeOffer(
             note: id, title: document.isEmpty && document.userTitle == nil ? NotesLibraryText.untitled : document.title,
             segment: segment, clips: clips.count, audio: clips.reduce(0) { $0 + $1.duration },

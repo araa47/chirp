@@ -306,12 +306,13 @@ public final class Preferences: @unchecked Sendable {
         if let choice = notesStructure, (notesStructureScope ?? "local") == Self.notesStructureScope(for: health) { return choice }
         return health.correctionLeavesMachine != true
     }
-    /// The `start` options for a Live Notes segment: the clean-up toggle (when the server offers it) with the server's
-    /// hidden `live_notes` style, whose prompt is tuned to its guard, so no edited prompt goes along. An older server
-    /// gets the default style with the user's edited default prompt. Per-app styles never apply. Word timings always:
-    /// they trim an overlapped cut to one copy of each word and place words on the speaker timeline.
+    /// The `start` options for a Live Notes segment: clean-up as dictation has it (`permitsCorrection`: never by default
+    /// for an external or unknown destination) with the server's hidden `live_notes` style, whose prompt is tuned to its
+    /// guard, so no edited prompt goes along. An older server gets the default style with the user's edited default
+    /// prompt. Per-app styles never apply. Word timings always: they trim an overlapped cut to one copy of each word and
+    /// place words on the speaker timeline.
     public func notesStartOptions(health: Health?) -> StartOptions {
-        let enabled = correction && (health?.correctionAvailable ?? false)
+        let enabled = permitsCorrection(health: health)
         if health?.notesCorrection == true {
             return StartOptions(client: "mac", correction: enabled, correctionProfile: CorrectionProfile.liveNotesID,
                                 wordTimings: true)

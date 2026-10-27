@@ -231,6 +231,29 @@ final class NotesURLStub: URLProtocol, @unchecked Sendable {
         #expect(Preferences(defaults: defaults).notesTab == "split")
     }
 
+    /// Clean-up nobody chose follows dictation: on for a local destination, never for an external or unknown one.
+    @Test func segmentsCleanUpByDefaultOnlyWhereDictationWould() {
+        let name = "chirp-test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let prefs = Preferences(defaults: defaults)
+        let local = Health(correction: "available", correctionLeavesMachine: false)
+        let external = Health(correction: "available", correctionLeavesMachine: true, correctionHost: "cleanup.example")
+        let unknown = Health(correction: "available")
+        #expect(prefs.notesStartOptions(health: local).correction)
+        #expect(!prefs.notesStartOptions(health: external).correction)
+        #expect(!prefs.notesStartOptions(health: unknown).correction)
+        #expect(!prefs.notesStartOptions(health: Health(correction: "available", correctionLeavesMachine: true,
+                                                         correctionHost: "cleanup.example", notesCorrection: true)).correction)
+        for health in [local, external, unknown] {
+            #expect(prefs.notesStartOptions(health: health).correction == prefs.permitsCorrection(health: health))
+        }
+        prefs.correction = true
+        #expect(prefs.notesStartOptions(health: external).correction)
+        prefs.correction = false
+        #expect(!prefs.notesStartOptions(health: local).correction)
+    }
+
     @Test func segmentsUseTheDefaultStyleAndTheEditedDefaultPrompt() {
         let name = "chirp-test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
