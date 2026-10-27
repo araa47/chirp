@@ -1,12 +1,12 @@
 import AppKit
 import SwiftUI
+import Observation
 
 /// The Pond design system: the koi-patterned bird identity as semantic tokens.
 ///
 /// Colour tokens are dynamic light/dark colours built the way `HUDColors` builds its own (an
 /// `NSColor(name:dynamicProvider:)` wrapped in `Color`), so they resolve live with the appearance.
-/// Body text keeps `.primary`/`.secondary` — Increase Contrast and system text sizes still work;
-/// these tokens cover the brand surfaces and accents the system has no equivalent for.
+/// Native chrome follows the system; content uses explicit, view-owned text sizing below.
 public enum ChirpColor {
     public typealias RGB = (r: Double, g: Double, b: Double)
 
@@ -173,5 +173,72 @@ public enum ChirpBrand {
         context.fill(CGRect(x: 0, y: 0, width: pixels, height: pixels))
         guard let tinted = context.makeImage() else { return nil }
         return NSImage(cgImage: tinted, size: NSSize(width: size, height: size))
+    }
+}
+
+/// Explicit content sizing. Each window/model owns its instance; no shared mutable font state.
+@MainActor @Observable
+public final class ChirpTextSize {
+    public static let steps: [CGFloat] = [1, 1.15, 1.3, 1.5, 1.75, 2]
+    public private(set) var factor: CGFloat
+    public init(factor: CGFloat = 1) { self.factor = Self.steps.min(by: { abs($0 - factor) < abs($1 - factor) }) ?? 1 }
+    public var percent: String { "\(Int((factor * 100).rounded()))%" }
+    public var canIncrease: Bool { factor < 2 }
+    public var canDecrease: Bool { factor > 1 }
+    public func increase() { factor = Self.steps.first(where: { $0 > factor }) ?? 2 }
+    public func decrease() { factor = Self.steps.last(where: { $0 < factor }) ?? 1 }
+    public func reset() { factor = 1 }
+}
+
+private struct ChirpTextScaleKey: EnvironmentKey { static let defaultValue: CGFloat = 1 }
+extension EnvironmentValues {
+    var chirpTextScale: CGFloat {
+        get { self[ChirpTextScaleKey.self] }
+        set { self[ChirpTextScaleKey.self] = newValue }
+    }
+}
+
+/// Content roles retain their hierarchy at every size. Native menu/toolbar control chrome remains native.
+enum ChirpTextRole {
+    case title, section, body, callout, meta, keycap, caption
+    var points: CGFloat {
+        switch self { case .title: 26; case .section: 19; case .body: 15; case .callout: 13; case .meta, .keycap, .caption: 12 }
+    }
+}
+private struct PondFont: ViewModifier {
+    @Environment(\.chirpTextScale) private var scale
+    let size: CGFloat
+    let weight: Font.Weight
+    let design: Font.Design
+    let digits: Bool
+    func body(content: Content) -> some View {
+        let font = Font.system(size: size * scale, weight: weight, design: design)
+        content.font(digits ? font.monospacedDigit() : font)
+    }
+}
+extension View {
+    func pondFont(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, digits: Bool = false) -> some View {
+        modifier(PondFont(size: size, weight: weight, design: design, digits: digits))
+    }
+    func pondFont(_ role: ChirpTextRole, weight: Font.Weight = .regular, design: Font.Design = .default) -> some View {
+        pondFont(role.points, weight: weight, design: design)
+    }
+}
+
+/// The History window's text size (Notes has View ▸ Bigger/Smaller Text): a toolbar menu with the same steps.
+struct TextSizeControl: View {
+    let size: ChirpTextSize
+    var body: some View {
+        Menu {
+            Text("Text size: " + size.percent)
+            Button("Bigger Text", action: size.increase).keyboardShortcut("+", modifiers: .command).disabled(!size.canIncrease)
+            Button("Smaller Text", action: size.decrease).keyboardShortcut("-", modifiers: .command).disabled(!size.canDecrease)
+            Button("Actual Size", action: size.reset).keyboardShortcut("0", modifiers: .command).disabled(size.factor == 1)
+        } label: {
+            Label("Text Size", systemImage: "textformat.size")
+        }
+        .help("Text size: " + size.percent + " (up to 200%)")
+        .accessibilityLabel("Text Size")
+        .accessibilityValue(size.percent)
     }
 }

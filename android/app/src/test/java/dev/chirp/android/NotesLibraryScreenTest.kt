@@ -215,6 +215,93 @@ class NotesLibraryScreenTest {
         compose.runOnIdle { assertTrue(library.open(id)!!.entry.deleted) }
     }
 
+    @Test fun `while a note records the primary action opens it and a new recording stays deliberate`() {
+        note("Garden plans", "- Buy seeds")
+        show()
+        compose.runOnIdle { live.model.rename("Product conversation"); live.record().final("We can keep the first release small."); live.idle() }
+        val recordingId = live.model.document.uid
+        // The pinned card is the same note the primary action opens; neither stops nor replaces it.
+        compose.onNodeWithContentDescription("Open the current recording").performClick()
+        loaded("Product conversation")
+        assertEquals(recordingId, live.model.document.uid)
+        assertEquals(NotesRecorder.State.RECORDING, live.model.state)
+        compose.onNodeWithText("Start a new recording?").assertDoesNotExist()
+        back()
+        compose.onNodeWithText("Start a new recording?").assertDoesNotExist()
+        // A deliberate new recording stays behind a named action and its confirmation.
+        compose.onNodeWithContentDescription("Library options").performClick()
+        compose.onNodeWithText("Record new note").performClick()
+        compose.onNodeWithText("Start a new recording?").assertIsDisplayed()
+        compose.onNodeWithText("Cancel").performClick()
+        assertEquals(NotesRecorder.State.RECORDING, live.model.state)
+    }
+
+    @Test fun `while a note is paused the primary action opens the same paused note`() {
+        show()
+        compose.runOnIdle { live.model.rename("Product conversation"); live.record().final("We can keep the first release small."); live.idle() }
+        compose.runOnIdle { live.model.pause(); live.idle() }
+        val recordingId = live.model.document.uid
+        compose.onNodeWithContentDescription("Open the paused recording").performClick()
+        loaded("Product conversation")
+        assertEquals(recordingId, live.model.document.uid)
+        assertEquals(NotesRecorder.State.PAUSED, live.model.state)
+        compose.onNodeWithText("Start a new recording?").assertDoesNotExist()
+    }
+
+    @Test fun `the pinned recording card is one button with truthful state and a named open action`() {
+        show()
+        compose.runOnIdle { live.model.rename("Product conversation"); live.record().final("We can keep the first release small."); live.idle() }
+        val card = compose.onNode(hasStateDescription("Recording"))
+        card.assertExists()
+        val node = card.fetchSemanticsNode()
+        assertEquals("Open the recording", node.config[androidx.compose.ui.semantics.SemanticsActions.OnClick].label)
+        // One merged node: the title and the frozen preview are announced by the card itself.
+        assertTrue(node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].any { "Product conversation" in it.text })
+        assertTrue("elapsed is available when focusing the card", node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].any { live.model.elapsedText in it.text })
+        assertTrue("one focus target", node.children.isEmpty())
+        fun quiet(n: androidx.compose.ui.semantics.SemanticsNode) {
+            if (androidx.compose.ui.semantics.SemanticsProperties.LiveRegion in n.config)
+                fail("no live region inside the recording card")
+            n.children.forEach(::quiet)
+        }
+        node.children.forEach(::quiet)
+        assertFalse(androidx.compose.ui.semantics.SemanticsProperties.LiveRegion in node.config)
+        card.performClick()
+        loaded("Product conversation")
+        assertTrue(live.model.state.active)
+    }
+
+    @Test fun `the pinned card tells paused from recording`() {
+        show()
+        compose.runOnIdle { live.model.rename("Product conversation"); live.record().final("We can keep the first release small."); live.idle() }
+        compose.runOnIdle { live.model.pause(); live.idle() }
+        compose.onNode(hasStateDescription("Paused")).assertExists()
+        compose.onNode(hasStateDescription("Recording")).assertDoesNotExist()
+    }
+
+    @Test fun `a failed open can be retried or left without stranding the library`() {
+        val id = note("Garden plans", "- Buy seeds")
+        show()
+        // The row is already displayed when its file becomes unavailable.
+        val file = File(context.filesDir, "${NotesSessions.DIR}/$id.bin")
+        val bytes = file.readBytes()
+        file.delete()
+        open("Garden plans")
+        compose.onNodeWithText("Couldn’t open this note").assertExists()
+        compose.onNodeWithText("Try again").performClick()
+        compose.onNodeWithText("Back to notes").assertExists()
+        file.writeBytes(bytes)
+        compose.onNodeWithText("Try again").performClick()
+        loaded("Garden plans")
+        back()
+        // A second missing note can be left using its visible recovery action.
+        val other = note("An earlier draft", "Synthetic draft")
+        File(context.filesDir, "${NotesSessions.DIR}/$other.bin").delete()
+        open("An earlier draft")
+        compose.onNodeWithText("Back to notes").performClick()
+        compose.onNodeWithText("Search notes").assertExists()
+    }
+
     @Test fun `browsing and renaming another note preserves the live recording`() {
         val id = note("Garden plans", "- Buy seeds")
         show()
@@ -275,7 +362,8 @@ class NotesLibraryScreenTest {
         }
     }
 
-    private fun render(width: String) {
+    private fun render(width: String, fontScale: Float = 1f) {
+        RuntimeEnvironment.setFontScale(fontScale)
         setup.mic = false
         show()
         val output = File(System.getProperty("chirp.screenshots")).apply { mkdirs() }
@@ -299,21 +387,45 @@ class NotesLibraryScreenTest {
         note("Ideas for the studio", "- A long table by the window\n- [ ] Find a reading lamp", 25)
         val deleted = note("An earlier draft", "A few thoughts worth returning to.", 50)
         library.trash(deleted); time = now
-        compose.onNodeWithText("☐ 0 open").assertDoesNotExist()
+        compose.onNodeWithText("0 open tasks").assertDoesNotExist()
         compose.onNodeWithText("0 sec").assertDoesNotExist()
         val listBottom = compose.onNodeWithTag("notes-library-list").fetchSemanticsNode().boundsInRoot.bottom
         val fabTop = compose.onNodeWithContentDescription("Record new note").fetchSemanticsNode().boundsInRoot.top
         assertTrue("list viewport stays above the capture controls", listBottom <= fabTop)
         shot("populated")
         compose.runOnIdle { live.model.rename("Product conversation"); live.record().final("We can keep the first release small."); live.idle() }
+        // The card that leads back to the live note is on screen, not inserted above the list's scroll anchor.
+        compose.onNode(hasStateDescription("Recording")).assertIsDisplayed()
         shot("recording")
+        compose.runOnIdle { live.model.pause(); live.idle() }
+        compose.onNode(hasStateDescription("Paused")).assertIsDisplayed()
+        shot("recording-paused")
+        val primary = compose.onNodeWithContentDescription("Open the paused recording").fetchSemanticsNode().boundsInRoot
+        val dictate = compose.onNodeWithContentDescription("Dictate").fetchSemanticsNode().boundsInRoot
+        val viewport = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue("paused primary stays inside screen", primary.left >= 0 && primary.right <= viewport.right)
+        assertTrue("primary and Dictate do not overlap", primary.left >= dictate.right || primary.top >= dictate.bottom || dictate.top >= primary.bottom)
+        assertTrue("measured list clears paused controls", compose.onNodeWithTag("notes-library-list").fetchSemanticsNode().boundsInRoot.bottom <= minOf(primary.top, dictate.top))
+        compose.runOnIdle { live.model.togglePause(); live.idle() }
         search("design")
-        compose.waitUntil(5000) { compose.onAllNodesWithText("Launch sync").fetchSemanticsNodes().isNotEmpty() }
+        // At 200% font the sticky recording card and the first rows share one viewport: the row is past the fold
+        // until the list is scrolled (lazy lists compose only what intersects the viewport).
+        // A new search first returns to the top; scroll once the results have settled there.
+        compose.waitUntil(5000) {
+            runCatching { compose.onNodeWithTag("notes-library-list").performScrollToNode(hasText("Launch sync")) }.isSuccess &&
+                compose.onAllNodesWithText("Launch sync").fetchSemanticsNodes().isNotEmpty()
+        }
         shot("search")
         search("summer holiday")
-        compose.waitUntil(5000) { compose.onAllNodesWithText("No results for “summer holiday”").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("No results for “summer holiday”").assertExists()
+        // A new search starts at the top, where the way back to the recording is (Connecting again after Resume).
+        compose.onNode(hasText("Product conversation") and hasClickAction()).assertIsDisplayed()
+        // At 200% on the cover the explanation sits below the card, past the fold.
+        compose.waitUntil(5000) {
+            runCatching { compose.onNodeWithTag("notes-library-list").performScrollToNode(hasText("No results for “summer holiday”")) }.isSuccess
+        }
+        compose.onNodeWithText("No results for “summer holiday”").assertIsDisplayed()
         shot("no-results")
+        if (fontScale != 1f) return
         search("")
         compose.onNode(hasText("Launch sync") and hasClickAction()).performTouchInput { longClick() }
         open("A walk by the water")
@@ -337,4 +449,6 @@ class NotesLibraryScreenTest {
 
     @Test fun `render library on cover in light and dark`() = render("cover")
     @Test @Config(qualifiers = "w840dp-h900dp-mdpi") fun `render library on inner in light and dark`() = render("inner")
+    @Test @Config(qualifiers = "w360dp-h740dp-mdpi") fun `render library at twice the font size on a narrow cover`() = render("narrow-font-200", fontScale = 2f)
+    @Test @Config(qualifiers = "w840dp-h900dp-mdpi") fun `render library at twice the font size unfolded`() = render("inner-font-200", fontScale = 2f)
 }

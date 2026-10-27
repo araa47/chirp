@@ -90,16 +90,32 @@ class FloatingMicRenderTest {
         }
         root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
         root.layout(0, 0, width, height)
+        if (panel != null && context.resources.configuration.fontScale >= 1.5f) {
+            val controls = listOf(panel.cancel, panel.mic, panel.fix, panel.privateChip, panel.raw, panel.copy, panel.scratchpad, panel.done)
+            for (view in controls.filter { it.visibility == View.VISIBLE && (it.parent as View).visibility == View.VISIBLE }) {
+                val layout = view.layout ?: continue
+                assertTrue("${view.text} fits vertically in ${shot.name}", layout.height <= view.height - view.compoundPaddingTop - view.compoundPaddingBottom)
+                assertTrue("${view.text} is not ellipsized", (0 until layout.lineCount).none { layout.getEllipsisCount(it) > 0 })
+            }
+            if (panel.cancel.visibility == View.VISIBLE && panel.mic.visibility == View.VISIBLE) {
+                fun bounds(view: View) = android.graphics.Rect(0, 0, view.width, view.height).also { root.offsetDescendantRectToMyCoords(view, it) }
+                assertFalse("Cancel and mic do not overlap", android.graphics.Rect.intersects(bounds(panel.cancel), bounds(panel.mic)))
+            }
+        }
         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { root.draw(Canvas(it)) }
     }
 
-    @Test fun `render floating mic states on cover and inner in light and dark`() {
+    @Test fun `render floating mic states on cover and inner in light and dark`() = render()
+    @Test fun `render floating panel at twice the font size`() = render(2f)
+
+    private fun render(fontScale: Float = 1f) {
         val output = File(System.getProperty("chirp.screenshots")).apply { mkdirs() }
         val controller = Robolectric.buildActivity(Activity::class.java).setup()
         val activity = controller.get()
         try {
             for ((theme, night) in listOf("light" to false, "dark" to true)) {
                 val config = Configuration(activity.resources.configuration).apply {
+                    this.fontScale = fontScale
                     uiMode = Configuration.UI_MODE_TYPE_NORMAL or if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
                 }
                 val themed = ContextThemeWrapper(activity.createConfigurationContext(config), R.style.Theme_Chirp)
@@ -108,7 +124,7 @@ class FloatingMicRenderTest {
                     val colours = HashSet<Int>()
                     for (y in 0 until bitmap.height step 4) for (x in 0 until bitmap.width step 4) colours += bitmap.getPixel(x, y)
                     assertTrue("${shot.name} is blank", colours.size > 8)
-                    File(output, "floating-${shot.name}-$screen-$theme.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    File(output, "floating-${shot.name}-$screen-${if (fontScale == 2f) "font-200-" else ""}$theme.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     bitmap.recycle()
                 }
             }

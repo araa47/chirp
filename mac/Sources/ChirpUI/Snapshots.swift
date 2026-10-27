@@ -888,6 +888,7 @@ public enum Snapshots {
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.toolbarStyle = .unified
+        library.windowResized(size)
         window.contentViewController = NSHostingController(rootView: NotesView(model: model, library: library))
         window.setContentSize(size)
         return window
@@ -902,7 +903,8 @@ public enum Snapshots {
     }
 
     /// A Notes window scenario: the demo meeting open in a populated library, recording, 3:12 in.
-    static func notes(_ name: String, _ configure: @escaping (NotesModel, NotesLibraryModel) -> Void) -> Scenario {
+    static func notes(_ name: String, size: CGSize = CGSize(width: 1000, height: 620),
+                      _ configure: @escaping (NotesModel, NotesLibraryModel) -> Void) -> Scenario {
         Scenario(name: "notes-\(name)", window: {
             let model = NotesModel()
             model.dictationKey = "⌥"
@@ -926,7 +928,7 @@ public enum Snapshots {
             library.selection = .note(d.id)
             configure(model, library)
             if !model.state.isActive, library.recordingID == model.document.id { library.recordingID = nil }
-            return notesWindow(model, library)
+            return notesWindow(model, library, size: size)
         })
     }
 
@@ -1341,7 +1343,10 @@ public enum Snapshots {
     }
 
     public static var allScenarios: [Scenario] {
-        hudScenarios + rippleScenarios + wordWaveScenarios + settingsScenarios + onboardingScenarios + menuScenarios
+        // `CHIRP_SNAPSHOT_REVIEW=303 ChirpMac --render-snapshots <dir>` renders only the #303 text-size/geometry review
+        // matrix (never part of the committed set).
+        if ProcessInfo.processInfo.environment["CHIRP_SNAPSHOT_REVIEW"] == "303" { return modernUXScenarios }
+        return hudScenarios + rippleScenarios + wordWaveScenarios + settingsScenarios + onboardingScenarios + menuScenarios
             + localModelsScenarios + notesScenarios + pairingScenarios + historyScenarios + savedVoicesScenarios
     }
 
@@ -1573,5 +1578,60 @@ private final class SubmenuRowView: NSView {
             (value as NSString).draw(at: NSPoint(x: bounds.width - MenuMetrics.trailing - size.width, y: y),
                                      withAttributes: [.font: MenuStyle.font, .foregroundColor: NSColor.secondaryLabelColor])
         }
+    }
+}
+
+// Dedicated #303 review matrix. Kept separate from the canonical captures owned by other workers.
+@MainActor extension Snapshots {
+    static var modernUXScenarios: [Scenario] {
+        var scenes: [Scenario] = []
+        for large in [false, true] {
+            let type = large ? "200" : "100"
+            for narrow in [false, true] {
+                let geometry = narrow ? "760" : "1120"
+                for state in ["recording", "paused", "empty", "no-results", "error", "transcript", "deleted", "focus"] {
+                    let base = notes("modern-\(state)-\(geometry)-\(type)",
+                                     size: narrow ? NotesViewMetrics.minimumSize : NotesViewMetrics.defaultSize) { model, library in
+                        if large { for _ in 0..<5 { library.textSize.increase() } }
+                        if state == "paused" { model.state = .paused }
+                        if state == "empty" {
+                            model.state = .idle; model.document = NotesDocument(); library.notes = []; library.recordingID = nil
+                            library.selection = .note(model.document.id)
+                        }
+                        if state == "no-results" { library.query = "invoice"; library.results = [] }
+                        if state == "error" { model.state = .error("Chirp server offline — check the server connection.") }
+                        if state == "transcript" { library.showsInspector = true }
+                        // Offscreen windows are never key; the flag stands in for the list holding keyboard focus.
+                        if state == "focus" { model.state = .stopped; library.recordingID = nil; library.sidebarFocused = true }
+                        if state == "deleted" {
+                            model.state = .stopped; library.recordingID = nil; library.selection = .recentlyDeleted
+                            library.deleted = [NotesLibraryEntry(id: UUID(), title: "Standup scratch", snippet: "Blocked on the staging deploy; pairing with Sam after lunch.", createdAt: notesNow, updatedAt: notesNow, deletedAt: notesNow.addingTimeInterval(-2 * 86400), audioBytes: 640_000)]
+                        }
+                    }
+                    scenes.append(base)
+                }
+            }
+            scenes.append(Scenario(name: "history-modern-\(type)", window: {
+                let model = HistoryModel()
+                model.now = { historyNow }; model.calendar = utcCalendar; model.icon = { demoIcon($0) }
+                model.show(demoHistory()); model.selection = demoHistory()[1].id
+                let size = ChirpTextSize(factor: large ? 2 : 1)
+                let window = NSWindow(contentRect: NSRect(origin: .zero, size: HistoryViewMetrics.defaultSize),
+                                      styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false; window.toolbarStyle = .unified
+                window.contentViewController = NSHostingController(rootView: HistoryView(model: model, textSize: size))
+                window.setContentSize(HistoryViewMetrics.defaultSize)
+                return window
+            }))
+            scenes.append(Scenario(name: "notes-modern-reader-\(type)") {
+                let model = NotesModel()
+                model.document = demoNotes()
+                let view = NSHostingView(rootView: NotesFormattedReader(model: model) {}
+                    .environment(\.chirpTextScale, large ? 2 : 1))
+                view.frame = NSRect(x: 0, y: 0, width: 640, height: 520)
+                return view
+            })
+        }
+        return scenes
     }
 }

@@ -11,8 +11,9 @@ public enum HistoryViewMetrics {
 /// detail with what was inserted, what was said, and Insert Again, Copy, Add to Notes and Delete (with Undo).
 public struct HistoryView: View {
     @Bindable var model: HistoryModel
+    private let textSize: ChirpTextSize
 
-    public init(model: HistoryModel) { self.model = model }
+    public init(model: HistoryModel, textSize: ChirpTextSize = ChirpTextSize()) { self.model = model; self.textSize = textSize }
 
     public var body: some View {
         NavigationSplitView {
@@ -31,6 +32,9 @@ public struct HistoryView: View {
         .sheet(isPresented: Binding(get: { model.teaching != nil }, set: { if !$0 { model.teaching = nil } })) {
             TeachSheet(model: model)
         }
+        .toolbar { ToolbarItem(placement: .primaryAction) { TextSizeControl(size: textSize) } }
+        .pondFont(.callout)
+        .environment(\.chirpTextScale, textSize.factor)
         .tint(Color.chirp.koi)
     }
 }
@@ -52,7 +56,7 @@ private struct HistorySidebar: View {
                     }
                 } header: {
                     Text(group.title)
-                        .font(.system(size: 12.5, weight: .semibold, design: .serif))
+                        .pondFont(12.5, weight: .semibold, design: .serif)
                         .foregroundStyle(NotesInk.secondary)
                         .textCase(nil)
                         .padding(.top, 4)
@@ -92,10 +96,11 @@ private struct HistorySidebar: View {
 
     private var footer: some View {
         HStack(spacing: 6) {
-            Image(systemName: "lock.fill").font(.system(size: 10))
+            Image(systemName: "lock.fill").pondFont(12)
             Text(model.enabled ? HistoryText.keptFor(model.retention) : HistoryText.off)
-                .font(.system(size: 11))
-                .lineLimit(1)
+                .pondFont(12)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .foregroundStyle(NotesInk.tertiary)
@@ -114,26 +119,29 @@ private struct HistoryRow: View {
 
     private var ink: RowInk { RowInk(selected: selected, scheme: scheme) }
 
+    @Environment(\.chirpTextScale) private var textScale
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             AppIcon(image: model.icon(entry.bundleID), size: 26)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+            let headingLayout = textScale > 1.3 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
+            headingLayout {
                     Text(entry.appTitle)
-                        .font(.system(size: 12, weight: .semibold))
+                        .pondFont(12, weight: .semibold)
                         .foregroundStyle(ink.title)
                         .lineLimit(1)
                     if entry.cleaned { PolishedBadge() }
-                    Spacer(minLength: 4)
+                    if textScale <= 1.3 { Spacer(minLength: 4) }
                     Text(HistoryText.time(entry.date, calendar: model.calendar))
-                        .font(.system(size: 11))
+                        .pondFont(12)
                         .foregroundStyle(ink.meta)
                         .monospacedDigit()
                         .fixedSize()
                 }
                 Text(entry.text.split(whereSeparator: \.isNewline).joined(separator: " "))
-                    .font(.system(size: 12.5))
+                    .pondFont(12.5)
                     .foregroundStyle(ink.snippet)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -149,7 +157,7 @@ private struct HistoryRow: View {
 private struct PolishedBadge: View {
     var body: some View {
         Text(HistoryText.cleaned)
-            .font(.system(size: 9.5, weight: .semibold))
+            .pondFont(12, weight: .semibold)
             .foregroundStyle(Color.chirp.moon)
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
@@ -168,7 +176,7 @@ struct AppIcon: View {
         } else {
             RoundedRectangle(cornerRadius: size * 0.22)
                 .fill(Color.chirp.surface)
-                .overlay(Image(systemName: "app.dashed").font(.system(size: size * 0.5)).foregroundStyle(NotesInk.tertiary))
+                .overlay(Image(systemName: "app.dashed").pondFont(size * 0.5).foregroundStyle(NotesInk.tertiary))
                 .frame(width: size, height: size)
         }
     }
@@ -182,9 +190,9 @@ private struct HistoryMessage: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: symbol).font(.system(size: 22, weight: .light)).foregroundStyle(NotesInk.tertiary)
-            Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(NotesInk.secondary).multilineTextAlignment(.center)
-            Text(detail).font(.system(size: 11.5)).foregroundStyle(NotesInk.tertiary).multilineTextAlignment(.center)
+            Image(systemName: symbol).pondFont(22, weight: .light).foregroundStyle(NotesInk.tertiary)
+            Text(title).pondFont(13, weight: .semibold).foregroundStyle(NotesInk.secondary).multilineTextAlignment(.center)
+            Text(detail).pondFont(12).foregroundStyle(NotesInk.tertiary).multilineTextAlignment(.center)
             if let action { Button(action.0, action: action.1).padding(.top, 6) }
         }
         .padding(24)
@@ -197,6 +205,7 @@ private struct HistoryMessage: View {
 private struct HistoryDetail: View {
     @Bindable var model: HistoryModel
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.chirpTextScale) private var textScale
 
     private var contrast: Bool { colorSchemeContrast == .increased }
 
@@ -212,7 +221,7 @@ private struct HistoryDetail: View {
                             if let segments = WordDiff.segments(raw: raw, cleaned: entry.text) {
                                 // The HUD's colour-blind-safe diff: removed words struck through in inkMuted, added
                                 // or changed words underlined in moon.
-                                DiffText(segments: segments, fade: 0, contrast: contrast, font: ChirpType.body, lineLimit: nil)
+                                DiffText(segments: segments, fade: 0, contrast: contrast, font: .system(size: ChirpTextRole.body.points * textScale), lineLimit: nil)
                             } else {
                                 Text(raw)
                             }
@@ -226,8 +235,8 @@ private struct HistoryDetail: View {
             }
         } else {
             VStack(spacing: 8) {
-                Image(systemName: "text.bubble").font(.system(size: 30, weight: .light)).foregroundStyle(NotesInk.tertiary)
-                Text(HistoryText.noSelection).font(.system(size: 13)).foregroundStyle(NotesInk.secondary)
+                Image(systemName: "text.bubble").pondFont(30, weight: .light).foregroundStyle(NotesInk.tertiary)
+                Text(HistoryText.noSelection).pondFont(13).foregroundStyle(NotesInk.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -237,16 +246,25 @@ private struct HistoryDetail: View {
         HStack(alignment: .center, spacing: 12) {
             AppIcon(image: model.icon(entry.bundleID), size: 40)
             VStack(alignment: .leading, spacing: 3) {
-                Text(entry.appTitle).font(ChirpType.noteTitle(22)).foregroundStyle(NotesInk.primary)
+                Text(entry.appTitle).pondFont(22, weight: .semibold, design: .serif).foregroundStyle(NotesInk.primary)
                 Text(HistoryText.meta(entry, now: model.now(), calendar: model.calendar))
-                    .font(ChirpType.meta).foregroundStyle(NotesInk.secondary)
+                    .pondFont(.meta).foregroundStyle(NotesInk.secondary)
             }
             Spacer()
         }
     }
 
     private func actions(_ entry: DictationEntry) -> some View {
-        HStack(spacing: 8) {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { actionButtons(entry) }
+            VStack(alignment: .leading, spacing: 8) { actionButtons(entry) }
+        }
+        // Buttons are native chrome: they keep the system size while the content around them grows.
+        .font(.body)
+        .controlSize(.regular)
+    }
+
+    @ViewBuilder private func actionButtons(_ entry: DictationEntry) -> some View {
             Button {
                 model.onInsertAgain(entry)
             } label: {
@@ -275,7 +293,7 @@ private struct HistoryDetail: View {
             .help("Copy Original, Add to Notes\(model.canTeach ? " and Teach Chirp" : "")")
             Spacer(minLength: 8)
             if let flash = model.flash {
-                Text(flash).font(ChirpType.meta).foregroundStyle(Color.chirp.lily)
+                Text(flash).pondFont(.meta).foregroundStyle(Color.chirp.lily)
                     .task(id: flash) {
                         try? await Task.sleep(for: .seconds(1.5))
                         if !Task.isCancelled { model.flash = nil }
@@ -289,8 +307,6 @@ private struct HistoryDetail: View {
             .fixedSize()
             .accessibilityLabel(HistoryText.delete)
             .help("Deletes this dictation from the history (Undo brings it back)")
-        }
-        .controlSize(.regular)
     }
 }
 
@@ -307,9 +323,9 @@ private struct TextCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 12.5, weight: .semibold, design: .serif)).foregroundStyle(NotesInk.secondary)
+            Text(title).pondFont(12.5, weight: .semibold, design: .serif).foregroundStyle(NotesInk.secondary)
             content
-                .font(ChirpType.body)
+                .pondFont(.body)
                 .lineSpacing(4)
                 .foregroundStyle(NotesInk.primary)
                 .textSelection(.enabled)
@@ -317,7 +333,7 @@ private struct TextCard<Content: View>: View {
                 .padding(16)
                 .background(RoundedRectangle(cornerRadius: ChirpRadius.row).fill(Color.chirp.surface))
                 .overlay(RoundedRectangle(cornerRadius: ChirpRadius.row).strokeBorder(NotesInk.tertiary.opacity(0.25)))
-            if let footnote { Text(footnote).font(.system(size: 11)).foregroundStyle(NotesInk.tertiary) }
+            if let footnote { Text(footnote).pondFont(12).foregroundStyle(NotesInk.tertiary) }
         }
     }
 }
@@ -328,11 +344,11 @@ struct TeachSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(HistoryText.teachTitle).font(ChirpType.h2)
-            Text(HistoryText.teachDetail).font(ChirpType.meta).foregroundStyle(NotesInk.secondary)
+            Text(HistoryText.teachTitle).pondFont(.section)
+            Text(HistoryText.teachDetail).pondFont(.meta).foregroundStyle(NotesInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             TextEditor(text: $model.teachText)
-                .font(ChirpType.body)
+                .pondFont(.body)
                 .scrollContentBackground(.hidden)
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: ChirpRadius.control).fill(Color.chirp.surface))
@@ -358,11 +374,11 @@ private struct HistoryToastView: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Text(toast.text).font(.callout).foregroundStyle(NotesInk.primary)
+            Text(toast.text).pondFont(.callout).foregroundStyle(NotesInk.primary)
             if toast.undo != nil {
                 Button("Undo") { model.undoDelete() }
                     .buttonStyle(.plain)
-                    .font(.callout.weight(.semibold))
+                    .pondFont(.callout, weight: .semibold)
                     .foregroundStyle(Color.chirp.koi)
                     .keyboardShortcut("z", modifiers: .command)
             }

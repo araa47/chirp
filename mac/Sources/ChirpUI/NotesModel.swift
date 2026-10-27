@@ -150,6 +150,11 @@ public struct HearingPart: Equatable, Sendable {
 /// controller stores just the preferences (the tab, "Structure notes", "Organize automatically" and Edit/Preview).
 @MainActor @Observable
 public final class NotesModel {
+    /// The editor's text size when no library window owns one (the window's `NotesLibraryModel.textSize` wins).
+    public let textSize = ChirpTextSize()
+    /// Toggles the task whose box holds this UTF-16 offset through the attached editor's edit/Undo path (the
+    /// formatted reader's checkboxes); false with no editor.
+    @ObservationIgnored var toggleAccessibleTask: (Int) -> Bool = { _ in false }
     public var state: NotesRecorderState = .idle
     public var document = NotesDocument()
     public var structuring: StructuringStatus = .idle

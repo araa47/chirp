@@ -760,61 +760,61 @@
     ]
   },
   "mac/hud-flow-3-diff-dark.png": {
-    "sha256": "d0ad0fda73d594bbb75e949877c78f64acd67356f4670fcbeb10a76d02dce048",
+    "sha256": "646d5f3d71cd535cd79ed1549400e1c41ee10a7239af1a9987eba8ce540d184b",
     "width": 1000,
-    "height": 198,
+    "height": 200,
     "variants": [
       {
         "file": "mac/hud-flow-3-diff-dark-320.webp",
         "width": 320,
-        "height": 63
+        "height": 64
       },
       {
         "file": "mac/hud-flow-3-diff-dark-640.webp",
         "width": 640,
-        "height": 127
+        "height": 128
       },
       {
         "file": "mac/hud-flow-3-diff-dark-960.webp",
         "width": 960,
-        "height": 190
+        "height": 192
       },
       {
         "file": "mac/hud-flow-3-diff-dark-1000.webp",
         "width": 1000,
-        "height": 198
+        "height": 200
       }
     ]
   },
   "mac/hud-flow-3-diff-light.png": {
-    "sha256": "eb0fae36889cb79e172334f20b7089aefce5c1c4f4e4f5d58df2303333149816",
+    "sha256": "818ba9075290239362e9cecaa24f23c36163a74215bc18f5bd5145a6cd0e310b",
     "width": 1000,
-    "height": 198,
+    "height": 200,
     "variants": [
       {
         "file": "mac/hud-flow-3-diff-light-320.webp",
         "width": 320,
-        "height": 63
+        "height": 64
       },
       {
         "file": "mac/hud-flow-3-diff-light-640.webp",
         "width": 640,
-        "height": 127
+        "height": 128
       },
       {
         "file": "mac/hud-flow-3-diff-light-960.webp",
         "width": 960,
-        "height": 190
+        "height": 192
       },
       {
         "file": "mac/hud-flow-3-diff-light-1000.webp",
         "width": 1000,
-        "height": 198
+        "height": 200
       }
     ]
   },
   "mac/hud-listening-dark.png": {
-    "sha256": "e1dceed9624c8442d62559ed2227dedaf016c14305c7dbf959ef0331e290c65e",
+    "sha256": "50dc6498f28c8b257c109860fe7b59ce41d776284195bd87040b7aa226977977",
     "width": 1000,
     "height": 236,
     "variants": [
@@ -841,7 +841,7 @@
     ]
   },
   "mac/hud-listening-light.png": {
-    "sha256": "2e6fa1b4b04b97ec69053d131739965715a89e51faf9b03b1f96225921a0ac4c",
+    "sha256": "bf5d189e3721bf4dde33d6ea4257d6ce0aa098b4d77e070cafe5f1f2a948553c",
     "width": 1000,
     "height": 236,
     "variants": [
@@ -868,7 +868,7 @@
     ]
   },
   "mac/notes-inspector-playing-dark.png": {
-    "sha256": "04622058c52ed7d272f838df14eae27d0c455e28bee165905d6f5c5609818ce4",
+    "sha256": "9dddd10db37fde499d8fcb534c25f5a2d5061fd8b23d1cb5612eb6c840db0c0b",
     "width": 2000,
     "height": 1240,
     "variants": [
@@ -895,7 +895,7 @@
     ]
   },
   "mac/notes-inspector-playing-light.png": {
-    "sha256": "c444908425cb8f391b5d69ee17af893b46d1a462e46cddb4b474fba3547608ae",
+    "sha256": "6d7d0e0246246e66ced43644beb2b9c2cfdcb0c268f4a0d160b182a8a86a9566",
     "width": 2000,
     "height": 1240,
     "variants": [
@@ -922,7 +922,7 @@
     ]
   },
   "mac/notes-library-dark.png": {
-    "sha256": "5dc69bcf3fa71d22f084c9a15cad503b63468f11fd81f91366879744a95fc87d",
+    "sha256": "c834ef84976ad28b35a9235e13c01c5b36918dee493b3c25064d9e34f3bbeb1e",
     "width": 2000,
     "height": 1240,
     "variants": [
@@ -949,7 +949,7 @@
     ]
   },
   "mac/notes-library-light.png": {
-    "sha256": "b5d2bef6fd61bca069ec7e1ef36ca1a4e9a43f9f15f749f3dfe073c4e255ae17",
+    "sha256": "751e549e0e996b8746e0bac1cab77e657d92ab5f2164cee48dda30318257b6d2",
     "width": 2000,
     "height": 1240,
     "variants": [
@@ -976,7 +976,7 @@
     ]
   },
   "mac/notes-recording-dark.png": {
-    "sha256": "bc558646876c86cd3e24297e445e2896f750f46d55acbc23315d2c7bd4619432",
+    "sha256": "860534e9da9216b2773e4e8f28e80330582b94f06095cb1a4102bba3a59c1668",
     "width": 2000,
     "height": 1240,
     "variants": [
@@ -1003,7 +1003,7 @@
     ]
   },
   "mac/notes-recording-light.png": {
-    "sha256": "64f18107f92a0470da019eb69e8da84d524af6f63586e24811457f1e8e1adcb7",
+    "sha256": "f7f838d4ea5c2a448e5d48f26a6e2474634b512ef069380613d49f502fcb1129",
     "width": 2000,
     "height": 1240,
     "variants": [
@@ -1030,7 +1030,7 @@
     ]
   },
   "mac/notes-search-dark.png": {
-    "sha256": "267d0cc5f5c9f4f55b13ae655427a71d42a4d481105464891373fb649998333d",
+    "sha256": "72fac32ab1cf70b3e229d36cb4203ce4ab924e66e8ee81b7ea197a8a7e6fc0e1",
     "width": 2000,
     "height": 1240,
     "variants": [
@@ -1057,7 +1057,7 @@
     ]
   },
   "mac/notes-search-light.png": {
-    "sha256": "d5b2a7509cd07fe98477de902c6a7ed9b3c7e09d3004c25f62a90da57f38b644",
+    "sha256": "8a806c697f6d4820db6c2040e2342bef722c6f8e1e17bffeb144d78a91703be0",
     "width": 2000,
     "height": 1240,
     "variants": [

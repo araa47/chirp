@@ -46,8 +46,13 @@ def check(probe, work, output):
         # A listening command shows what it heard: never printed.
         if any(t.startswith('“') for t in texts) and status is None: status = '“…”'
         note = next((t for t in texts if t.startswith(NOTES)), None)
-        # Chirp's elapsed clock (not the status bar's) comes before any transcript timestamp.
-        clock = next((n.get('text') for n in hierarchy if n.get('package') == package and re.fullmatch(r'(\d+:)?\d\d:\d\d', n.get('text', ''))), '0:0')
+        # Chirp's elapsed clock (not the status bar's) comes before any transcript timestamp. The recording dock is one
+        # accessibility node read as "<title>, <elapsed>", so its time ends the description rather than being a text node.
+        def elapsed(n):
+            if re.fullmatch(r'(\d+:)?\d\d:\d\d', n.get('text', '')): return n.get('text')
+            found = re.search(r', ((\d+:)?\d\d:\d\d)$', n.get('content-desc', ''))
+            return found and found.group(1)
+        clock = next((t for n in hierarchy if n.get('package') == package for t in [elapsed(n)] if t), '0:0')
         seconds = sum(int(part) * 60 ** i for i, part in enumerate(reversed(clock.split(':'))))
         return {'status': status, 'note': note, 'clock': seconds, 'notes_chars': notes, 'gaps': [t for t in texts if 'audio not transcribed' in t],
                 'hearing': any(n.get('resource-id') == 'notes-hearing' for n in hierarchy)}

@@ -283,4 +283,48 @@ class NotesRenderTest {
 
     @Test @Config(qualifiers = "w411dp-h891dp-mdpi") fun `render notes on the cover screen in light and dark`() = render("cover")
     @Test @Config(qualifiers = "w832dp-h749dp-land-mdpi") fun `render notes side by side on the inner screen in light and dark`() = render("inner")
+
+    @Test @Config(qualifiers = "w360dp-h740dp-mdpi") fun `render the recording dock at twice the font size`() = largeText("cover")
+    @Test @Config(qualifiers = "w840dp-h900dp-mdpi") fun `render the unfolded dock at twice the font size`() = largeText("inner")
+
+    private fun largeText(width: String) {
+        RuntimeEnvironment.setFontScale(2f)
+        val output = File(System.getProperty("chirp.screenshots")).apply { mkdirs() }
+        val rig = NotesModelRig(RuntimeEnvironment.getApplication())
+        val dark = mutableStateOf(false)
+        compose.setContent { ChirpTheme(dark.value) { NotesScreen(rig.model, rig.model::toggle, {}, {}, {}, {}) } }
+        rig.api.answers += NotesStructureResponse("## Launch plan\n- [ ] Draft the invite email", true)
+        fun shot(name: String) {
+            compose.mainClock.advanceTimeBy(2000); compose.waitForIdle()
+            val target = if (name == "transcript") compose.onNode(isRoot() and hasAnyDescendant(hasText("Show raw"))) else compose.onRoot()
+            val bitmap = notesScreenshot(target)
+            File(output, "notes-$width-font-200-$name-${if (dark.value) "dark" else "light"}.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        for (night in listOf(false, true)) {
+            compose.runOnIdle { dark.value = night }
+            compose.runOnIdle { rig.record().final("Synthetic example at twice the font size."); rig.wire.partial("Someone should draft the invite email") }
+            shot("recording")
+            compose.runOnIdle { rig.model.pause(); rig.idle() }
+            shot("paused")
+            val dock = compose.onNodeWithTag("notes-recording-dock").fetchSemanticsNode().boundsInRoot
+            for (label in listOf("Resume recording notes", "Stop recording notes")) {
+                val control = compose.onNodeWithContentDescription(label)
+                control.assertIsDisplayed().assertIsEnabled()
+                val bounds = control.fetchSemanticsNode().boundsInRoot
+                assertTrue("$label inside dock", bounds.left >= dock.left && bounds.right <= dock.right && bounds.bottom <= dock.bottom)
+                assertTrue("$label has 48dp target", bounds.height >= 48 && bounds.width >= 48)
+            }
+            // Hold to edit keeps its own full-size target beside or above the pill, never under it.
+            val command = compose.onNodeWithContentDescription("Edit notes by voice. Hold, say the change, let go.").fetchSemanticsNode().boundsInRoot
+            assertFalse("Hold to edit clear of the pill", command.overlaps(dock))
+            assertTrue("Hold to edit has 48dp height", command.height >= 48)
+            compose.onNodeWithContentDescription("Resume recording notes").performClick()
+            assertTrue(rig.model.recording)
+            compose.onNodeWithText("Transcript").performClick()
+            shot("transcript")
+            compose.onNodeWithContentDescription("Close transcript").performClick()
+            compose.onNodeWithContentDescription("Stop recording notes").performClick()
+            compose.runOnIdle { rig.model.recorder.cancel(); rig.model.clear() }
+        }
+    }
 }

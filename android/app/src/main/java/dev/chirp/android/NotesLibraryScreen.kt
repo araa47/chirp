@@ -3,6 +3,7 @@ package dev.chirp.android
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +47,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
@@ -86,7 +89,7 @@ internal fun highlightedNote(text: String, query: String): AnnotatedString {
  * Notes is the app's starting point. The live model owns the microphone; the reader can open and edit other documents
  * without moving it. Both share the same library/index. Query, selection and list position survive pane and tab changes.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun NotesLibraryScreen(
     live: NotesModel, reader: NotesModel,
@@ -120,6 +123,7 @@ internal fun NotesLibraryScreen(
     var hits by remember { mutableStateOf<List<NotesSearchHit>>(emptyList()) }
     var searched by remember { mutableStateOf("") }
     val list = rememberLazyListState()
+    var captureHeight by remember { mutableIntStateOf(0) }
     val trashList = rememberLazyListState()
     val liveId = live.document.uid
     val recording = live.state.active
@@ -147,6 +151,10 @@ internal fun NotesLibraryScreen(
     LaunchedEffect(selected) {
         selected?.takeIf { it != liveId && it != reader.document.uid }?.let { reader.open(it) }
     }
+    // New search terms show their results from the top; the first value is the restored query, whose position is kept.
+    LaunchedEffect(trash) { snapshotFlow { query }.drop(1).collect { (if (trash) trashList else list).scrollToItem(0) } }
+    // The recording card joins the top of the list; keep it in view rather than leaving the list anchored on the row below.
+    LaunchedEffect(recording, trash) { if (recording && !trash && list.firstVisibleItemIndex <= 1) list.scrollToItem(0) }
     fun open(id: String) { focus.clearFocus(); reader.keepSession(); selected = id }
     fun close() { shownModel.keepSession(); selected = null }
     BackHandler(selected != null) { close() }
@@ -234,7 +242,7 @@ internal fun NotesLibraryScreen(
                     Scaffold(containerColor = MaterialTheme.colorScheme.background, modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                         topBar = { Column {
                             LargeTopAppBar(title = { Text(if (selection.isNotEmpty()) "${selection.size} selected" else if (trash) "Recently Deleted" else "Notes",
-                                fontFamily = if (selection.isEmpty()) FontFamily.Serif else FontFamily.Default) },
+                                fontFamily = if (selection.isEmpty()) FontFamily.Serif else FontFamily.Default, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                 navigationIcon = { if (trash || selection.isNotEmpty()) IconButton({ if (selection.isNotEmpty()) selection = emptyList() else trash = false }) {
                                     Icon(painterResource(if (selection.isNotEmpty()) R.drawable.ic_close else R.drawable.ic_arrow_back), if (selection.isNotEmpty()) "Clear selection" else "Back to notes") } },
                                 actions = {
@@ -249,6 +257,10 @@ internal fun NotesLibraryScreen(
                                         Box {
                                             IconButton({ menu = true }) { Icon(painterResource(R.drawable.ic_more_vert), "Library options") }
                                             DropdownMenu(menu, { menu = false }) {
+                                                // While a note holds the microphone, the primary action opens it; a new recording stays deliberate, behind its confirmation.
+                                                if (!trash && recording) DropdownMenuItem({ Column { Text("Record new note"); Text("Stops the current recording first",
+                                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+                                                    { menu = false; start(null) }, leadingIcon = { Icon(painterResource(R.drawable.ic_record), null) })
                                                 if (!trash) DropdownMenuItem({ Text("Recently Deleted") }, { menu = false; trash = true; selected = null; selection = emptyList() },
                                                     leadingIcon = { Icon(painterResource(R.drawable.ic_delete), null) })
                                                 else DropdownMenuItem({ Text("Empty Recently Deleted") }, { menu = false; emptyTrash = true }, enabled = shown.isNotEmpty())
@@ -261,23 +273,38 @@ internal fun NotesLibraryScreen(
                                 modifier = Modifier.focusRequester(searchFocus), placeholder = { Text(if (trash) "Search Recently Deleted" else "Search notes") }, leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
                                 trailingIcon = if (query.isEmpty()) null else ({ IconButton({ query = "" }) { Icon(painterResource(R.drawable.ic_close), "Clear search") } })) },
                                 expanded = false, onExpandedChange = {}, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)) { }
-                            if (!trash && recording) Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp)) {
-                                Text("Recording", Modifier.padding(start = 8.dp, bottom = 8.dp), style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Serif)
-                                RecordingNoteCard(live, { open(liveId) })
-                            }
                         } },
-                        floatingActionButton = { if (!trash && selection.isEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        floatingActionButton = { if (!trash && selection.isEmpty()) FlowRow(Modifier.widthIn(max = width - 32.dp).onSizeChanged { captureHeight = it.height },
+                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                             SmallFloatingActionButton(dictate, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.onSurface,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp)) { Icon(painterResource(R.drawable.ic_mic), "Dictate") }
-                            ExtendedFloatingActionButton(onClick = { start(null) }, icon = { Icon(painterResource(R.drawable.ic_record), null) }, text = { Text("Record") },
-                                modifier = Modifier.semantics { contentDescription = "Record new note" },
+                            // The strongest affordance follows the microphone: Record when idle; while a note holds it, open that note — never silently stop it.
+                            ExtendedFloatingActionButton(onClick = { if (recording) open(liveId) else start(null) },
+                                icon = { Icon(painterResource(if (recording) R.drawable.ic_note else R.drawable.ic_record), null) },
+                                text = { Text(if (!recording) "Record" else if (live.paused) "Open paused note" else "Open recording") },
+                                modifier = Modifier.semantics { contentDescription = if (!recording) "Record new note" else if (live.paused) "Open the paused recording" else "Open the current recording" },
                                 containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary, elevation = FloatingActionButtonDefaults.elevation(0.dp))
                         } },
                     ) { padding ->
-                        // Reserve the 56 dp FAB height plus its 16 dp bottom inset. Rows never draw behind the controls.
-                        val captureInset = if (!trash && selection.isEmpty()) 72.dp else 0.dp
+                        // Reserve the actual controls, including a wrapped action row at large text sizes.
+                        val largeText = LocalDensity.current.fontScale >= 1.5f
+                        val captureInset = if (!trash && selection.isEmpty()) with(LocalDensity.current) { captureHeight.toDp() } + 16.dp else 0.dp
                         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(bottom = captureInset).testTag("notes-library-list"), if (trash) trashList else list,
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)) {
+                            // Pinned in the list flow, not the top bar: it stays in reach while scrolling and never
+                            // crowds the rows out of a 200%-font viewport.
+                            val recordingHeader: @Composable () -> Unit = {
+                                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(bottom = 12.dp)) {
+                                    Text(if (live.paused) "Paused" else "Recording", Modifier.padding(start = 8.dp, bottom = 8.dp),
+                                        style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Serif)
+                                    RecordingNoteCard(live, { open(liveId) })
+                                }
+                            }
+                            if (!trash && recording) {
+                                // Large text can make a sticky card taller than the usable row viewport.
+                                if (largeText) item(key = "recording", content = { recordingHeader() })
+                                else stickyHeader(key = "recording", content = { recordingHeader() })
+                            }
                             if (!trash && !setupDismissed && setup?.missing != null) item(key = "setup") {
                                 SetupCard(setup, fix = { context.startActivity(android.content.Intent(context, SetupActivity::class.java).putExtra("section", setup.missing.section)) },
                                     dismiss = { setupDismissed = true; state?.tryIt = false; SettingsStore(context).tryItDismissed = true })
@@ -308,9 +335,18 @@ internal fun NotesLibraryScreen(
                                 }
                             }
                             if (shown.isEmpty() && !(recording && !trash && query.isBlank()) && (query.isBlank() || searched == query)) item(key = "empty") {
-                                LibraryEmpty(if (trash) "Nothing recently deleted" else if (query.isBlank()) "Your notes will live here" else "No results for “${query.trim()}”",
-                                    if (trash) "Deleted notes appear here for 30 days." else if (query.isBlank()) "Tap New note to type, or Record to turn a conversation into notes." else "Try another word from your notes or transcript.",
-                                    glyph = query.isBlank(), modifier = Modifier.fillMaxWidth().padding(top = 48.dp))
+                                val state = when {
+                                    trash -> "trash"; query.isBlank() -> "blank"; else -> "no-results"
+                                }
+                                LibraryEmpty(if (state == "trash") "Nothing recently deleted" else if (state == "blank") "Your notes will live here" else "No results for “${query.trim()}”",
+                                    if (state == "trash") "Deleted notes appear here for 30 days." else if (state == "blank") "Tap New note to type, or Record to turn a conversation into notes." else "Try another word from your notes or transcript.",
+                                    glyph = query.isBlank(), modifier = Modifier.fillMaxWidth().padding(top = 48.dp)) {
+                                    if (state == "blank") FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                                        Button(::newNote) { Text("New note") }
+                                        TextButton({ start(null) }) { Text("Record") }
+                                    }
+                                    if (state == "no-results") TextButton({ query = "" }) { Text("Clear search") }
+                                }
                             }
 
                         }
@@ -324,12 +360,20 @@ internal fun NotesLibraryScreen(
                                 recordingElsewhere = live.takeIf { recording && shownModel !== live }, jumpToRecording = { open(liveId) },
                                 deleteNote = { delete(listOf(shownModel.document.uid)) }, initiallyEditing = selected == typedSelection)
                             else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                if (reader.message != null) LibraryEmpty("Couldn’t open this note", "Go back to the library and choose another note.", false, Modifier.padding(24.dp))
+                                if (reader.message != null) LibraryEmpty("Couldn’t open this note", "Try again, or return to the library. Your other notes are still here.", false,
+                                    Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(24.dp)) {
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                                        Button({ reader.message = null; reader.open(selected!!) }) { Text("Try again") }
+                                        TextButton(::close) { Text("Back to notes") }
+                                    }
+                                }
                                 else CircularProgressIndicator()
                             }
                         }
                     } else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        LibraryEmpty("A little room to think", "Choose a note, type a new one, or start recording.", true, Modifier.widthIn(max = 360.dp).padding(24.dp))
+                        LibraryEmpty("A little room to think", "Choose a note, type a new one, or start recording.", true, Modifier.widthIn(max = 360.dp).padding(24.dp)) {
+                            Button(::newNote) { Text("New note") }
+                        }
                     }
                 } },
                 extraPane = if (extraPane) ({ AnimatedPane { Surface(Modifier.fillMaxSize(), shape = MaterialTheme.shapes.large,
@@ -365,7 +409,7 @@ private fun SetupCard(progress: dev.chirp.android.shell.SetupProgress, fix: () -
 }
 
 @Composable
-internal fun LibraryEmpty(title: String, body: String, glyph: Boolean, modifier: Modifier = Modifier) {
+internal fun LibraryEmpty(title: String, body: String, glyph: Boolean, modifier: Modifier = Modifier, actions: @Composable () -> Unit = {}) {
     val roles = LocalChirpRoles.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
@@ -376,22 +420,34 @@ internal fun LibraryEmpty(title: String, body: String, glyph: Boolean, modifier:
         }
         Text(title, Modifier.padding(top = 16.dp), style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif), textAlign = TextAlign.Center)
         Text(body, Modifier.widthIn(max = 290.dp).padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        actions()
         if (glyph && title == "Your notes will live here") Text("Notes stay on this phone.", Modifier.padding(top = 24.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
+/**
+ * The way back to the live note. One button for TalkBack — title, truthful recording/paused state and the frozen preview in
+ * a single node, a named open action — while the running clock stays visible but quiet: no live region, so it never
+ * re-announces every second.
+ */
 @Composable
 private fun RecordingNoteCard(model: NotesModel, click: () -> Unit) {
     // The preview freezes at the beginning of each capture, so live text never rearranges the library.
     val preview = remember(model.document.uid, model.state.active) { model.document.snippet }
-    Surface(click, Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
+    val paused = model.paused
+    Surface(Modifier.fillMaxWidth().combinedClickable(onClickLabel = if (paused) "Open the paused recording" else "Open the recording", onClick = click)
+        .semantics(mergeDescendants = true) { role = Role.Button; stateDescription = captureState(model) },
+        shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (model.recording) Ripple(model.level.toFloat(), Modifier.size(28.dp)) else Ripple(0f, Modifier.size(28.dp), animate = false)
+                if (paused) Icon(painterResource(R.drawable.ic_pause), null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                else if (model.recording) Ripple(model.level.toFloat(), Modifier.size(28.dp).clearAndSetSemantics { })
+                else Ripple(0f, Modifier.size(28.dp).clearAndSetSemantics { }, animate = false)
                 Text(model.displayTitle, Modifier.weight(1f), fontFamily = FontFamily.Serif, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(model.elapsedText, style = ChirpTokens.timer, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(preview.ifBlank { "Listening. Your notes are taking shape." }, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            Text("${captureState(model)} · ${model.elapsedText}", style = ChirpTokens.timer,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(preview.ifBlank { if (paused) "Resume when you’re ready." else "Your notes are taking shape." }, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -411,21 +467,20 @@ private fun NoteLibraryRow(entry: NotesIndexEntry, query: String, snippet: Strin
             modifier = Modifier.fillMaxWidth().testTag("note-library-row").combinedClickable(onClick = click, onLongClick = longClick).semantics(mergeDescendants = true) {
                 if (selecting) { role = Role.Checkbox; stateDescription = if (selected) "Selected" else "Not selected" }
                 customActions = if (trash) listOf(CustomAccessibilityAction("Restore") { restore(); true }) else listOf(CustomAccessibilityAction("Delete") { delete(); true }, CustomAccessibilityAction("Select") { longClick(); true })
-            }) {
+            }.then(if (selected && !selecting) Modifier.border(1.5.dp, scheme.secondary, RoundedCornerShape(10.dp)) else Modifier)) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (selecting) { Checkbox(selected, null); Spacer(Modifier.width(12.dp)) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(highlightedNote(entry.title, query), Modifier.weight(1f), fontFamily = FontFamily.Serif, style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(historyAge(now, entry.updatedAt).first, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    }
+                    // The title takes the whole row; age and facts wrap below, so narrow screens and 200% text never squeeze it.
+                    Text(highlightedNote(entry.title, query), fontFamily = FontFamily.Serif, style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(highlightedNote(snippet, query), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(historyAge(now, entry.updatedAt).first, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
                         if (entry.duration >= 1) Text(notesDuration(entry.duration), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                        if (entry.openTodos > 0) {
-                            if (entry.duration >= 1) Text("·", color = scheme.outline)
-                            Text("☐ ${entry.openTodos} open", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                        if (entry.openTodos > 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(painterResource(R.drawable.ic_checklist), null, Modifier.size(18.dp), tint = scheme.onSurfaceVariant)
+                            Text("${entry.openTodos} open ${if (entry.openTodos == 1) "task" else "tasks"}", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
                         }
                         if (entry.recovered) Text("Recovered", style = MaterialTheme.typography.bodyMedium, color = LocalChirpRoles.current.moon)
                         if (RetranscribeGate.progress?.noteId == entry.id) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)

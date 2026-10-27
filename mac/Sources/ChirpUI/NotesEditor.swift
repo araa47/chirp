@@ -50,6 +50,7 @@ struct NotesEditorProbe: Equatable {
 /// commands. Everything that edits goes through the normal `shouldChangeText`/`didChangeText` path.
 final class NotesTextView: NSTextView {
     weak var coordinator: NotesEditorCoordinator?
+    var textScale: CGFloat = 1
     /// The AI tail to tint, UTF-16; empty when the user owns everything.
     var tint = NSRange(location: 0, length: 0) { didSet { if tint != oldValue { needsDisplay = true } } }
     var placeholder = NotesStatus.placeholder() { didSet { if placeholder != oldValue { needsDisplay = true } } }
@@ -157,19 +158,19 @@ final class NotesTextView: NSTextView {
             switch item.kind {
             case .bullet(let nested):
                 let dot = nested ? "◦" : "•"
-                let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 17, weight: .bold),
+                let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 17 * textScale, weight: .bold),
                                                             .foregroundColor: NSColor.secondaryLabelColor]
                 let size = (dot as NSString).size(withAttributes: attrs)
                 (dot as NSString).draw(at: NSPoint(x: mark.midX - size.width / 2 + 1, y: mark.midY - size.height / 2 - 0.5), withAttributes: attrs)
                 continue
             case .task(let checked):
                 image = checked
-                    ? NotesEditorDecorations.symbol("checkmark.square.fill", size: 14, colors: [.white, .chirpKoi], weight: .medium)
-                    : NotesEditorDecorations.symbol("square", size: 14, color: .secondaryLabelColor, weight: .regular)
+                    ? NotesEditorDecorations.symbol("checkmark.square.fill", size: 14 * textScale, colors: [.white, .chirpKoi], weight: .medium)
+                    : NotesEditorDecorations.symbol("square", size: 14 * textScale, color: .secondaryLabelColor, weight: .regular)
             case .decision:
-                image = NotesEditorDecorations.symbol("checkmark.circle.fill", size: 15, colors: [.white, NotesEditorDecorations.lily])
+                image = NotesEditorDecorations.symbol("checkmark.circle.fill", size: 15 * textScale, colors: [.white, NotesEditorDecorations.lily])
             case .question:
-                image = NotesEditorDecorations.symbol("questionmark.circle.fill", size: 15, colors: [.white, NotesEditorDecorations.moon])
+                image = NotesEditorDecorations.symbol("questionmark.circle.fill", size: 15 * textScale, colors: [.white, NotesEditorDecorations.moon])
             }
             guard let image else { continue }
             let size = image.size
@@ -202,8 +203,21 @@ final class NotesTextView: NSTextView {
         guard string.isEmpty, !hasMarkedText() else { return }
         let padding = textContainer?.lineFragmentPadding ?? 5
         let origin = NSPoint(x: textContainerOrigin.x + padding, y: textContainerOrigin.y)
-        (placeholder as NSString).draw(at: origin, withAttributes: [.font: NotesEditorStyle.body,
+        (placeholder as NSString).draw(at: origin, withAttributes: [.font: NSFont.systemFont(ofSize: NotesEditorStyle.bodySize * textScale),
                                                                     .foregroundColor: NSColor.placeholderTextColor])
+    }
+
+    private var accessibleTaskCache: (document: UUID?, text: String, tasks: [NotesTaskAccessibilityElement])?
+
+    override func accessibilityChildren() -> [Any]? {
+        if accessibleTaskCache?.text != string || accessibleTaskCache?.document != coordinator?.model.document.id {
+            let tasks = NotesEditorDecorations.items(string, hide: false, raw: nil).compactMap { item -> NotesTaskAccessibilityElement? in
+                guard case .task = item.kind else { return nil }
+                return NotesTaskAccessibilityElement(editor: self, item: item)
+            }
+            accessibleTaskCache = (coordinator?.model.document.id, string, tasks)
+        }
+        return (super.accessibilityChildren() ?? []) + (accessibleTaskCache?.tasks ?? [])
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -326,6 +340,8 @@ final class NotesEditorCoordinator: NSObject, NSTextViewDelegate {
         isFocused = { [weak textView] in textView?.window?.firstResponder === textView }
         super.init()
         Self.configure(textView)
+        textView.setAccessibilityLabel("Notes editor")
+        textView.setAccessibilityHelp("Edit Markdown with native text selection. Read Formatted Note in the View menu reads without syntax. Tasks are also available as checkboxes.")
         textView.coordinator = self
         textView.delegate = self
         scrollView.documentView = textView
@@ -348,7 +364,9 @@ final class NotesEditorCoordinator: NSObject, NSTextViewDelegate {
             textView.header = header
         }
         textView.hidesMarkup = !(library?.showMarkdown ?? false)
+        textView.textScale = (library?.textSize ?? model.textSize).factor
         load()
+        model.toggleAccessibleTask = { [weak self] index in self?.toggleTask(at: index) ?? false }
         model.editorOwner = ObjectIdentifier(self)
         model.onPendingChanges = { [weak self] in self?.pendingChangesArrived() }
         model.undoReorganize = { [weak self] in self?.undoReorganize() }
@@ -398,6 +416,7 @@ final class NotesEditorCoordinator: NSObject, NSTextViewDelegate {
     /// new editor before this one is dismantled, so it only lets go of what it still owns.
     func detach() {
         guard model.editorOwner == ObjectIdentifier(self) else { return }
+        model.toggleAccessibleTask = { _ in false }
         model.editorOwner = nil
         model.onPendingChanges = nil
         model.undoReorganize = {}
@@ -429,6 +448,21 @@ final class NotesEditorCoordinator: NSObject, NSTextViewDelegate {
             load()
         }
         updateTint()
+        let scale = (library?.textSize ?? model.textSize).factor
+        if textView.textScale != scale, !textView.hasMarkedText() {
+            let selection = textView.selectedRanges
+            let scroll = scrollView.contentView.bounds.origin
+            textView.textScale = scale
+            undo.disableUndoRegistration()
+            restyle(nil)
+            textView.typingAttributes = [.font: NSFont.systemFont(ofSize: NotesEditorStyle.bodySize * scale),
+                                         .foregroundColor: NSColor.labelColor]
+            undo.enableUndoRegistration()
+            textView.selectedRanges = selection
+            textView.layoutHeader()
+            scrollView.contentView.scroll(to: scroll)
+            textView.needsDisplay = true
+        }
         let hides = !(library?.showMarkdown ?? false)
         if hides != textView.hidesMarkup {
             textView.hidesMarkup = hides
@@ -508,7 +542,7 @@ final class NotesEditorCoordinator: NSObject, NSTextViewDelegate {
     /// Restyles the paragraphs `range` touches (all of them when nil), hiding syntax off the caret's lines.
     func restyle(_ range: NSRange?) {
         guard let storage = textView.textStorage else { return }
-        NotesEditorStyle.restyle(storage, range: range, hide: textView.hidesMarkup, raw: textView.raw)
+        NotesEditorStyle.restyle(storage, range: range, hide: textView.hidesMarkup, raw: textView.raw, scale: textView.textScale)
     }
 
     /// Tells the recorder whether an append would land under the caret: focus with the selection touching the tail,
@@ -883,4 +917,74 @@ final class NotesEditorCoordinator: NSObject, NSTextViewDelegate {
 
     /// Notes keep their own undo stack, so ⌘Z never reaches into another control's edits.
     func undoManager(for view: NSTextView) -> UndoManager? { undo }
+}
+
+/// Real AX checkboxes over the drawn task marks. The NSTextView keeps its native editable value and ranges.
+/// An old AX element refuses to act after its line changes, rather than editing a different task at a stale offset.
+final class NotesTaskAccessibilityElement: NSAccessibilityElement {
+    /// NSAccessibilityElement is explicitly non-Sendable in the SDK. Keep its document access in an isolated
+    /// Swift object, and capture only that Sendable reference in the AppKit callback's main-actor bridge.
+    private let state: NotesTaskAccessibilityState
+
+    @MainActor init(editor: NotesTextView, item: NotesEditorDecorations.Item) {
+        state = NotesTaskAccessibilityState(editor: editor, item: item)
+        super.init()
+        state.element = self
+        setAccessibilityParent(editor)
+        setAccessibilityElement(true)
+        setAccessibilityEnabled(true)
+        setAccessibilityRole(.checkBox)
+        setAccessibilityLabel(state.label)
+    }
+    override func accessibilityValue() -> Any? {
+        let value: NSNumber? = MainActor.assumeIsolated { [state] in state.value }
+        return value
+    }
+    override func accessibilityFrame() -> NSRect {
+        MainActor.assumeIsolated { [state] in state.frame }
+    }
+    override func accessibilityPerformPress() -> Bool {
+        MainActor.assumeIsolated { [state] in state.press() }
+    }
+}
+
+@MainActor private final class NotesTaskAccessibilityState {
+    weak var editor: NotesTextView?
+    weak var element: NotesTaskAccessibilityElement?
+    let item: NotesEditorDecorations.Item
+    let originalLine: String
+    let document: UUID?
+    let label: String
+
+    init(editor: NotesTextView, item: NotesEditorDecorations.Item) {
+        self.editor = editor
+        self.item = item
+        document = editor.coordinator?.model.document.id
+        originalLine = (editor.string as NSString).substring(with: item.line)
+        label = NotesLibraryText.plain(String(originalLine.dropFirst(NotesMarkdown.listPrefix(Substring(originalLine))?.length ?? 0)))
+    }
+    private var valid: Bool {
+        guard let editor, editor.coordinator?.model.document.id == document, NSMaxRange(item.line) <= editor.string.utf16.count else { return false }
+        let line = (editor.string as NSString).substring(with: item.line)
+        func unchecked(_ text: String) -> String {
+            text.replacingOccurrences(of: "[x]", with: "[ ]").replacingOccurrences(of: "[X]", with: "[ ]")
+        }
+        return unchecked(line) == unchecked(originalLine)
+    }
+    var value: NSNumber? {
+        guard valid, let editor else { return nil }
+        return NSNumber(value: (editor.string as NSString).substring(with: item.mark).lowercased() == "[x]")
+    }
+    var frame: NSRect {
+        guard valid, let editor, let window = editor.window, let rect = editor.rect(of: item.mark) else { return .zero }
+        return window.convertToScreen(editor.convert(rect, to: nil))
+    }
+    func press() -> Bool {
+        guard valid, let editor, let coordinator = editor.coordinator else { return false }
+        let selection = editor.selectedRanges
+        let result = coordinator.toggleTask(at: item.mark.location + 1)
+        editor.selectedRanges = selection
+        if result, let element { NSAccessibility.post(element: element, notification: .valueChanged) }
+        return result
+    }
 }

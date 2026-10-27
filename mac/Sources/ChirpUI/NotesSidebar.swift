@@ -44,9 +44,9 @@ struct NotesSidebar: View {
                     Section {
                         RecordingRow(model: model, entry: recording, selected: library.selection == .note(recording.id))
                             .tag(NotesSidebarItem.note(recording.id))
-                            .listRowBackground(SelectionBackground(selected: library.selection == .note(recording.id)))
+                            .listRowBackground(SelectionBackground(selected: library.selection == .note(recording.id), focused: library.sidebarFocused))
                     } header: {
-                        SidebarHeader(title: NotesLibraryText.recording)
+                        SidebarHeader(title: model.isPaused ? NotesStatus.paused : NotesLibraryText.recording)
                     }
                 }
                 ForEach(library.groups(pending: pending)) { group in
@@ -59,6 +59,7 @@ struct NotesSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .background(SidebarFocusObserver(library: library))
         .scrollContentBackground(.hidden)
         .overlay { overlay }
         .onDeleteCommand { trashSelection() }
@@ -94,7 +95,7 @@ struct NotesSidebar: View {
                 renaming: Binding(get: { library.renaming == entry.id }, set: { if !$0 { library.renaming = nil } }),
                 selected: library.selection == .note(entry.id))
             .tag(NotesSidebarItem.note(entry.id))
-            .listRowBackground(SelectionBackground(selected: library.selection == .note(entry.id)))
+            .listRowBackground(SelectionBackground(selected: library.selection == .note(entry.id), focused: library.sidebarFocused))
             .contextMenu { menu(entry) }
     }
 
@@ -135,7 +136,7 @@ private struct SidebarHeader: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 12.5, weight: .semibold, design: .serif))
+            .pondFont(12.5, weight: .semibold, design: .serif)
             .foregroundStyle(NotesInk.secondary)
             .textCase(nil)
             .padding(.top, 4)
@@ -145,10 +146,13 @@ private struct SidebarHeader: View {
 /// Selected library rows use the Pond koi container in both appearances.
 struct SelectionBackground: View {
     let selected: Bool
+    var focused = false
 
     var body: some View {
         RoundedRectangle(cornerRadius: ChirpRadius.row)
             .fill(selected ? Color.chirp.koiContainer : .clear)
+            .overlay(RoundedRectangle(cornerRadius: ChirpRadius.row)
+                .strokeBorder(selected && focused ? Color.chirp.koi : .clear, lineWidth: 2))
             .padding(.horizontal, 10)
     }
 }
@@ -157,7 +161,7 @@ struct SelectionBackground: View {
 struct RowInk {
     /// How much pond ink the snippet and meta keep on the pill (the theme tests check their contrast).
     static let snippetOnPill: Double = 0.78
-    static let metaOnPill: Double = 0.62
+    static let metaOnPill: Double = 0.85
 
     let selected: Bool
     let scheme: ColorScheme
@@ -170,7 +174,7 @@ struct RowInk {
     var onPill: Bool { selected && scheme == .dark }
     var title: Color { onPill ? Color.chirp.onKoiContainer : NotesInk.primary }
     var snippet: Color { onPill ? Color.chirp.onKoiContainer.opacity(Self.snippetOnPill) : NotesInk.secondary }
-    var meta: Color { onPill ? Color.chirp.onKoiContainer.opacity(Self.metaOnPill) : NotesInk.tertiary }
+    var meta: Color { onPill ? Color.chirp.onKoiContainer.opacity(Self.metaOnPill) : NotesInk.secondary }
     /// The record-coloured marks (the timer, the dot): pond ink while they sit on the pill.
     var mark: Color { onPill ? Color.chirp.onKoiContainer : Color.chirp.record }
 }
@@ -186,30 +190,33 @@ private struct NoteRow: View {
 
     private var ink: RowInk { RowInk(selected: selected, scheme: scheme) }
 
+    @Environment(\.chirpTextScale) private var textScale
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            let headingLayout = textScale > 1.3 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
+            headingLayout {
                 if renaming {
                     TextField("Title", text: $library.renameText)
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 13.5, weight: .semibold, design: .serif))
+                        .pondFont(13.5, weight: .semibold, design: .serif)
                         .onSubmit { library.commitRename() }
                         .onExitCommand { library.renaming = nil }
                 } else {
                     Text(entry.title)
-                        .font(.system(size: 14, weight: .semibold, design: .serif))
+                        .pondFont(14, weight: .semibold, design: .serif)
                         .foregroundStyle(ink.title)
                         .lineLimit(1)
                 }
-                Spacer(minLength: 4)
+                if textScale <= 1.3 { Spacer(minLength: 4) }
                 Text(NotesLibraryText.relative(entry.updatedAt, now: library.now(), calendar: library.calendar))
-                    .font(.system(size: 11))
+                    .pondFont(12)
                     .foregroundStyle(ink.snippet)
                     .lineLimit(1)
                     .fixedSize()
             }
             snippet
-                .font(.system(size: 12))
+                .pondFont(12)
                 .foregroundStyle(ink.snippet)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -256,29 +263,35 @@ private struct MetaLine: View {
     var progress: Double?
 
     var body: some View {
-        let length = NotesLibraryText.duration(entry.duration)
-        if length != nil || entry.openTodos > 0 || entry.recovered || entry.hasAudio {
-            HStack(spacing: 10) {
-                if let length, let progress {
-                    Label {
-                        Text(length)
-                    } icon: {
-                        ProgressRing(value: progress, color: ink.meta).frame(width: 10, height: 10)
-                    }
-                    .accessibilityLabel("\(length), re-transcribing")
-                } else if let length {
-                    Label(length, systemImage: entry.hasAudio ? "waveform" : "mic")
-                }
-                if entry.openTodos > 0 {
-                    Label(NotesLibraryText.open(entry.openTodos), systemImage: "square")
-                }
-                if entry.recovered { RecoveredBadge(onPill: ink.onPill) }
+        if NotesLibraryText.duration(entry.duration) != nil || entry.openTodos > 0 || entry.recovered || entry.hasAudio {
+            // One line while it fits; enlarged text wraps the facts instead of clipping them.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { facts }
+                VStack(alignment: .leading, spacing: 4) { facts }
             }
             .labelStyle(MetaLabelStyle())
-            .font(.system(size: 11))
+            .pondFont(12)
             .foregroundStyle(ink.meta)
             .padding(.top, 1)
         }
+    }
+
+    @ViewBuilder private var facts: some View {
+        let length = NotesLibraryText.duration(entry.duration)
+        if let length, let progress {
+            Label {
+                Text(length)
+            } icon: {
+                ProgressRing(value: progress, color: ink.meta).frame(width: 10, height: 10)
+            }
+            .accessibilityLabel("\(length), re-transcribing")
+        } else if let length {
+            Label(length, systemImage: entry.hasAudio ? "waveform" : "mic")
+        }
+        if entry.openTodos > 0 {
+            Label(NotesLibraryText.open(entry.openTodos), systemImage: "square")
+        }
+        if entry.recovered { RecoveredBadge(onPill: ink.onPill) }
     }
 }
 
@@ -300,11 +313,13 @@ private struct RecordingRow: View {
 
     private var ink: RowInk { RowInk(selected: selected, scheme: scheme) }
 
+    @Environment(\.chirpTextScale) private var textScale
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             ZStack {
                 if model.isPaused {
-                    Image(systemName: "pause.fill").font(.system(size: 11, weight: .bold)).foregroundStyle(ink.mark)
+                    Image(systemName: "pause.fill").pondFont(12, weight: .bold).foregroundStyle(ink.snippet)
                 } else {
                     Ripple(level: Double(model.level), reduceMotion: model.reduceMotion, phase: model.ripplePhase,
                            color: ink.onPill ? .chirp.onKoiContainer : .chirp.koiDecor,
@@ -314,18 +329,20 @@ private struct RecordingRow: View {
             }
             .frame(width: 30, height: 30)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline) {
+                // Over 130% the timer drops under the title, which keeps the row's width for the title.
+                let headingLayout = textScale > 1.3 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
+                headingLayout {
                     Text(entry.title)
-                        .font(.system(size: 14, weight: .semibold, design: .serif))
+                        .pondFont(14, weight: .semibold, design: .serif)
                         .foregroundStyle(ink.title)
                         .lineLimit(1)
-                    Spacer(minLength: 4)
+                    if textScale <= 1.3 { Spacer(minLength: 4) }
                     Text(model.elapsedText)
-                        .font(ChirpType.timer(12, weight: .semibold))
-                        .foregroundStyle(ink.mark)
+                        .pondFont(12, weight: .semibold, digits: true)
+                        .foregroundStyle(model.isPaused ? ink.snippet : ink.mark)
                 }
                 Text(entry.snippet.isEmpty ? (model.isPaused ? NotesStatus.paused : NotesStatus.listening) : NotesLibraryText.plain(entry.snippet))
-                    .font(.system(size: 12))
+                    .pondFont(12)
                     .foregroundStyle(ink.snippet)
                     .lineLimit(2)
             }
@@ -333,7 +350,7 @@ private struct RecordingRow: View {
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Recording: \(entry.title), \(model.elapsedText)")
+        .accessibilityLabel("\(model.isPaused ? "Paused" : "Recording"): \(entry.title), \(model.elapsedText)")
     }
 }
 
@@ -353,10 +370,10 @@ private struct RecentlyDeletedButton: View {
                 Text(NotesLibraryText.recentlyDeleted).foregroundStyle(ink.title)
                 Spacer()
                 if !library.deleted.isEmpty {
-                    Text("\(library.deleted.count)").font(.system(size: 11).monospacedDigit()).foregroundStyle(ink.snippet)
+                    Text("\(library.deleted.count)").pondFont(12, digits: true).foregroundStyle(ink.snippet)
                 }
             }
-            .font(.system(size: 13))
+            .pondFont(13)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(SelectionBackground(selected: selected).padding(.horizontal, -10))
@@ -378,10 +395,10 @@ private struct SidebarMessage: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: symbol).font(.system(size: 22, weight: .light)).foregroundStyle(NotesInk.tertiary)
-            Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(NotesInk.secondary).multilineTextAlignment(.center)
+            Image(systemName: symbol).pondFont(22, weight: .light).foregroundStyle(NotesInk.tertiary)
+            Text(title).pondFont(13, weight: .semibold).foregroundStyle(NotesInk.secondary).multilineTextAlignment(.center)
             if let detail {
-                Text(detail).font(.system(size: 11.5)).foregroundStyle(NotesInk.tertiary).multilineTextAlignment(.center)
+                Text(detail).pondFont(12).foregroundStyle(NotesInk.tertiary).multilineTextAlignment(.center)
             }
         }
         .padding(24)
@@ -400,8 +417,8 @@ struct RecentlyDeletedView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(NotesLibraryText.recentlyDeleted).font(ChirpType.noteTitle(26)).foregroundStyle(NotesInk.primary)
-                    Text(NotesLibraryText.trashHelp).font(ChirpType.meta).foregroundStyle(NotesInk.secondary)
+                    Text(NotesLibraryText.recentlyDeleted).pondFont(26, weight: .semibold, design: .serif).foregroundStyle(NotesInk.primary)
+                    Text(NotesLibraryText.trashHelp).pondFont(.meta).foregroundStyle(NotesInk.secondary)
                 }
                 Spacer()
                 Button("Empty…") { library.confirmingEmpty = true }
@@ -411,8 +428,8 @@ struct RecentlyDeletedView: View {
             .padding(.bottom, 18)
             if library.deleted.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "trash").font(.system(size: 30, weight: .light)).foregroundStyle(NotesInk.tertiary)
-                    Text(NotesLibraryText.trashEmpty).font(.callout).foregroundStyle(NotesInk.secondary)
+                    Image(systemName: "trash").pondFont(30, weight: .light).foregroundStyle(NotesInk.tertiary)
+                    Text(NotesLibraryText.trashEmpty).pondFont(.callout).foregroundStyle(NotesInk.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -435,21 +452,26 @@ private struct DeletedRow: View {
     let entry: NotesLibraryEntry
     let library: NotesLibraryModel
 
+    @Environment(\.chirpTextScale) private var textScale
+
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        let layout = textScale > 1.3 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout(alignment: .center, spacing: 14))
+        layout {
             VStack(alignment: .leading, spacing: 3) {
-                Text(entry.title).font(.system(size: 14, weight: .semibold, design: .serif)).foregroundStyle(NotesInk.primary).lineLimit(1)
+                Text(entry.title).pondFont(14, weight: .semibold, design: .serif).foregroundStyle(NotesInk.primary).lineLimit(1)
                 Text(entry.snippet.isEmpty ? "No additional text" : NotesLibraryText.plain(entry.snippet))
-                    .font(.system(size: 12)).foregroundStyle(NotesInk.secondary).lineLimit(1)
+                    .pondFont(12).foregroundStyle(NotesInk.secondary).lineLimit(1)
                 if let deletedAt = entry.deletedAt {
                     Text(NotesLibraryText.daysLeft(deletedAt: deletedAt, now: library.now()))
-                        .font(.system(size: 11)).foregroundStyle(NotesInk.tertiary)
+                        .pondFont(12).foregroundStyle(NotesInk.tertiary)
                 }
             }
-            Spacer(minLength: 8)
+            if textScale <= 1.3 { Spacer(minLength: 8) }
+            HStack(spacing: 10) {
             Button("Restore") { library.onRestore(entry.id) }
-            Button("Delete Now", role: .destructive) { library.onPurge(entry.id) }
+            Button("Delete Now", role: .destructive) { library.requestPurge(entry.id) }
                 .foregroundStyle(Color.chirp.record)
+            }
         }
         .controlSize(.small)
         .padding(.horizontal, 14)
@@ -471,4 +493,39 @@ private struct ProgressRing: View {
                 .rotationEffect(.degrees(-90))
         }
     }
+}
+
+
+/// Observe AppKit's actual first responder; selection alone is not keyboard focus.
+private struct SidebarFocusObserver: NSViewRepresentable {
+    let library: NotesLibraryModel
+    func makeNSView(context: Context) -> SidebarFocusView { SidebarFocusView(library: library) }
+    func updateNSView(_ view: SidebarFocusView, context: Context) { view.refresh() }
+}
+private final class SidebarFocusView: NSView {
+    let library: NotesLibraryModel
+    init(library: NotesLibraryModel) { self.library = library; super.init(frame: .zero) }
+    required init?(coder: NSCoder) { fatalError("not used") }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        NotificationCenter.default.removeObserver(self)
+        if let window {
+            for name in [NSWindow.didUpdateNotification, NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+                NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: name, object: window)
+            }
+        }
+        refresh()
+    }
+    @objc func refresh() {
+        var responder = window?.firstResponder
+        var inList = false
+        while let current = responder {
+            if current is NSTableView { inList = true; break }
+            responder = current.nextResponder
+        }
+        let focused = window?.isKeyWindow == true && inList
+        guard library.sidebarFocused != focused else { return }
+        DispatchQueue.main.async { [weak self] in self?.library.sidebarFocused = focused }
+    }
+    deinit { NotificationCenter.default.removeObserver(self) }
 }

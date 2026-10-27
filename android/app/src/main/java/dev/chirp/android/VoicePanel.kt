@@ -79,6 +79,7 @@ private fun readableOn(fill: Int): Int {
  */
 @SuppressLint("SetTextI18n", "ViewConstructor")
 internal class VoicePanel(context: Context) : LinearLayout(context) {
+    private val largeText = context.resources.configuration.fontScale >= 1.5f
     private val palette = VoicePalette.of(context)
     val banner = context.label("").apply { visibility = GONE }
     private val dot = View(context)
@@ -173,15 +174,17 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
             setPadding(0, 0, context.dp(10), 0)
         }
         addView(inner, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        inner.addView(privateChip, LayoutParams(LayoutParams.WRAP_CONTENT, context.dp(24)).apply { bottomMargin = context.dp(8) })
+        privateChip.minHeight = context.dp(24)
+        inner.addView(privateChip, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = context.dp(8) })
         error.addView(errorText, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        error.addView(fix, LayoutParams(LayoutParams.WRAP_CONTENT, context.dp(40)))
+        error.addView(fix, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
         inner.addView(error, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = context.dp(8) })
         inner.addView(transcript, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         micRow.addView(ripple, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        micRow.addView(cancel, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, context.dp(44), Gravity.START or Gravity.CENTER_VERTICAL))
-        micRow.addView(mic, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, context.dp(56), Gravity.CENTER))
+        if (!largeText) micRow.addView(cancel, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, context.dp(44), Gravity.START or Gravity.CENTER_VERTICAL))
+        micRow.addView(mic, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER))
         inner.addView(micRow, LayoutParams(LayoutParams.MATCH_PARENT, context.dp(96)))
+        if (largeText) inner.addView(cancel, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER_HORIZONTAL })
         inner.addView(countdown, LayoutParams(LayoutParams.MATCH_PARENT, context.dp(4)).apply { topMargin = context.dp(14) })
         inner.addView(actions, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = context.dp(12) })
     }

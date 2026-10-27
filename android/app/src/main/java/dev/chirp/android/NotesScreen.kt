@@ -49,6 +49,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -125,7 +127,6 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
             dismissButton = { TextButton(model::disableRememberVoices) { Text("Don’t remember voices") } })
     }
     val menu = NotesMenuActions(copy = copy, share = share, save = save, rename = { renaming = true }, settings = { settings = true }, delete = deleteNote)
-    val action = DictationAction.forStatus(model.status)
     /** Into the editor at the block tapped (or the first one on screen), at the height it had on the page. */
     fun startEditing(block: NotesBlock?) {
         val keys = NotesBlocks.keys(model.field.text, blocks)
@@ -141,7 +142,13 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
     Surface(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
             val wide = !externalTranscript && maxWidth >= SIDE_BY_SIDE && maxWidth > maxHeight
+            val density = LocalDensity.current
+            // Hold to edit beside the recording pill needs roughly 380dp at normal text size; below that they stack, decided by
+            // the window and font size rather than the labels so the button never jumps lines while held.
+            val stackedDock = maxWidth / density.fontScale < 400.dp
+            var dockHeight by remember { mutableIntStateOf(0) }
             val gutter = if (wide) 28.dp else 20.dp
+            val statusMaxHeight = maxHeight * .35f
 
             Column(Modifier.fillMaxSize()) {
                 NotesTopBar(model, editing, gutter, edit = { if (editing) read() else startEditing(null) }, menu,
@@ -150,28 +157,20 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
                 if (recordingElsewhere != null) AssistChip(jumpToRecording, modifier = Modifier.padding(horizontal = gutter),
                     label = { Text("Recording · ${recordingElsewhere.displayTitle} · ${recordingElsewhere.elapsedText}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = { Ripple(recordingElsewhere.level.toFloat(), Modifier.size(20.dp)) })
-                // One banner slot, ordered by urgency. Action feedback uses the dock's single notice slot.
-                Box(Modifier.padding(horizontal = gutter)) {
-                    when {
-                        model.retained -> StatusBanner(StatusKind.Error, stringResource(R.string.debug_retention))
-                        action != null -> StatusBanner(StatusKind.Warning, model.status, action = action.label, onAction = { act(action) })
-                        model.recovered != null -> StatusBanner(StatusKind.Info, "Recovered note", body = "Your note was recovered and kept on this phone.")
-                        model.speakerModelControl.status != null -> SpeakerModelStatus(model.speakerModelControl)
-                        model.askToNameSpeakers -> StatusBanner(StatusKind.Info, "Who was speaking?", action = "Name speakers",
-                            onAction = { model.nameSpeakersOpen = true })
-                        model.explanation != null -> Text(model.explanation!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+                // Independent recovery, connection and speaker notices coexist; cap the stack so notes stay usable.
+                NotesStatusStack(model, act, Modifier.padding(horizontal = gutter).heightIn(max = statusMaxHeight))
                 if (!editing && !wide && !externalTranscript) Row(Modifier.padding(horizontal = gutter)) {
-                    AssistChip({ transcript = true }, label = { Text("Transcript") }, leadingIcon = { Icon(painterResource(R.drawable.ic_notes_tab), null, Modifier.size(18.dp)) })
+                    AssistChip({ transcript = true }, label = { Text("Transcript") }, leadingIcon = { Icon(painterResource(R.drawable.ic_transcript), null, Modifier.size(18.dp)) })
                 }
                 Row(Modifier.fillMaxWidth().weight(1f)) {
                     Box(Modifier.weight(1.5f).fillMaxHeight()) {
                         when {
                             editing -> NotesEditor(model, scroll, anchor, { layout = it }, { anchor = null }, gutter, done = ::read)
-                            else -> NotesPage(model, blocks, list, anchor, { anchor = null }, gutter, edit = ::startEditing)
+                            else -> NotesPage(model, blocks, list, anchor, { anchor = null }, gutter,
+                                with(density) { dockHeight.toDp() } + 32.dp, edit = ::startEditing)
                         }
-                        if (!editing) NotesDock(model, record, Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 16.dp), allowCommand = recordingElsewhere == null)
+                        if (!editing) NotesDock(model, record, Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 16.dp)
+                            .onSizeChanged { dockHeight = it.height }, allowCommand = recordingElsewhere == null, stacked = stackedDock)
                     }
                     if (wide) Surface(Modifier.weight(1f).fillMaxHeight().padding(end = 16.dp, bottom = 16.dp), shape = MaterialTheme.shapes.extraLarge,
                         color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -184,6 +183,32 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
 }
 
 private class NotesMenuActions(val copy: () -> Unit, val share: () -> Unit, val save: () -> Unit, val rename: () -> Unit, val settings: () -> Unit, val delete: () -> Unit)
+
+/** Capture state is independent of structuring, connection and action feedback. */
+internal fun captureState(model: NotesModel): String = when (model.state) {
+    NotesRecorder.State.STARTING -> "Connecting"
+    NotesRecorder.State.PAUSED -> "Paused"
+    NotesRecorder.State.STOPPING -> "Finishing"
+    NotesRecorder.State.RECORDING -> "Recording"
+    else -> "Stopped"
+}
+
+@Composable
+internal fun NotesStatusStack(model: NotesModel, act: (DictationAction) -> Unit, modifier: Modifier = Modifier) {
+    val action = DictationAction.forStatus(model.status)
+    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (model.retained) StatusBanner(StatusKind.Error, stringResource(R.string.debug_retention))
+        if (action != null) StatusBanner(StatusKind.Warning, model.status, action = action.label, onAction = { act(action) })
+        if (model.recovered != null) StatusBanner(StatusKind.Info, "Recovered note", body = "Your note was recovered and kept on this phone.")
+        if (model.speakerModelControl.status != null) SpeakerModelStatus(model.speakerModelControl)
+        // Naming is premature while the model is still preparing. Keep the actionable model status instead.
+        else if (model.askToNameSpeakers) StatusBanner(StatusKind.Info, "Who was speaking?", action = "Name speakers",
+            onAction = { model.nameSpeakersOpen = true })
+        if (!model.retained && action == null) model.explanation?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
 
 /** Title (tap to rename) over a one-line status, then Edit and the overflow menu. */
 @Composable
@@ -287,7 +312,7 @@ private fun NotesMenu(model: NotesModel, actions: NotesMenuActions) {
  */
 @Composable
 private fun NotesPage(model: NotesModel, blocks: List<NotesBlock>, list: LazyListState, anchor: Anchor?, settled: () -> Unit,
-                      gutter: androidx.compose.ui.unit.Dp, edit: (NotesBlock?) -> Unit) {
+                      gutter: androidx.compose.ui.unit.Dp, bottomInset: androidx.compose.ui.unit.Dp, edit: (NotesBlock?) -> Unit) {
     val text = model.field.text
     val keys = remember(text, blocks) { NotesBlocks.keys(text, blocks) }
     val hearing = model.hearing
@@ -305,7 +330,7 @@ private fun NotesPage(model: NotesModel, blocks: List<NotesBlock>, list: LazyLis
         list.scrollToItem(index + lead); list.scrollBy(-at.y.toFloat()); settled()
     }
     val readable = Modifier.widthIn(max = NOTES_READING_WIDTH).fillMaxWidth().padding(horizontal = gutter)
-    LazyColumn(Modifier.fillMaxSize().testTag("notes-page"), list, contentPadding = PaddingValues(top = 4.dp, bottom = 128.dp),
+    LazyColumn(Modifier.fillMaxSize().testTag("notes-page"), list, contentPadding = PaddingValues(top = 4.dp, bottom = bottomInset),
         horizontalAlignment = Alignment.CenterHorizontally) {
         itemsIndexed(blocks, key = { i, _ -> keys[i] }) { _, block ->
             NotesBlockView(block, edit, toggle = { task ->
@@ -371,11 +396,15 @@ private fun NotesEditor(model: NotesModel, scroll: androidx.compose.foundation.S
  * running time, and Stop. Edit by voice sits beside it when the Mac offers it. Notes about the last action float above.
  */
 @Composable
-private fun NotesDock(model: NotesModel, record: () -> Unit, modifier: Modifier, allowCommand: Boolean = true) {
+private fun NotesDock(model: NotesModel, record: () -> Unit, modifier: Modifier, allowCommand: Boolean = true, stacked: Boolean = false) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Notices(model)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (allowCommand && model.voiceEditAvailable && (model.state.active || model.hasContent)) CommandButton(model, Modifier.weight(1f, fill = false))
+        val command = allowCommand && model.voiceEditAvailable && (model.state.active || model.hasContent)
+        if (stacked) {
+            if (command) CommandButton(model, Modifier)
+            if (model.state.active) RecordingPill(model, record) else RecordButton(model, record)
+        } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (command) CommandButton(model, Modifier.weight(1f, fill = false))
             if (model.state.active) RecordingPill(model, record) else RecordButton(model, record)
         }
     }
@@ -418,18 +447,26 @@ private fun RecordButton(model: NotesModel, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RecordingPill(model: NotesModel, stop: () -> Unit) {
+private fun RecordingPill(model: NotesModel, stop: () -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Surface(shape = CircleShape, color = scheme.surfaceContainerHighest, shadowElevation = 6.dp) {
+    val state = captureState(model)
+    Surface(modifier.testTag("notes-recording-dock"), shape = CircleShape, color = scheme.surfaceContainerHighest, shadowElevation = 6.dp) {
         Row(Modifier.heightIn(min = 64.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             val canPause = model.state == NotesRecorder.State.RECORDING || model.paused
             FilledTonalIconButton(model::togglePause, Modifier.size(48.dp).semantics { contentDescription = if (model.paused) "Resume recording notes" else "Pause recording notes" },
                 enabled = canPause) {
-                Icon(painterResource(if (model.paused) R.drawable.ic_mic else R.drawable.ic_pause), null)
+                Icon(painterResource(if (model.paused) R.drawable.ic_play else R.drawable.ic_pause), null)
             }
-            Column(Modifier.padding(horizontal = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (model.busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Ripple(model.level.toFloat(), Modifier.size(24.dp))
-                Text(model.elapsedText, style = dev.chirp.android.ui.ChirpTokens.timer)
+            // One quiet node: the note, its truthful state and the running time are read on focus, never announced as the clock ticks.
+            Row(Modifier.padding(horizontal = 12.dp).clearAndSetSemantics { contentDescription = "${model.displayTitle}, ${model.elapsedText}"; stateDescription = state },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // The ripple is the listening sign; paused shows no ripple, only its word.
+                if (model.busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                else if (model.recording) Ripple(model.level.toFloat(), Modifier.size(24.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(state, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                    Text(model.elapsedText, style = dev.chirp.android.ui.ChirpTokens.timer)
+                }
             }
             FilledIconButton(stop, Modifier.size(48.dp).semantics { contentDescription = "Stop recording notes" }, enabled = !model.busy,
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = dev.chirp.android.ui.LocalChirpRoles.current.record, contentColor = scheme.onError)) {

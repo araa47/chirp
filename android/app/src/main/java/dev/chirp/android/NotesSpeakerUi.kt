@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -61,12 +62,15 @@ internal object SpeakerColors {
 internal fun SpeakerChip(name: String, colorIndex: Int, onClick: () -> Unit, modifier: Modifier = Modifier, recognized: Boolean = false) {
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val color = SpeakerColors.of(colorIndex, dark)
-    Row(modifier.clip(CircleShape).background(color.copy(alpha = if (dark) .18f else .12f))
-        .clickable(onClick = onClick).semantics { role = Role.Button; contentDescription = "$name${if (recognized) ", recognised" else ""}. Rename, merge or reassign this speaker" }
+    Box(modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onClick)
+        .semantics(mergeDescendants = true) { role = Role.Button; contentDescription = "$name${if (recognized) ", recognised" else ""}. Rename, merge or reassign this speaker" },
+        contentAlignment = Alignment.CenterStart) {
+    Row(Modifier.clip(CircleShape).background(color.copy(alpha = if (dark) .18f else .12f))
         .padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(6.dp))
         Text(name + if (recognized) " ✓" else "", style = MaterialTheme.typography.labelLarge, color = color)
+    }
     }
 }
 
@@ -162,7 +166,7 @@ internal fun RenameSpeakerDialog(model: NotesModel, person: Int, dismiss: () -> 
         dismissButton = { TextButton(dismiss) { Text("Cancel") } })
 }
 
-/** Model preparation shares the note's single banner slot; controls wrap on narrow screens. */
+/** Model preparation can coexist with recovery and connection notices. */
 @Composable
 internal fun SpeakerModelStatus(model: NotesSpeakerModel, modifier: Modifier = Modifier) {
     val status = model.status ?: return

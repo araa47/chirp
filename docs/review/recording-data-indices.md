@@ -44,3 +44,11 @@ recording check on the original crash host remains a coordinator/operator gate.
 The separate repeated legacy Keychain refresh prompts are unproven and are not
 explained by this bounds failure. This investigation changes no installed app,
 permissions or Keychain state.
+
+Coordinator verification on unchanged `da214ff4`: the exact full
+`mac/scripts/test.sh` rerun exited 0, with 1,244 tests in 189 suites and the
+separate two-hour-session soak passing. The earlier full command exited 1 only
+on the soak hearing-parts timing budget; its unchanged isolated retry also
+passed. No source or timing budgets changed between these runs. iOS source
+checks, 108 shared tests, 112 keyboard-policy tests, and the owned simulator
+build plus 100 app unit tests passed on the same source head.

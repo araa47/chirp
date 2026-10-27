@@ -8,7 +8,7 @@ public enum NotesCommand: CaseIterable, Sendable {
     /// Re-transcribe Note… and Restore Previous Transcript (#287): hidden, not greyed, when they don't apply.
     case retranscribe, restoreTranscript
     case findNotes, copyMarkdown, export
-    case toggleInspector, showMarkdown
+    case toggleInspector, showMarkdown, biggerText, smallerText, actualSize, readFormattedNote
     case restoreOrganize
 
     /// Which main-menu menu the command sits in.
@@ -28,7 +28,7 @@ public enum NotesCommand: CaseIterable, Sendable {
 
     public var menu: Menu {
         switch self {
-        case .toggleInspector, .showMarkdown: .view
+        case .toggleInspector, .showMarkdown, .biggerText, .smallerText, .actualSize, .readFormattedNote: .view
         case .restoreOrganize: .edit
         default: .notes
         }
@@ -82,6 +82,13 @@ public enum NotesCommand: CaseIterable, Sendable {
             case .showMarkdown:
                 return Item(command: c, title: "Show Markdown", key: "m", modifiers: shiftCommand,
                             enabled: on && library != nil, checked: library?.showMarkdown == true)
+            case .biggerText, .smallerText, .actualSize:
+                let size = library?.textSize ?? shown.textSize
+                let title = c == .biggerText ? "Bigger Text" : c == .smallerText ? "Smaller Text" : "Actual Size (100%)"
+                return Item(command: c, title: title, key: c == .biggerText ? "+" : c == .smallerText ? "-" : "0", modifiers: .command,
+                            enabled: on && (c == .biggerText ? size.canIncrease : c == .smallerText ? size.canDecrease : size.factor != 1), checked: false)
+            case .readFormattedNote:
+                return Item(command: c, title: "Read Formatted Note", key: "", modifiers: [], enabled: on && library != nil && library?.selection != .recentlyDeleted, checked: false)
             case .restoreOrganize:
                 return Item(command: c, title: "Restore Notes Before Organize…", key: "", modifiers: [], enabled: on && shown.canRestore, checked: false)
             case .retranscribe:
@@ -113,6 +120,10 @@ extension NotesModel {
         case .export: shown.onSave()
         case .toggleInspector: library.map { $0.setInspector(!$0.showsInspector) }
         case .showMarkdown: library.map { $0.setShowMarkdown(!$0.showMarkdown) }
+        case .biggerText: (library?.textSize ?? shown.textSize).increase()
+        case .smallerText: (library?.textSize ?? shown.textSize).decrease()
+        case .actualSize: (library?.textSize ?? shown.textSize).reset()
+        case .readFormattedNote: library?.readingNote = true
         case .restoreOrganize: shown.review()
         case .retranscribe: library?.onRetranscribe(shown.document.id, nil)
         case .restoreTranscript: library?.onRestoreTranscript(shown.document.id)

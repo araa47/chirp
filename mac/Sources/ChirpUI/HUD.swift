@@ -301,14 +301,14 @@ public struct HUDView: View {
                     Spacer(minLength: 8)
                     durationLabel
                 }
-                .font(.system(size: 11))
+                .pondFont(.meta)
                 .foregroundStyle(Color.secondary)
             }
             HStack(spacing: 10) {
                 indicator
                     .accessibilityHidden(true)
                 Text(model.status)
-                    .font(.system(size: 13, weight: .medium))
+                    .pondFont(13, weight: .medium)
                     .foregroundStyle(model.isError ? HUDColors.error : Color.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -327,7 +327,7 @@ public struct HUDView: View {
                     HUDChip(MenuContent.debugRetention, tone: .alert)
                         .help(MenuContent.debugRetentionHelp)
                 }
-                if !model.privateSession { durationLabel.font(.system(size: 11)).foregroundStyle(Color.secondary) }
+                if !model.privateSession { durationLabel.pondFont(.meta).foregroundStyle(Color.secondary) }
             }
             let shown = HUDText.tail(stable: model.stable, unstable: model.unstable, limit: HUDText.lineBudget)
             let viewport = TranscriptViewport(maxHeight: HUDViewMetrics.transcriptMaxHeight(wordWaveform: model.showsWordWaveform))
@@ -358,7 +358,7 @@ public struct HUDView: View {
             } else if !shown.stable.isEmpty || !shown.unstable.isEmpty {
                 viewport {
                     (Text(shown.stable) + Text(shown.unstable).foregroundStyle(Color.primary.opacity(model.increaseContrast ? 0.72 : 0.5)))
-                        .font(.system(size: 15))
+                        .pondFont(15)
                         .frame(width: contentWidth, alignment: .leading)
                 }
                 .modifier(fade)
@@ -375,14 +375,14 @@ public struct HUDView: View {
     @ViewBuilder private var indicator: some View {
         if let symbol = model.indicator.symbol {
             Image(systemName: symbol.name)
-                .font(.system(size: 15))
+                .pondFont(15)
                 .foregroundStyle(model.isError ? HUDColors.error : model.indicator == .success ? Color.chirp.lily : Color.chirp.inkMuted)
                 .frame(width: 20, height: 20)
         } else if model.indicator == .waveform {
             Ripple(level: Double(model.levels.samples.last ?? 0), reduceMotion: model.reduceMotion, phase: model.pulsePhase)
         } else if model.indicator == .sparkle {
             Image(systemName: "sparkles")
-                .font(.system(size: 15))
+                .pondFont(15)
                 .foregroundStyle(Color.chirp.moon)
                 .symbolEffect(.pulse, options: .repeating, isActive: !model.reduceMotion)
                 .frame(width: 20, height: 20)
@@ -463,10 +463,10 @@ struct HUDChip: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            if let symbol { Image(systemName: symbol).font(.system(size: 9, weight: .semibold)) }
+            if let symbol { Image(systemName: symbol).pondFont(9, weight: .semibold) }
             Text(text).lineLimit(1)
         }
-        .font(.system(size: 10, weight: .semibold))
+        .pondFont(.caption, weight: .semibold)
         .foregroundStyle(foreground)
         .padding(.horizontal, 8).padding(.vertical, 3)
         .background(background, in: Capsule())
@@ -533,7 +533,7 @@ struct ShimmerText: View {
         }
     }
 
-    private var label: some View { Text(text).font(.system(size: 15)) }
+    private var label: some View { Text(text).pondFont(15) }
 
     @ViewBuilder private func sweep(at position: Double?) -> some View {
         if let position {
