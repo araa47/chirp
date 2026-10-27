@@ -33,13 +33,21 @@ jobs:
             echo "PR #$PR is $state again, nothing to cancel."
             exit 0
           fi
-          # Every pull_request run of the branch that belongs to this PR and has not finished (queued, waiting or
-          # in progress), whatever commit it ran on, except this job's own run.
+          # Runs are matched by branch, not by PR number: GitHub leaves a run's `pull_requests` list empty in some
+          # cases (seen for a PR whose base is not the default branch). So stand down if another open PR still uses
+          # this head branch.
+          others=$(gh api --method GET "repos/$REPO/pulls" -f state=open -f head="${REPO%%/*}:$BRANCH" --jq length)
+          if [ "$others" != 0 ]; then
+            echo "Another open PR uses branch $BRANCH, nothing to cancel."
+            exit 0
+          fi
+          # Every pull_request run of the branch that has not finished (queued, waiting or in progress), whatever
+          # commit it ran on, except this job's own run.
           runs=$(gh api --method GET --paginate "repos/$REPO/actions/runs" \
             -f event=pull_request -f branch="$BRANCH" -f per_page=100 \
             --jq '.workflow_runs[]
               | select(.status != "completed" and .id != (env.THIS_RUN | tonumber))
-              | select(any(.pull_requests[]; .number == (env.PR | tonumber)))
+              | select(.head_repository.full_name == env.REPO)
               | "\(.id) \(.name) \(.head_sha[0:8]) \(.status)"')
           if [ -z "$runs" ]; then
             echo "No unfinished runs for PR #$PR."
