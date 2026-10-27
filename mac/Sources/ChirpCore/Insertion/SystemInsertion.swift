@@ -31,7 +31,7 @@ public enum SystemInsertion {
         return AXUIElementCopyAttributeValue(element, attribute as CFString, &ref) == .success ? ref : nil
     }
 
-    private static func range(_ element: AXUIElement) -> CFRange? {
+    fileprivate static func range(_ element: AXUIElement) -> CFRange? {
         guard let v = copy(element, "AXSelectedTextRange"), CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
         var r = CFRange()
         return AXValueGetValue(v as! AXValue, .cfRange, &r) ? r : nil
@@ -142,6 +142,22 @@ public final class AXWatchedField: WatchedField {
     }
 
     public func value() -> String? { SystemInsertion.copy(element, "AXValue") as? String }
+
+    public func selection() -> NSRange? {
+        SystemInsertion.range(element).map { NSRange(location: $0.location, length: $0.length) }
+    }
+
+    private static var requested: Set<pid_t> = []
+
+    /// Chromium and Electron apps build their Accessibility tree only for assistive apps, so a field Chirp pasted into
+    /// there cannot be read. Ask for it once per process with `AXManualAccessibility` (never `AXEnhancedUserInterface`,
+    /// which upsets window managers); other apps ignore the attribute.
+    public static func requestAccessibility(pid: pid_t) {
+        guard AXIsProcessTrusted(), requested.insert(pid).inserted else { return }
+        let app = AXUIElementCreateApplication(pid)
+        let result = AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+        chirpLog.info("learn AXManualAccessibility result=\(result.rawValue, privacy: .public)")
+    }
 
     public var isFocused: Bool {
         guard let now = SystemInsertion.focusedElement() else { return false }

@@ -221,10 +221,36 @@ public actor LearnedStore {
 public protocol WatchedField: AnyObject {
     /// The field's whole text, nil when it can no longer be read.
     func value() -> String?
+    /// The selection or caret (UTF-16), nil when the app does not say: finds a pasted dictation.
+    func selection() -> NSRange?
     /// It is still the focused element.
     var isFocused: Bool { get }
     /// A password field, or secure input is on: nothing is read or learned.
     var isSecure: Bool { get }
+}
+
+/// Whether a committed dictation's field is watched, every gate in order. An AX write and a paste go through the same
+/// gates; only what passes them may be looked for in the field (and only then is a Chromium or Electron app asked to
+/// expose it). The gate names go to the log.
+public enum LearnWatchPlan: Sendable, Equatable {
+    case skip(gate: String)
+    /// A verified AX write that said where it went.
+    case watch(NSRange)
+    /// A paste, or an AX write that was not confirmed or gave no range: look for it in the field.
+    case find
+
+    public static func plan(learningEnabled: Bool, historyEnabled: Bool, isPrivate: Bool, excluded: Bool, secureField: Bool,
+                            outcome: InsertionOutcome, axRange: NSRange?) -> LearnWatchPlan {
+        guard learningEnabled else { return .skip(gate: historyEnabled ? "learningOff" : "historyOff") }
+        guard !isPrivate else { return .skip(gate: "private") }
+        guard !excluded else { return .skip(gate: "excludedApp") }
+        guard !secureField else { return .skip(gate: "secure") }
+        switch outcome {
+        case .inserted(.ax): return axRange.map(LearnWatchPlan.watch) ?? .find
+        case .inserted(.paste), .insertedUnverified: return .find
+        case .inserted(.copy), .copied, .refusedSecure: return .skip(gate: "notInserted")
+        }
+    }
 }
 
 /// A plain in-memory text field: the test-mode stand-in for an app's field (unit tests and `--learn-selftest`).
@@ -233,14 +259,18 @@ public final class TestTextField: WatchedField {
     public var text: String
     public var isFocused = true
     public var isSecure = false
+    /// The caret, after the last insertion; nil for an app that does not report it.
+    public var caret: NSRange?
     public init(_ text: String = "") { self.text = text }
     public func value() -> String? { text }
+    public func selection() -> NSRange? { caret }
 
     /// Inserts at the end as a dictation does; returns where it went (UTF-16).
     @discardableResult
     public func insert(_ inserted: String) -> NSRange {
         let range = NSRange(location: (text as NSString).length, length: (inserted as NSString).length)
         text += inserted
+        caret = NSRange(location: NSMaxRange(range), length: 0)
         return range
     }
 
@@ -248,13 +278,18 @@ public final class TestTextField: WatchedField {
     public func edit(_ old: String, to new: String) { text = text.replacingOccurrences(of: old, with: new) }
 }
 
-/// Watches the field a dictation went into for a bounded window: it ends at the first focus change, after `window`,
-/// or when the next dictation starts. Then the inserted span, as the user left it, goes to `onEdit`. Secure fields
-/// are never read. Field text is held in memory only for the window.
+/// Watches the field a dictation went into for a bounded window: it ends at the first focus change, when the text
+/// around the dictation changes (the message was sent, the field cleared, an edit elsewhere), after `window`, or when
+/// the next dictation starts. Then the inserted span, as the user last left it, goes to `onEdit`. Secure fields are
+/// never read. Field text is held in memory only for the window; the log says why a window started or ended, never
+/// what the field holds.
 @MainActor
 public final class EditWatcher {
     public static let window: Duration = .seconds(60)
     public static let interval: Duration = .milliseconds(400)
+    /// A paste lands when the app gets to it: how often and how long to look for it.
+    public static let pasteInterval: Duration = .milliseconds(125)
+    public static let pasteAttempts = 12
 
     public struct Edit: Sendable, Equatable {
         public var inserted: String
@@ -262,6 +297,11 @@ public final class EditWatcher {
         public var raw: String
         public var bundleID: String?
         public var appName: String?
+    }
+
+    /// Why a window ended, for the log.
+    public enum End: String, Sendable {
+        case next, focus, timeout, moved, unreadable, secure
     }
 
     private struct Watch {
@@ -277,6 +317,8 @@ public final class EditWatcher {
 
     private var current: Watch?
     private var task: Task<Void, Never>?
+    /// Bumped whenever a window ends or is cancelled, so a paste still being looked for gives up.
+    private var generation = 0
     private let sleep: (Duration) async -> Void
     private let window: Duration
     private let interval: Duration
@@ -291,42 +333,85 @@ public final class EditWatcher {
     }
 
     /// Starts watching `field`, where `inserted` went at `range`; the previous window ends first.
-    public func watch(_ field: WatchedField, inserted: String, range: NSRange, raw: String, bundleID: String?, appName: String?) {
+    @discardableResult
+    public func watch(_ field: WatchedField, inserted: String, range: NSRange, raw: String, bundleID: String?, appName: String?) -> Bool {
         finish()
-        guard !field.isSecure, let before = field.value(), let r = Range(range, in: before), before[r] == inserted else { return }
+        let app = bundleID ?? "-"
+        guard !field.isSecure else { chirpLog.info("learn skip gate=secure app=\(app, privacy: .public)"); return false }
+        guard let before = field.value() else { chirpLog.info("learn skip gate=unreadable app=\(app, privacy: .public)"); return false }
+        guard let r = Range(range, in: before), before[r] == inserted else {
+            chirpLog.info("learn skip gate=notInField app=\(app, privacy: .public)")
+            return false
+        }
         current = Watch(field: field, before: before, latest: before, range: range, inserted: inserted, raw: raw,
                         bundleID: bundleID, appName: appName)
+        chirpLog.info("learn watch app=\(app, privacy: .public)")
         let polls = max(1, Int(window / interval))
         task = Task { [weak self] in
             for _ in 0..<polls {
                 await self?.sleep(self?.interval ?? .seconds(1))
-                guard !Task.isCancelled, let self, self.poll() else { break }
+                guard !Task.isCancelled, let self else { return }
+                if let end = self.poll() { self.finish(end); return }
             }
             guard !Task.isCancelled else { return }
-            self?.finish()
+            self?.finish(.timeout)
         }
-    }
-
-    /// One look: false when the window is over (focus moved, the field went secure or unreadable).
-    private func poll() -> Bool {
-        guard var watch = current else { return false }
-        if watch.field.isSecure { current = nil; return false }
-        guard watch.field.isFocused, let value = watch.field.value() else { return false }
-        watch.latest = value
-        current = watch
         return true
     }
 
+    /// After a paste, or an AX write that did not say where it landed: the app applies it on its own time, so look
+    /// for the text in the focused field (just before the caret, or its only occurrence) for a moment, then watch it
+    /// there. Gives up when the next dictation starts or Use raw runs meanwhile.
+    @discardableResult
+    public func watchPasted(_ field: @escaping () -> WatchedField?, inserted: String, raw: String, bundleID: String?,
+                            appName: String?, attempts: Int = EditWatcher.pasteAttempts) async -> Bool {
+        finish()
+        let started = generation
+        var gate = "unreadable"
+        for attempt in 0..<max(1, attempts) {
+            if attempt > 0 { await sleep(Self.pasteInterval) }
+            guard generation == started, !Task.isCancelled else { return false }
+            guard let f = field() else { continue }
+            if f.isSecure { gate = "secure"; break }
+            guard let value = f.value() else { continue }
+            gate = "notInField"
+            if let range = EditRegion.pasted(inserted, in: value, caret: f.selection()) {
+                return watch(f, inserted: inserted, range: range, raw: raw, bundleID: bundleID, appName: appName)
+            }
+        }
+        chirpLog.info("learn skip gate=\(gate, privacy: .public) app=\(bundleID ?? "-", privacy: .public)")
+        return false
+    }
+
+    /// One look: why the window is over (focus moved, the text around it changed, the field went secure or
+    /// unreadable), or nil to keep watching.
+    private func poll() -> End? {
+        guard var watch = current else { return .next }
+        if watch.field.isSecure { return .secure }
+        guard watch.field.isFocused else { return .focus }
+        guard let value = watch.field.value() else { return .unreadable }
+        // Sent, cleared or edited elsewhere: what the user made of the dictation is the last text seen.
+        guard EditRegion.holds(before: watch.before, after: value, range: watch.range) else { return .moved }
+        watch.latest = value
+        current = watch
+        return nil
+    }
+
     /// Ends the window (the next dictation, focus moved, time is up) and reports the edit, if any.
-    public func finish() {
+    public func finish(_ end: End = .next) {
         task?.cancel()
         task = nil
+        generation += 1
         guard var watch = current else { return }
         current = nil
-        if watch.field.isSecure { return }
-        if watch.field.isFocused, let value = watch.field.value() { watch.latest = value }
-        guard let edited = EditRegion.edited(before: watch.before, after: watch.latest, range: watch.range),
-              edited != watch.inserted else { return }
+        let app = watch.bundleID ?? "-"
+        if watch.field.isSecure { chirpLog.info("learn end=secure app=\(app, privacy: .public)"); return }
+        if watch.field.isFocused, let value = watch.field.value(),
+           EditRegion.holds(before: watch.before, after: value, range: watch.range) { watch.latest = value }
+        let edited = EditRegion.edited(before: watch.before, after: watch.latest, range: watch.range)
+        let changed = edited.map { $0 != watch.inserted } ?? false
+        chirpLog.info("learn end=\(end.rawValue, privacy: .public) edited=\(changed, privacy: .public) app=\(app, privacy: .public)")
+        guard let edited, changed else { return }
         onEdit(Edit(inserted: watch.inserted, edited: edited, raw: watch.raw, bundleID: watch.bundleID, appName: watch.appName))
     }
 
@@ -334,6 +419,8 @@ public final class EditWatcher {
     public func cancel() {
         task?.cancel()
         task = nil
+        generation += 1
+        if let watch = current { chirpLog.info("learn end=cancelled app=\(watch.bundleID ?? "-", privacy: .public)") }
         current = nil
     }
 }
@@ -341,7 +428,7 @@ public final class EditWatcher {
 // MARK: the app's learning
 
 /// Learn from my edits for the app and its windows: the watcher's edits become corrections in the store, and
-/// `payload`/`apply` hand the active ones to the next dictation. Nothing here is logged.
+/// `payload`/`apply` hand the active ones to the next dictation. The log has counts and the app only, never the words.
 @MainActor @Observable public final class EditLearning {
     public let store: LearnedStore
     @ObservationIgnored public let watcher: EditWatcher
@@ -364,7 +451,10 @@ public final class EditWatcher {
     /// An edit the watcher saw.
     public func learn(_ edit: EditWatcher.Edit) {
         let corrections = EditCorrections.extract(inserted: edit.inserted, edited: edit.edited)
-        guard !corrections.isEmpty else { return }
+        guard !corrections.isEmpty else {
+            chirpLog.info("learn edit corrections=0 app=\(edit.bundleID ?? "-", privacy: .public)")
+            return
+        }
         Task { await observe(corrections, edit: edit, explicit: false) }
     }
 
@@ -379,10 +469,17 @@ public final class EditWatcher {
 
     @discardableResult
     private func observe(_ corrections: [LearnedCorrection], edit: EditWatcher.Edit, explicit: Bool) async -> [LearnedItem] {
-        let activated = (try? await store.observe(corrections, bundleID: edit.bundleID, appName: edit.appName,
-                                                  inserted: edit.inserted, edited: edit.edited, said: edit.raw,
-                                                  explicit: explicit)) ?? []
+        var activated: [LearnedItem] = []
+        do {
+            activated = try await store.observe(corrections, bundleID: edit.bundleID, appName: edit.appName,
+                                                inserted: edit.inserted, edited: edit.edited, said: edit.raw, explicit: explicit)
+        } catch {
+            let e = error as NSError   // the domain and code only: an error's description may quote a value
+            chirpLog.error("learn store failed domain=\(e.domain, privacy: .public) code=\(e.code, privacy: .public)")
+        }
         await reload()
+        let counts = corrections.map { c in items.first { LearnedStore.same($0, c, edit.bundleID) }.map { "\($0.state.rawValue):\($0.count)" } ?? "lost" }
+        chirpLog.info("learn edit corrections=\(corrections.count, privacy: .public) activated=\(activated.count, privacy: .public) items=\(counts.joined(separator: ","), privacy: .public) explicit=\(explicit, privacy: .public) app=\(edit.bundleID ?? "-", privacy: .public)")
         if !activated.isEmpty { onLearned(activated) }
         return activated
     }

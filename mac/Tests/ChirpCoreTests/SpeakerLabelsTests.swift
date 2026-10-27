@@ -12,6 +12,8 @@ final class FakeModelStore: SpeakerModelStore, @unchecked Sendable {
     private var held: CheckedContinuation<Void, Never>?
     var hold = false
     var fail = false
+    /// Delays the start of each load, as a busy machine delays the background download task.
+    var startDelay: Duration = .zero
 
     init(downloaded: Bool) {
         _downloaded = downloaded
@@ -28,6 +30,7 @@ final class FakeModelStore: SpeakerModelStore, @unchecked Sendable {
     func remove() throws { lock.withLock { _removes += 1; _downloaded = false; _files = false } }
 
     func load(download: Bool, progress: @escaping @Sendable (Double) -> Void) async throws -> any SpeakerDiarizerFactory {
+        if startDelay > .zero { try? await Task.sleep(for: startDelay) }
         let shouldHold = lock.withLock { () -> Bool in
             _loads.append(download)
             if download { _files = true }

@@ -12,8 +12,9 @@ public enum SoundCue: Equatable, Sendable {
         }
     }
 
-    /// The cue a state change plays, if any. Start sounds at the beginning of a dictation (before the microphone is
-    /// opened, so it is not recorded); stop when capture ends. Errors, cancels and insertion stay silent.
+    /// The cue a state change plays, if any. Start sounds at the beginning of a dictation, as the microphone opens
+    /// (dictation zeroes the cue's window in what it sends); stop when capture ends. Errors, cancels and insertion
+    /// stay silent.
     public static func cue(from old: DictationState, to new: DictationState, enabled: Bool) -> SoundCue? {
         guard enabled, old != new else { return nil }
         switch (old, new) {

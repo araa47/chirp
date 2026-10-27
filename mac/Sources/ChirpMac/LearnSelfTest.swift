@@ -4,7 +4,7 @@ import Foundation
 /// `ChirpMac --learn-selftest [--url URL] [--token-file PATH]`: Learn from my edits end to end without a microphone,
 /// Accessibility or the real Keychain. Each "dictation" goes into a test text field the way Chirp inserts it, the
 /// user's edit is made in that field, and the field watcher, the correction extractor and a throwaway sealed store do
-/// the rest: after the second identical fix the term is active, and the third dictation's `start` carries it and its
+/// the rest (the second dictation is found in the field as a paste is): after the second identical fix the term is active, and the third dictation's `start` carries it and its
 /// text comes out respelled. With `--url` the `start` (with `learned`) also goes to that server with half a second of
 /// silence, to check it accepts the block. Prints counts and the synthetic text only; writes only to a temp folder.
 @MainActor
@@ -31,7 +31,11 @@ enum LearnSelfTest {
             let text = options.learned?.apply(to: heard) ?? heard
             let field = TestTextField("Status: ")
             let range = field.insert(text)
-            learning.watcher.watch(field, inserted: text, range: range, raw: heard, bundleID: app.id, appName: app.name)
+            // The first goes in the way an AX write does (its range known), the second as a paste is found in the field.
+            let watching = round == 1
+                ? learning.watcher.watch(field, inserted: text, range: range, raw: heard, bundleID: app.id, appName: app.name)
+                : await learning.watcher.watchPasted({ field }, inserted: text, raw: heard, bundleID: app.id, appName: app.name)
+            check(watching, round == 1 ? "the inserted field is watched" : "the pasted text is found in its field and watched")
             field.edit("cooper netties", to: "Kubernetes")
             print("  dictation \(round): inserted “\(text)”, edited to “\(field.text.dropFirst(8))”")
             learning.watcher.finish()

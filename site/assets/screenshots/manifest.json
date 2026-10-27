@@ -760,90 +760,110 @@
     ]
   },
   "mac/hud-flow-3-diff-dark.png": {
-    "sha256": "bfbd8ec5bb37d069ab828e8e4124cadb9f6ed3abbd038d974fdc9a0a57484d67",
-    "width": 776,
-    "height": 280,
+    "sha256": "d0ad0fda73d594bbb75e949877c78f64acd67356f4670fcbeb10a76d02dce048",
+    "width": 1000,
+    "height": 198,
     "variants": [
       {
         "file": "mac/hud-flow-3-diff-dark-320.webp",
         "width": 320,
-        "height": 115
+        "height": 63
       },
       {
         "file": "mac/hud-flow-3-diff-dark-640.webp",
         "width": 640,
-        "height": 231
+        "height": 127
       },
       {
-        "file": "mac/hud-flow-3-diff-dark-776.webp",
-        "width": 776,
-        "height": 280
+        "file": "mac/hud-flow-3-diff-dark-960.webp",
+        "width": 960,
+        "height": 190
+      },
+      {
+        "file": "mac/hud-flow-3-diff-dark-1000.webp",
+        "width": 1000,
+        "height": 198
       }
     ]
   },
   "mac/hud-flow-3-diff-light.png": {
-    "sha256": "fb4e165103760dec0a152beb408435e1336207f0aa964072cfb805af1ad41c74",
-    "width": 776,
-    "height": 280,
+    "sha256": "eb0fae36889cb79e172334f20b7089aefce5c1c4f4e4f5d58df2303333149816",
+    "width": 1000,
+    "height": 198,
     "variants": [
       {
         "file": "mac/hud-flow-3-diff-light-320.webp",
         "width": 320,
-        "height": 115
+        "height": 63
       },
       {
         "file": "mac/hud-flow-3-diff-light-640.webp",
         "width": 640,
-        "height": 231
+        "height": 127
       },
       {
-        "file": "mac/hud-flow-3-diff-light-776.webp",
-        "width": 776,
-        "height": 280
+        "file": "mac/hud-flow-3-diff-light-960.webp",
+        "width": 960,
+        "height": 190
+      },
+      {
+        "file": "mac/hud-flow-3-diff-light-1000.webp",
+        "width": 1000,
+        "height": 198
       }
     ]
   },
   "mac/hud-listening-dark.png": {
-    "sha256": "d6529fd87eda8873d3327188f55aaa12787896fd5bc00eaa91150a5ce7e0fb62",
-    "width": 776,
-    "height": 280,
+    "sha256": "e1dceed9624c8442d62559ed2227dedaf016c14305c7dbf959ef0331e290c65e",
+    "width": 1000,
+    "height": 236,
     "variants": [
       {
         "file": "mac/hud-listening-dark-320.webp",
         "width": 320,
-        "height": 115
+        "height": 76
       },
       {
         "file": "mac/hud-listening-dark-640.webp",
         "width": 640,
-        "height": 231
+        "height": 151
       },
       {
-        "file": "mac/hud-listening-dark-776.webp",
-        "width": 776,
-        "height": 280
+        "file": "mac/hud-listening-dark-960.webp",
+        "width": 960,
+        "height": 227
+      },
+      {
+        "file": "mac/hud-listening-dark-1000.webp",
+        "width": 1000,
+        "height": 236
       }
     ]
   },
   "mac/hud-listening-light.png": {
-    "sha256": "d62fbead6bff14e303a1cbeed5e08d2f6a923f236d1f829c5a39798582ddce67",
-    "width": 776,
-    "height": 280,
+    "sha256": "2e6fa1b4b04b97ec69053d131739965715a89e51faf9b03b1f96225921a0ac4c",
+    "width": 1000,
+    "height": 236,
     "variants": [
       {
         "file": "mac/hud-listening-light-320.webp",
         "width": 320,
-        "height": 115
+        "height": 76
       },
       {
         "file": "mac/hud-listening-light-640.webp",
         "width": 640,
-        "height": 231
+        "height": 151
       },
       {
-        "file": "mac/hud-listening-light-776.webp",
-        "width": 776,
-        "height": 280
+        "file": "mac/hud-listening-light-960.webp",
+        "width": 960,
+        "height": 227
+      },
+      {
+        "file": "mac/hud-listening-light-1000.webp",
+        "width": 1000,
+        "height": 236
       }
     ]
   },

@@ -50,6 +50,8 @@ public enum Snapshots {
     }
 
     private static let rawSentence = "move the standup to three thirty and uh let everyone know"
+    /// About 600 characters: five times the 120 the HUD used to keep.
+    static let longDictation = "Okay so for the planning doc, first we need to move the standup to three thirty on Thursday because the design review runs long, then check the rollout plan with the whole team before the release review, and remind the designers about the icon sizes for the settings page, we still need the dark variants and the notification badge, and the onboarding copy needs one more pass from marketing, after that book the big room for Friday afternoon, order lunch for twelve people, ask finance whether the new laptops are approved, and make sure the on-call rota covers the long weekend"
 
     // MARK: word waveform demo data
 
@@ -154,6 +156,11 @@ public enum Snapshots {
             hud("listening") { $0.status = HUDStatus.listening; $0.levels = .demo(peak: 0.8); $0.pulsePhase = 0.4; $0.stable = stable; $0.unstable = tail },
             hud("listening-no-text") { $0.status = HUDStatus.listening; $0.levels = .demo(peak: 0.45); $0.pulsePhase = 0.4 },
             hud("listening-unstable-only") { $0.status = HUDStatus.listening; $0.levels = .demo(peak: 1); $0.pulsePhase = 0.4; $0.unstable = "so the first words are" },
+            // A long dictation: the viewport keeps the newest lines and fades the earlier ones at the top edge.
+            hud("long-dictation") {
+                $0.status = HUDStatus.listening; $0.duration = "1:12 / 10:00"; $0.levels = .demo(peak: 0.7); $0.pulsePhase = 0.4
+                $0.stable = longDictation; $0.unstable = " and send the notes to everyone"
+            },
             hud("listening-multiline") { $0.status = HUDStatus.listening; $0.levels = .demo(peak: 0.7); $0.pulsePhase = 0.6; $0.stable = long; $0.unstable = " and finally" },
             hud("listening-reduce-motion") { $0.status = HUDStatus.listening; $0.reduceMotion = true; $0.levels = .demo(peak: 0.6); $0.stable = stable; $0.unstable = tail },
             hud("listening-contrast") {
@@ -579,7 +586,7 @@ public enum Snapshots {
     /// The scenarios whose PNGs are committed under `docs/screenshots/mac`: the key HUD states, the menu in light and
     /// dark, one per Settings tab, and the setup window. The rest only render to a temporary directory for review.
     public static let committedNames: [String] = [
-        "hud-rolling", "hud-private", "hud-duration-limit", "menu-private", "settings-privacy-private",
+        "hud-rolling", "hud-private", "hud-duration-limit", "hud-long-dictation", "menu-private", "settings-privacy-private",
         "hud-listening", "ripple-speech", "ripple-static",
         "hud-flow-2-polishing", "hud-flow-3-diff", "hud-correction-use-raw",
         "hud-wordwave-listening", "hud-wordwave-long", "hud-wordwave-polishing",

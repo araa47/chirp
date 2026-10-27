@@ -44,7 +44,7 @@ Every cue starts and ends on an exact zero sample, with raised-cosine fades, so 
 
 ## Recording safety
 
-The start cue must be over before the microphone opens, or the USB mic would record it. The microphone waits `min(cue length + 20 ms, 300 ms)` after the cue starts. A start cue longer than 300 ms (a long custom file, or Tink at 614 ms) plays only its first 300 ms, with a 40 ms fade, and Settings says so ("Long start sounds are trimmed to 0.3 s so they aren't recorded."). The stop cue plays after capture has stopped, so its length is not restricted, only capped at 1.5 s (with a fade).
+The start cue must never reach the transcript, or the USB mic would record it. Dictation does not wait for it: the microphone opens as the dictation starts and the cue plays at the same moment, so sounds on or off the first sample is captured at the same time. What the microphone hears from the cue's start for its length plus 40 ms (`SoundTiming.muteWindow`; 160 ms for the Chirp pack, at most 340 ms) is zeroed in the audio sent to the server, so the cue is not transcribed, and speech inside that window is lost with it. The silence and auto-stop detectors ignore the zeroed audio. Live Notes still opens its microphone `min(cue length + 20 ms, 300 ms)` after the cue starts. A start cue longer than 300 ms (a long custom file, or Tink at 614 ms) plays only its first 300 ms, with a 40 ms fade, and Settings says so ("Long start sounds are trimmed to 0.3 s so they aren't recorded."). The stop cue plays after capture has stopped, so its length is not restricted, only capped at 1.5 s (with a fade).
 
 ## Playback and volume
 

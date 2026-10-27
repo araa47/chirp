@@ -113,11 +113,14 @@ import Testing
         #expect(contrast(HUDColors.actionDark, darkMaterial) >= 3)
     }
 
-    @Test func hudIsAFixedWidthPanelWithTheWordWaveformWider() {
-        #expect(HUDViewMetrics.width == 360 && HUDViewMetrics.wordWaveformWidth == 420)
-        #expect(HUDViewMetrics.width(wordWaveform: false) == 360 && HUDViewMetrics.width(wordWaveform: true) == 420)
-        #expect(HUDViewMetrics.contentWidth(wordWaveform: false) == 328)
-        #expect(HUDViewMetrics.corner == ChirpRadius.panel && HUDViewMetrics.transcriptLines == 3)
+    @Test func hudIsAFixedFullLengthPanel() {
+        // 472 pt is the full length the capsule reached before the Pond restyle (a 440 pt text column); the 360 pt panel
+        // wrapped a sentence after a few words and read as cut short. Both modes share it now.
+        #expect(HUDViewMetrics.width == 472 && HUDViewMetrics.wordWaveformWidth == 472)
+        #expect(HUDViewMetrics.width(wordWaveform: false) == 472 && HUDViewMetrics.width(wordWaveform: true) == 472)
+        #expect(HUDViewMetrics.contentWidth(wordWaveform: false) == 440)
+        // Half the 44 pt one-line height: a one-line HUD is a capsule again.
+        #expect(HUDViewMetrics.corner == 22 && HUDViewMetrics.transcriptLines == 5)
     }
 
     @Test func debugBadgeKeepsWhiteTextReadable() {
@@ -550,7 +553,9 @@ import Testing
         let names = Snapshots.committedNames
         let all = Set(Snapshots.allScenarios.map(\.name))
         #expect(names.allSatisfy { all.contains($0) } && Set(names).count == names.count)
-        #expect(names.count * 2 <= 110)  // 55 states (including dictation parity): every Settings page, the 720 × 520 windows, the Notes window states and History
+        // 56 states (including dictation parity and the HUD's long-dictation viewport): every Settings page, the 720 × 520
+        // windows, the Notes window states and History.
+        #expect(names.count * 2 <= 112)
         // The menu in light and dark, one per Settings tab, setup, the key HUD states and the Notes window.
         #expect(["notes-empty", "notes-library", "notes-recording", "notes-search", "notes-no-results", "notes-deleted",
                  "notes-continued", "notes-inspector-playing", "notes-review-sheet"].allSatisfy(names.contains))

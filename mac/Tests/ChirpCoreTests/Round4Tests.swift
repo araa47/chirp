@@ -308,8 +308,7 @@ import Testing
             return NSHostingViewSize.of(HUDView(model: m))
         }
         let base = size { _ in }
-        // The Ripple glyph is narrower than the waveform bars it replaced, so a short capsule rests
-        // on the HUD's own 150 pt floor rather than rising past it.
+        // The HUD is a fixed full-length panel, whatever the indicator's width.
         #expect(base.height > 40 && base.width == HUDViewMetrics.width)
         #expect(size { $0.reduceMotion = true } == base)
         #expect(size { $0.increaseContrast = true } == base)
@@ -327,12 +326,14 @@ import Testing
         let none = size(""), short = size("hello"), medium = size("please move the standup to three thirty")
         let long = size(String(repeating: "and then we should check the rollout plan ", count: 8))
         #expect(none.height <= 48)                                  // one line
-        // Never jumps sideways: 360 pt for every text, 420 pt with the word waveform on.
+        // Never jumps sideways: 472 pt for every text, with or without the word waveform.
         #expect([none, short, medium, long].allSatisfy { $0.width == HUDViewMetrics.width })
         #expect(size("hello", words: true).width == HUDViewMetrics.wordWaveformWidth)
         #expect(long.height > medium.height && medium.height > short.height - 0.5)   // wraps instead
+        // A long dictation stops growing at the transcript viewport (five lines and a faded one), plus the status row.
         let huge = size(String(repeating: "word ", count: 400))
-        #expect(huge.height < 140)                                  // three lines at most, plus the header row
+        let cap = 2 * HUDViewMetrics.verticalPadding + 20 + 8 + HUDViewMetrics.transcriptMaxHeight(wordWaveform: false)
+        #expect(abs(huge.height - cap) < 1 && size(String(repeating: "word ", count: 300)).height == huge.height)
     }
 }
 

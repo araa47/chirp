@@ -6,8 +6,9 @@ import ChirpCore
 /// sound after a hotkey press has no decode or disk wait. AVAudioPlayer plays through the default output and does not
 /// duck or pause other apps' audio.
 ///
-/// Recording safety lives in `SoundTiming`: the start cue plays at most 300 ms (with a fade when it is cut), and
-/// `DictationController` opens the microphone only after `startDelay()` has passed.
+/// Recording safety lives in `SoundTiming`: the start cue plays at most 300 ms (with a fade when it is cut).
+/// Dictation never waits for it: `DictationController` opens the microphone at once and zeroes `startCueWindow()` of
+/// what it sends. Live Notes opens its microphone only after `startDelay()` has passed.
 @MainActor
 enum Sounds {
     private struct Loaded {
@@ -33,6 +34,12 @@ enum Sounds {
     static func startDelay() -> TimeInterval {
         guard settings.soundsEnabled, settings.soundVolume > 0 else { return 0 }
         return load(.start)?.resolved.micDelay ?? 0
+    }
+
+    /// How much dictation audio from the start cue is zeroed (zero when sounds are off).
+    static func startCueWindow() -> TimeInterval {
+        guard settings.soundsEnabled, settings.soundVolume > 0 else { return 0 }
+        return load(.start)?.resolved.muteWindow ?? 0
     }
 
     /// Plays the current pack's cue. The caller decides whether sounds are on: dictation checks the switch, while

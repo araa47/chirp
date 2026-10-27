@@ -245,6 +245,15 @@ private enum Flags {
         #expect(!HotkeyGesture(mode: .holdToTalk, modifierOnly: true, singleKey: true).holdOrTap)    // already hold-only
     }
 
+    @Test func onlyASingleModifierKeyOpensTheMicrophoneOnThePress() {
+        #expect(gesture().opensMicOnPress)
+        #expect(HotkeyGesture(mode: .holdToTalk, modifierOnly: true, singleKey: true).opensMicOnPress)
+        #expect(!HotkeyGesture(mode: .autoStop, modifierOnly: true).opensMicOnPress)       // ⌥ either side types é
+        #expect(!HotkeyGesture(mode: .holdToTalk, modifierOnly: true).opensMicOnPress)
+        #expect(!HotkeyGesture(mode: .autoStop, modifierOnly: false, singleKey: true).opensMicOnPress)   // ⌃⌥Space starts at once
+        #expect(!HotkeyGesture(mode: .holdToTalk).opensMicOnPress)
+    }
+
     @Test func aQuickTapStartsOnReleaseAndStaysOn() {
         var g = gesture()
         #expect(g.down(at: 1) == [])

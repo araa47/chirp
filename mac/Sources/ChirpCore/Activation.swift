@@ -15,6 +15,11 @@ public struct HotkeyGesture: Sendable {
     public let modifierOnly: Bool
     /// Auto-stop with one side's modifier: the dictation starts once held alone, and a long hold ends on release.
     public let holdOrTap: Bool
+    /// The shortcut is one physical modifier key (Right ⌥), in either mode: its dictation starts up to `armDelay` (or a
+    /// tap) after the press, so the owner opens the microphone on the press itself and keeps that audio in memory until
+    /// the dictation starts, or drops it unsent when the press turns out to be a chord or an early release. Never for a
+    /// modifier on both sides (⌥), which types special characters all day.
+    public let opensMicOnPress: Bool
     private var pressedAt: TimeInterval?
     /// Hold-to-talk with a modifier: the delayed press has reached the machine.
     private var armed = false
@@ -25,6 +30,7 @@ public struct HotkeyGesture: Sendable {
         self.mode = mode
         self.modifierOnly = modifierOnly
         holdOrTap = modifierOnly && singleKey && mode == .autoStop
+        opensMicOnPress = modifierOnly && singleKey
     }
 
     /// The owner calls `armDue(pressedAt:at:)` `armDelay` after a press.

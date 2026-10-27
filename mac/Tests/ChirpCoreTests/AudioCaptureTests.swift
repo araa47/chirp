@@ -21,7 +21,12 @@ final class FakeEngine: CaptureEngine, @unchecked Sendable {
     }
     func removeTap() { taps = max(0, taps - 1); removes += 1; block = nil }
     func prepare() {}
-    func start() throws { if let startError { throw startError } }
+    /// Runs as the input starts (a test clock can charge the engine's start-up time here).
+    var onStart: (() -> Void)?
+    func start() throws {
+        if let startError { throw startError }
+        onStart?()
+    }
     func stop() { stops += 1 }
     func setConfigurationChangeHandler(_ handler: (@Sendable () -> Void)?) { onChange = handler }
 

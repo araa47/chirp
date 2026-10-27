@@ -223,15 +223,40 @@ public struct LevelHistory: Equatable, Sendable {
 }
 
 public enum HUDViewMetrics {
-    /// Corner radius of the HUD (the Pond panel radius): a rounded rectangle at one line and at three.
-    public static let corner: CGFloat = ChirpRadius.panel
-    /// The HUD never changes width, so it does not jump as words arrive: 360 pt, and 420 pt while the word waveform is on.
-    public static let width: CGFloat = 360
-    public static let wordWaveformWidth: CGFloat = 420
+    /// Corner radius of the HUD: half the one-line height (a 20 pt row and 12 pt padding), so a one-line HUD is a capsule
+    /// and a taller one a softly rounded rectangle, as before the Pond restyle.
+    public static let corner: CGFloat = 22
+    /// The HUD never changes width, so it does not jump as words arrive. 472 pt is the full length the capsule grew to
+    /// before the Pond restyle (a 440 pt text column), in both modes: 360 pt wrapped a sentence after a few words.
+    public static let width: CGFloat = 472
+    public static let wordWaveformWidth: CGFloat = 472
     public static let horizontalPadding: CGFloat = ChirpSpacing.s16
     public static let verticalPadding: CGFloat = 12
-    /// A transcript is at most three lines; older words give way at the front.
-    public static let transcriptLines = 3
+    /// The transcript viewport shows this many whole lines of plain text, or rows of word cells, and most of the one
+    /// before: longer dictation keeps its newest lines in view while the earlier ones fade out past the top edge.
+    public static let transcriptLines = 5
+    public static let wordWaveformRows = 3
+    /// Transparent room around the glass surface, so the live panel (sized to this view) never clips the glass edge.
+    public static let glassMargin: CGFloat = 12
+
+    /// How much of the earlier line shows above the whole ones, faded: a line of text from just above its capitals
+    /// down (only the line spacing is cut), or the words (not the bars) of a row of word cells.
+    public static func transcriptPeek(wordWaveform: Bool) -> CGFloat {
+        wordWaveform ? WordWaveformView.textHeight : lineHeight - 3
+    }
+
+    /// The viewport's height. The peek is never a whole number of lines, so a transcript fills the viewport exactly only
+    /// when it overflows (the cue for the fade), and the faded line says there is more above.
+    public static func transcriptMaxHeight(wordWaveform: Bool) -> CGFloat {
+        if wordWaveform {
+            let row = WordWaveformView.ribbonHeight + WordWaveformView.ribbonGap + WordWaveformView.textHeight
+            return CGFloat(wordWaveformRows) * (row + WordWaveformView.lineSpacing) + transcriptPeek(wordWaveform: true)
+        }
+        return CGFloat(transcriptLines) * lineHeight + transcriptPeek(wordWaveform: false)
+    }
+
+    /// SwiftUI's line pitch for the 15 pt transcript (AppKit's default line height says 18); a test measures it.
+    public static let lineHeight: CGFloat = 19
 
     public static func width(wordWaveform: Bool) -> CGFloat { wordWaveform ? wordWaveformWidth : width }
     /// The width of the text column inside the padding.
@@ -259,6 +284,7 @@ public struct HUDView: View {
             .frame(width: HUDViewMetrics.width(wordWaveform: model.wordWaveform), alignment: .leading)
             .tint(Color.chirp.koi)
             .modifier(HUDSurface(flat: model.flatSurface || model.increaseContrast, glass: model.usesGlass, contrast: model.increaseContrast))
+            .padding(model.usesGlass && !(model.flatSurface || model.increaseContrast) ? HUDViewMetrics.glassMargin : 0)
             .fixedSize()
             .onGeometryChange(for: CGSize.self, of: { $0.size }, action: onSize)
             // The live panel is sized by `onSize`; in a larger frame the HUD stays centred.
@@ -267,11 +293,13 @@ public struct HUDView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if model.privateSession || model.duration != nil {
+            // The private-session line carries the duration; otherwise it sits at the end of the status row, so an
+            // ordinary dictation is not topped by a row that is empty but for the timer.
+            if model.privateSession {
                 HStack {
-                    if model.privateSession { Label("Private session", systemImage: "lock.fill") }
+                    Label("Private session", systemImage: "lock.fill")
                     Spacer(minLength: 8)
-                    if let duration = model.duration { Text(duration).monospacedDigit().accessibilityLabel("Dictation duration: " + duration) }
+                    durationLabel
                 }
                 .font(.system(size: 11))
                 .foregroundStyle(Color.secondary)
@@ -299,34 +327,49 @@ public struct HUDView: View {
                     HUDChip(MenuContent.debugRetention, tone: .alert)
                         .help(MenuContent.debugRetentionHelp)
                 }
+                if !model.privateSession { durationLabel.font(.system(size: 11)).foregroundStyle(Color.secondary) }
             }
             let shown = HUDText.tail(stable: model.stable, unstable: model.unstable, limit: HUDText.lineBudget)
+            let viewport = TranscriptViewport(maxHeight: HUDViewMetrics.transcriptMaxHeight(wordWaveform: model.showsWordWaveform))
+            let fade = TranscriptFade(maxHeight: viewport.maxHeight, length: HUDViewMetrics.transcriptPeek(wordWaveform: model.showsWordWaveform))
             if model.showsWordWaveform {
-                WordWaveformView(cells: model.wordCells, levels: model.utterance, revised: model.revisedWords,
-                                 truncated: model.wordsTruncated, polishing: model.polishing, animated: !model.reduceMotion,
-                                 contrast: model.increaseContrast, pulsePhase: model.pulsePhase, shimmerPhase: model.shimmerPhase,
-                                 maxWidth: contentWidth)
-                    .transition(.opacity)
+                viewport {
+                    WordWaveformView(cells: model.wordCells, levels: model.utterance, revised: model.revisedWords,
+                                     truncated: model.wordsTruncated, polishing: model.polishing, animated: !model.reduceMotion,
+                                     contrast: model.increaseContrast, pulsePhase: model.pulsePhase, shimmerPhase: model.shimmerPhase,
+                                     maxWidth: contentWidth)
+                }
+                .modifier(fade)
+                .transition(.opacity)
             } else if let diff = model.diff {
-                DiffText(segments: diff, fade: model.diffFade, contrast: model.increaseContrast)
-                    .frame(width: contentWidth, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .transition(.opacity)
+                viewport {
+                    DiffText(segments: diff, fade: model.diffFade, contrast: model.increaseContrast)
+                        .frame(width: contentWidth, alignment: .leading)
+                }
+                .modifier(fade)
+                .transition(.opacity)
             } else if model.polishing, !shown.stable.isEmpty || !shown.unstable.isEmpty {
-                ShimmerText(text: shown.stable + shown.unstable, animated: !model.reduceMotion, phase: model.shimmerPhase)
-                    .frame(width: contentWidth, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .transition(.opacity)
+                viewport {
+                    ShimmerText(text: shown.stable + shown.unstable, animated: !model.reduceMotion, phase: model.shimmerPhase)
+                        .frame(width: contentWidth, alignment: .leading)
+                }
+                .modifier(fade)
+                .transition(.opacity)
             } else if !shown.stable.isEmpty || !shown.unstable.isEmpty {
-                (Text(shown.stable) + Text(shown.unstable).foregroundStyle(Color.primary.opacity(model.increaseContrast ? 0.72 : 0.5)))
-                    .font(.system(size: 15))
-                    .lineLimit(HUDViewMetrics.transcriptLines)
-                    .frame(width: contentWidth, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.updatesFrequently)
+                viewport {
+                    (Text(shown.stable) + Text(shown.unstable).foregroundStyle(Color.primary.opacity(model.increaseContrast ? 0.72 : 0.5)))
+                        .font(.system(size: 15))
+                        .frame(width: contentWidth, alignment: .leading)
+                }
+                .modifier(fade)
+                .accessibilityAddTraits(.updatesFrequently)
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private var durationLabel: some View {
+        if let duration = model.duration { Text(duration).monospacedDigit().accessibilityLabel("Dictation duration: " + duration) }
     }
 
     @ViewBuilder private var indicator: some View {
@@ -344,6 +387,46 @@ public struct HUDView: View {
                 .symbolEffect(.pulse, options: .repeating, isActive: !model.reduceMotion)
                 .frame(width: 20, height: 20)
         }
+    }
+}
+
+/// The transcript's window: as tall as the text up to `maxHeight`, then fixed, with the text anchored at the bottom so
+/// the newest line stays in view and earlier lines move up past the top edge. The whole text stays in the view, so
+/// VoiceOver still reads all of it.
+struct TranscriptViewport: Layout {
+    let maxHeight: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let text = subviews.first else { return .zero }
+        let natural = text.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: proposal.width ?? natural.width, height: min(natural.height, maxHeight))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: CGPoint(x: bounds.minX, y: bounds.maxY), anchor: .bottomLeading,
+                              proposal: ProposedViewSize(width: bounds.width, height: nil))
+    }
+}
+
+/// Clips the viewport and, once the transcript overflows it, fades the partly shown line at the top edge.
+struct TranscriptFade: ViewModifier {
+    let maxHeight: CGFloat
+    let length: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .clipped()
+            .mask {
+                GeometryReader { g in
+                    if g.size.height >= maxHeight - 0.5 {
+                        LinearGradient(stops: [.init(color: .clear, location: 0),
+                                               .init(color: .black, location: min(1, (length + 2) / max(g.size.height, 1)))],
+                                       startPoint: .top, endPoint: .bottom)
+                    } else {
+                        Color.black
+                    }
+                }
+            }
     }
 }
 
@@ -450,7 +533,7 @@ struct ShimmerText: View {
         }
     }
 
-    private var label: some View { Text(text).font(.system(size: 15)).lineLimit(HUDViewMetrics.transcriptLines) }
+    private var label: some View { Text(text).font(.system(size: 15)) }
 
     @ViewBuilder private func sweep(at position: Double?) -> some View {
         if let position {
@@ -479,9 +562,10 @@ struct DiffText: View {
     let segments: [WordDiff.Segment]
     let fade: Double
     let contrast: Bool
-    /// The HUD's 15 pt and line cap; the History window passes its body font and no cap.
+    /// The HUD's 15 pt, uncapped (the HUD's transcript viewport keeps the newest lines in view); the History window
+    /// passes its body font.
     var font: Font = .system(size: 15)
-    var lineLimit: Int? = HUDViewMetrics.transcriptLines
+    var lineLimit: Int?
 
     /// The text without the removed words (the width the HUD settles at); removed words add width while visible.
     static func plain(_ segments: [WordDiff.Segment]) -> String { segments.map(\.text).joined(separator: " ") }
@@ -553,8 +637,9 @@ public struct OutcomePresentation: Equatable, Sendable {
 }
 
 public enum HUDText {
-    /// The most characters of a plain transcript the HUD keeps (about three lines at 360 pt); older words give way at the front.
-    public static let lineBudget = 120
+    /// The most characters of a plain transcript the HUD lays out: only a bound on layout work for very long dictation.
+    /// At about 70 characters a line that is nearly thirty lines, far above the six-line viewport, so the cut is never on screen.
+    public static let lineBudget = 2000
 
     /// The width a line of text wants, capped at `max`. SwiftUI proposes no width to a fixed-size capsule, so a Text
     /// would never wrap; giving it this width makes the HUD hug short text and wrap long text at the maximum.

@@ -120,12 +120,18 @@ private func timings(_ text: String, pace: Double = 0.3, length: Double = 0.25, 
     }
 
     @Test func longDictationKeepsTheNewestWords() {
-        let text = (1...80).map { "word\($0)" }.joined(separator: " ")
+        // 200 words, well past the 600-character layout bound (the HUD viewport shows only the newest rows of it).
+        let text = (1...200).map { "word\($0)" }.joined(separator: " ")
         let cells = WordWaveform.cells(text: text, words: timings(text))
         let (kept, truncated) = WordWaveform.tail(cells)
         #expect(truncated)
-        #expect(kept.last?.text == "word80")
+        #expect(kept.last?.text == "word200")
         #expect(kept.reduce(0) { $0 + $1.text.count + 1 } <= WordWaveform.characterLimit)
+        // Far more than the 120 characters it once kept: about ten rows, so the cut is never inside the viewport.
+        #expect(WordWaveform.characterLimit >= 600 && kept.count > 70)
+        // What the operator dictates in a long minute (about 80 words) is not cut at all.
+        let minute = (1...80).map { "word\($0)" }.joined(separator: " ")
+        #expect(!WordWaveform.tail(WordWaveform.cells(text: minute, words: timings(minute))).truncated)
         #expect(kept.first?.gapBefore == 0)
         // Ids are positions in the utterance, so they survive the cut.
         #expect(kept.first?.id == cells.count - kept.count)
@@ -216,9 +222,9 @@ private func timings(_ text: String, pace: Double = 0.3, length: Double = 0.25, 
     @Test func truncationIsFlaggedForTheEllipsis() {
         let m = HUDModel()
         m.wordWaveform = true
-        let long = (1...80).map { "word\($0)" }.joined(separator: " ")
+        let long = (1...200).map { "word\($0)" }.joined(separator: " ")
         m.showWords(text: long, words: timings(long))
-        #expect(m.wordsTruncated && m.wordCells.last?.text == "word80")
+        #expect(m.wordsTruncated && m.wordCells.last?.text == "word200")
     }
 
     @Test func reduceMotionAppliesWithoutAnimation() {
