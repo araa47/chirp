@@ -8,7 +8,7 @@
 #   reference Mac (`scripts/test.sh`).
 set -eu
 cd "$(dirname "$0")/.."
-ISOLATED="NotesBudgetTests NotesLongRecorderTests NotesLayoutTests NotesLongSessionTests NotesOrganizeRecorderTests NotesOverlapRouterTests NotesPauseSessionTests NotesPauseTests NotesRecorderTests NotesReorganizeRecorderTests NotesSoakTests ServerSpeakersRecorderTests SpeakerRecorderTests StreamBoundsTests StreamSessionTests RollingDictationTests NotesRetranscribeTests NotesRetranscribeSessionTests"
+ISOLATED="NotesBudgetTests NotesLongRecorderTests NotesLayoutTests NotesLongSessionTests NotesOrganizeRecorderTests NotesOverlapRouterTests NotesPauseSessionTests NotesPauseTests NotesRecorderTests NotesReorganizeRecorderTests NotesSoakTests ServerSpeakersRecorderTests SpeakerRecorderTests StreamBoundsTests StreamSessionTests RollingDictationTests DictationStartTests NotesRetranscribeTests NotesRetranscribeSessionTests"
 SKIPPED="GeneratedSoundTests SnapshotTests"
 re() { echo "$*" | tr ' ' '\n' | paste -sd'|' -; }
 # Keep the build quiet, but show compiler errors when it fails.

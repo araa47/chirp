@@ -85,9 +85,19 @@ public enum SoundTiming {
     public static let defaultVolume = 0.6
     public static let longStartWarning = "Long start sounds are trimmed to 0.3 s so they aren't recorded."
 
+    /// After the cue's end, how much more dictation audio is zeroed: the speaker's and the input's latency.
+    public static let muteMargin: TimeInterval = 0.04
+
     /// How long the microphone waits after the start cue begins: its length plus a margin, never more than 300 ms.
+    /// Live Notes still waits; dictation opens the microphone at once and zeroes `muteWindow` instead.
     public static func micDelay(cueDuration: TimeInterval) -> TimeInterval {
         min(max(cueDuration, 0) + startMargin, startLimit)
+    }
+
+    /// How much dictation audio from the start cue's first sample is zeroed, so the cue is never transcribed: what
+    /// plays of it (at most 300 ms) plus `muteMargin`.
+    public static func muteWindow(cueDuration: TimeInterval) -> TimeInterval {
+        min(max(cueDuration, 0), startLimit) + muteMargin
     }
 
     /// How much of a file plays: all of it, except a start cue over 300 ms or a stop cue over 1.5 s.
@@ -242,6 +252,8 @@ public struct ResolvedCue: Equatable, Sendable {
 
     /// How long the mic waits after this cue starts (zero for the stop cue, which plays after capture ends).
     public var micDelay: TimeInterval { cue == .start ? SoundTiming.micDelay(cueDuration: playLength) : 0 }
+    /// How much dictation audio from this cue's start is zeroed (zero for the stop cue).
+    public var muteWindow: TimeInterval { cue == .start ? SoundTiming.muteWindow(cueDuration: playLength) : 0 }
     public var isTrimmed: Bool { SoundTiming.isTrimmed(cue, duration: duration) }
 }
 

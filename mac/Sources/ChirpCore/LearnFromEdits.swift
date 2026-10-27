@@ -58,6 +58,32 @@ public enum EditRegion {
         guard length >= 0 else { return nil }
         return a.substring(with: NSRange(location: range.location, length: length))
     }
+
+    /// The text around the inserted span is unchanged in `after` and something is left of the span: the user is still
+    /// working on it. False once the field is cleared or sent, the span deleted, or the text before or after it edited.
+    public static func holds(before: String, after: String, range: NSRange) -> Bool {
+        let b = before as NSString, a = after as NSString
+        guard range.location >= 0, NSMaxRange(range) <= b.length else { return false }
+        let head = b.substring(to: range.location), tail = b.substring(from: NSMaxRange(range))
+        // NSString says no empty string is a prefix or suffix.
+        return a.length > head.utf16.count + tail.utf16.count && (head.isEmpty || a.hasPrefix(head)) && (tail.isEmpty || a.hasSuffix(tail))
+    }
+
+    /// Where `text` went after a paste: just before the caret, or else its only occurrence in the field. Nil when it
+    /// is not there (yet) or appears more than once with no caret to tell which.
+    public static func pasted(_ text: String, in value: String, caret: NSRange?) -> NSRange? {
+        let v = value as NSString, length = (text as NSString).length
+        guard length > 0 else { return nil }
+        if let caret, caret.length == 0, caret.location >= length, caret.location <= v.length {
+            let range = NSRange(location: caret.location - length, length: length)
+            if v.substring(with: range) == text { return range }
+        }
+        let first = v.range(of: text, options: .literal)
+        guard first.location != NSNotFound else { return nil }
+        let after = NSMaxRange(first)
+        let again = v.range(of: text, options: .literal, range: NSRange(location: after, length: v.length - after))
+        return again.location == NSNotFound ? first : nil
+    }
 }
 
 // MARK: corrections in an edit

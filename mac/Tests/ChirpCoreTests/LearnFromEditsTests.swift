@@ -342,3 +342,226 @@ struct LearnedPayloadTests {
         #expect(await learning.teach(inserted: "same", wanted: "same", raw: nil, bundleID: nil, appName: nil).isEmpty)
     }
 }
+
+/// A clock the test moves: each watcher sleep waits for `tick()`.
+@MainActor private final class EditClock {
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func sleep() async { await withCheckedContinuation { waiters.append($0) } }
+    func tick(_ times: Int = 1) async {
+        for _ in 0..<times {
+            for _ in 0..<10 { await Task.yield() }
+            let w = waiters
+            waiters = []
+            w.forEach { $0.resume() }
+            for _ in 0..<10 { await Task.yield() }
+        }
+    }
+}
+
+/// Real-use edits (#220 follow-up): the window must survive what people do after a dictation, and a pasted dictation
+/// (Chromium, Electron, an unconfirmed AX write) must be found in its field.
+@MainActor @Suite(.serialized) struct EditWatcherRealUseTests {
+    private func learning(_ clock: EditClock, _ dir: URL) -> EditLearning {
+        EditLearning(store: LearnedStore(directory: dir, keys: MemoryHistoryKeyStore()),
+                     watcher: EditWatcher(window: .seconds(60), interval: .milliseconds(400), sleep: { _ in await clock.sleep() }))
+    }
+
+    private func settle(_ learning: EditLearning, count: Int) async throws {
+        for _ in 0..<100 where learning.items.first?.count != count { try await Task.sleep(for: .milliseconds(5)) }
+    }
+
+    @Test func oneWordFixedInATextEditFieldThenFocusMovesIsLearnedAndAppliedNextTime() async throws {
+        let dir = learnedDirectory(); defer { try? FileManager.default.removeItem(at: dir) }
+        let clock = EditClock()
+        let learning = learning(clock, dir)
+        var learned: [String] = []
+        learning.onLearned = { learned += $0.map(\.correction.title) }
+        let heard = "Push it to github tonight."
+        for round in 1...2 {
+            let text = learning.payload(for: "com.apple.TextEdit").apply(to: heard)
+            #expect(text == heard)
+            let field = TestTextField("Notes from today.\n")
+            let range = field.insert(text)
+            #expect(learning.watcher.watch(field, inserted: text, range: range, raw: heard, bundleID: "com.apple.TextEdit",
+                                           appName: "TextEdit"))
+            await clock.tick(3)   // the user reads it
+            field.edit("github", to: "GitHub")
+            await clock.tick()    // one poll sees the fix
+            field.isFocused = false   // then they click into another window
+            field.text = ""
+            await clock.tick()
+            #expect(!learning.watcher.isWatching)
+            try await settle(learning, count: round)
+            #expect(learning.items.first?.count == round)
+        }
+        #expect(learned == ["GitHub"])
+        #expect(learning.payload(for: "com.apple.mail").apply(to: heard) == "Push it to GitHub tonight.")
+    }
+
+    @Test func aMessageSentAfterTheFixIsLearnedFromTheLastTextSeen() async throws {
+        let dir = learnedDirectory(); defer { try? FileManager.default.removeItem(at: dir) }
+        let clock = EditClock()
+        let learning = learning(clock, dir)
+        let field = TestTextField()
+        let text = "ask coy about the deploy"
+        let range = field.insert(text)
+        learning.watcher.watch(field, inserted: text, range: range, raw: text, bundleID: "com.apple.MobileSMS", appName: "Messages")
+        field.edit("coy", to: "Koi")
+        await clock.tick()
+        field.text = ""   // Return sent it; the field is empty and still focused
+        await clock.tick()
+        #expect(!learning.watcher.isWatching)
+        try await settle(learning, count: 1)
+        #expect(learning.items.map(\.correction) == [.term(heard: "coy", term: "Koi")])
+        #expect(learning.items.first?.state == .learning)
+    }
+
+    @Test func typingOnAfterTheDictationKeepsTheWindowOpen() async throws {
+        let clock = EditClock()
+        let w = EditWatcher(window: .seconds(60), interval: .milliseconds(400), sleep: { _ in await clock.sleep() })
+        var edits: [EditWatcher.Edit] = []
+        w.onEdit = { edits.append($0) }
+        let field = TestTextField("Plan: ")
+        let range = field.insert("move the cooper netties cluster")
+        w.watch(field, inserted: "move the cooper netties cluster", range: range, raw: "", bundleID: nil, appName: nil)
+        field.text += " and then"
+        await clock.tick(2)
+        #expect(w.isWatching)
+        field.edit("cooper netties", to: "Kubernetes")
+        await clock.tick()
+        w.finish()
+        #expect(edits.map(\.edited) == ["move the Kubernetes cluster and then"])
+    }
+
+    @Test func aPastedDictationIsFoundOnceTheAppAppliesIt() async throws {
+        let dir = learnedDirectory(); defer { try? FileManager.default.removeItem(at: dir) }
+        let clock = EditClock()
+        let learning = learning(clock, dir)
+        let field = TestTextField("Hi team, ")
+        var applied = false
+        let text = "the cooper netties upgrade is done"
+        let found = Task { @MainActor in
+            await learning.watcher.watchPasted({ applied ? field : nil }, inserted: text, raw: text,
+                                               bundleID: "com.tinyspeck.slackmacgap", appName: "Slack")
+        }
+        await clock.tick()
+        #expect(!learning.watcher.isWatching)
+        field.insert(text)   // Slack reads the pasteboard
+        applied = true
+        await clock.tick()
+        #expect(await found.value)
+        #expect(learning.watcher.isWatching)
+        field.edit("cooper netties", to: "Kubernetes")
+        await clock.tick()
+        learning.watcher.finish()
+        try await settle(learning, count: 1)
+        #expect(learning.items.map(\.correction) == [.term(heard: "cooper netties", term: "Kubernetes")])
+        #expect(learning.items.first?.bundleID == "com.tinyspeck.slackmacgap")
+    }
+
+    @Test func thePasteSearchGivesUpForTheNextDictationOrAnUnreadableField() async {
+        let clock = EditClock()
+        let w = EditWatcher(window: .seconds(60), interval: .milliseconds(400), sleep: { _ in await clock.sleep() })
+        let field = TestTextField()
+        let search = Task { @MainActor in
+            await w.watchPasted({ field }, inserted: "hello", raw: "", bundleID: nil, appName: nil)
+        }
+        await clock.tick()
+        w.finish()   // the next dictation started
+        field.insert("hello")
+        await clock.tick()
+        #expect(await search.value == false)
+        #expect(!w.isWatching)
+        #expect(await w.watchPasted({ nil }, inserted: "hello", raw: "", bundleID: nil, appName: nil, attempts: 1) == false)
+    }
+}
+
+/// Where a pasted dictation went, and whether the text around it still holds.
+struct EditRegionPasteTests {
+    @Test func theTextBeforeTheCaretOrItsOnlyOccurrence() {
+        let value = "ok ok then ok"
+        #expect(EditRegion.pasted("ok", in: value, caret: NSRange(location: 5, length: 0)) == NSRange(location: 3, length: 2))
+        #expect(EditRegion.pasted("ok", in: value, caret: nil) == nil)              // three of them, no caret
+        #expect(EditRegion.pasted("then", in: value, caret: nil) == NSRange(location: 6, length: 4))
+        #expect(EditRegion.pasted("then", in: value, caret: NSRange(location: 0, length: 0)) == NSRange(location: 6, length: 4))
+        #expect(EditRegion.pasted("later", in: value, caret: nil) == nil)
+        #expect(EditRegion.pasted("", in: value, caret: nil) == nil)
+    }
+
+    @Test func holdsWhileTheSurroundingsAreUnchanged() {
+        let before = "To: Sam\nship it Friday\nThanks"
+        let range = (before as NSString).range(of: "ship it Friday")
+        #expect(EditRegion.holds(before: before, after: before, range: range))
+        #expect(EditRegion.holds(before: before, after: "To: Sam\nship it Monday, ok\nThanks", range: range))
+        #expect(!EditRegion.holds(before: before, after: "", range: range))
+        #expect(!EditRegion.holds(before: before, after: "To: Sam\n\nThanks", range: range))
+        #expect(!EditRegion.holds(before: before, after: "To: Kim\nship it Friday\nThanks", range: range))
+        #expect(!EditRegion.holds(before: "hi", after: "hi", range: NSRange(location: 1, length: 5)))
+        // The whole field, or its very start or end.
+        #expect(EditRegion.holds(before: "ship it", after: "ship it now", range: NSRange(location: 0, length: 7)))
+        #expect(EditRegion.holds(before: "To: ship it", after: "To: Ship it", range: NSRange(location: 4, length: 7)))
+        #expect(!EditRegion.holds(before: "ship it", after: "", range: NSRange(location: 0, length: 7)))
+    }
+}
+
+/// Every gate holds for a paste exactly as for an AX write; only a dictation that passes them all may be looked for in
+/// its field (the one case where a Chromium or Electron app is asked to expose it).
+struct LearnWatchPlanTests {
+    private func plan(learning: Bool = true, history: Bool = true, isPrivate: Bool = false, excluded: Bool = false,
+                      secure: Bool = false, _ outcome: InsertionOutcome, range: NSRange? = nil) -> LearnWatchPlan {
+        LearnWatchPlan.plan(learningEnabled: learning, historyEnabled: history, isPrivate: isPrivate, excluded: excluded,
+                            secureField: secure, outcome: outcome, axRange: range)
+    }
+
+    @Test func everyGateAppliesToEveryInsertion() {
+        let r = NSRange(location: 0, length: 3)
+        for (outcome, range) in [(InsertionOutcome.inserted(.ax), r), (.inserted(.ax), nil), (.inserted(.paste), nil),
+                                 (.insertedUnverified, nil)] as [(InsertionOutcome, NSRange?)] {
+            #expect(plan(learning: false, history: false, outcome, range: range) == .skip(gate: "historyOff"))
+            #expect(plan(learning: false, outcome, range: range) == .skip(gate: "learningOff"))
+            #expect(plan(isPrivate: true, outcome, range: range) == .skip(gate: "private"))
+            #expect(plan(excluded: true, outcome, range: range) == .skip(gate: "excludedApp"))
+            #expect(plan(secure: true, outcome, range: range) == .skip(gate: "secure"))
+        }
+    }
+
+    @Test func onlyAnInsertionThatPassedIsWatchedOrLookedFor() {
+        let r = NSRange(location: 4, length: 2)
+        #expect(plan(.inserted(.ax), range: r) == .watch(r))
+        #expect(plan(.inserted(.ax)) == .find)
+        #expect(plan(.inserted(.paste)) == .find)
+        #expect(plan(.insertedUnverified) == .find)
+        #expect(plan(.copied) == .skip(gate: "notInserted"))
+        #expect(plan(.inserted(.copy)) == .skip(gate: "notInserted"))
+        #expect(plan(.refusedSecure) == .skip(gate: "notInserted"))
+    }
+}
+
+@MainActor struct EditWatcherPasteGateTests {
+    @Test func useRawOrAPrivateSessionStopsThePasteSearch() async {
+        let clock = EditClock()
+        let w = EditWatcher(window: .seconds(60), interval: .milliseconds(400), sleep: { _ in await clock.sleep() })
+        let field = TestTextField()
+        let search = Task { @MainActor in await w.watchPasted({ field }, inserted: "hello", raw: "", bundleID: nil, appName: nil) }
+        await clock.tick()
+        w.cancel()   // Use raw, or a private session turned on: both cancel the watcher
+        field.insert("hello")
+        await clock.tick()
+        #expect(await search.value == false)
+        #expect(!w.isWatching)
+    }
+
+    @Test func aSecureFieldIsNeverReadOnThePastePath() async {
+        let w = EditWatcher(sleep: { _ in await Task.yield() })
+        final class Probe: WatchedField {
+            var reads = 0
+            func value() -> String? { reads += 1; return "hunter two" }
+            func selection() -> NSRange? { NSRange(location: 10, length: 0) }
+            var isFocused: Bool { true }
+            var isSecure: Bool { true }
+        }
+        let probe = Probe()
+        #expect(await w.watchPasted({ probe }, inserted: "hunter two", raw: "", bundleID: nil, appName: nil) == false)
+        #expect(probe.reads == 0 && !w.isWatching)
+    }
+}

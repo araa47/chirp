@@ -137,14 +137,18 @@ private func libraryDirectory() -> URL {
 /// Record never waits for it.
 @MainActor
 @Suite struct SpeakerDefaultOnTests {
-    @Test func recordingWithTheModelMissingStartsAtOnceDownloadsAndJoinsLabelsWhenReady() async throws {
+    /// A slow-starting download (a busy CI runner) must not change the outcome.
+    @Test(arguments: [Duration.zero, .milliseconds(300)])
+    func recordingWithTheModelMissingStartsAtOnceDownloadsAndJoinsLabelsWhenReady(downloadStartDelay: Duration) async throws {
         let store = FakeModelStore(downloaded: false)
         store.hold = true
+        store.startDelay = downloadStartDelay
         let h = NotesHarness(speakers: store)
         #expect(h.session.speakers.enabled && h.prefs.notesSpeakerLabelsChoice == nil)   // on by default, nothing stored
         await h.record()
         #expect(h.recorder.state == .recording)                 // not held up by the download
-        #expect(store.loads == [true] && h.session.speakers.model.isDownloading)
+        // The download starts on its own task (#314): wait for it to reach the store rather than race it.
+        await h.until("speaker model download started") { store.loads == [true] && h.session.speakers.model.isDownloading }
         let notice = try #require(h.model.speakerModelNotice)
         #expect(notice.text == "Getting the speaker model ready (106 MB, once)… 0%" && !notice.failed)
         #expect(h.model.speakerStatus == nil && h.prefs.notesSpeakerLabelsChoice == nil)

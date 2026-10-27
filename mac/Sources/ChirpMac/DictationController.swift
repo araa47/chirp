@@ -21,7 +21,7 @@ final class DictationController {
     static let blockedMessage = "Notes is recording — stop it to dictate"
 
     let hud = HUDController()
-    private let capture = AudioCapture(engine: SystemCaptureEngine(pickedDevice: { InputDevice.pickedID(uid: settings.inputDeviceUID) }))
+    private let mic = DictationMic(capture: AudioCapture(engine: SystemCaptureEngine(pickedDevice: { InputDevice.pickedID(uid: settings.inputDeviceUID) })))
     private let inserter = TextInserter(env: SystemInsertion.environment(), pasteboard: SystemPasteboard())
     private let autoEnter = AutoEnterSender(env: SystemInsertion.autoEnterEnvironment())
     /// ⇧ was held when this dictation stopped: no Return after it (unless the hotkey itself uses ⇧).
@@ -32,6 +32,10 @@ final class DictationController {
     private var target: (bundleID: String?, name: String?) = (nil, nil)
     /// When the microphone opened, and the seconds it stayed open.
     private var captureStartedAt: ContinuousClock.Instant?
+    /// When this dictation started (uptime), for the microphone latency in the log.
+    private var startedAt: TimeInterval = 0
+    /// The press (uptime) that opened the microphone before any dictation started (`HotkeyGesture.opensMicOnPress`).
+    private var preRollPress: TimeInterval?
     private var capturedSeconds: TimeInterval = 0
     /// The last dictation's history entry, so "Use raw" can record what is really in the field.
     private var lastHistoryID: UUID?
@@ -149,16 +153,46 @@ final class DictationController {
 
     func hotkeyDown() {
         let now = ProcessInfo.processInfo.systemUptime
+        if gesture.opensMicOnPress { openOnPress(at: now) }
         deliver(gesture.down(at: now))
-        guard gesture.needsArmTimer else { return }
+        guard gesture.needsArmTimer else { dropPreRoll(); return }
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(HotkeyGesture.armDelay))
             guard let self else { return }
             self.deliver(self.gesture.armDue(pressedAt: now, at: ProcessInfo.processInfo.systemUptime))
+            // Armed, a tap, or nothing (a chord, an early release, a key-up that never came): decided by now.
+            self.dropPreRoll(of: now)
         }
     }
-    func hotkeyUp() { deliver(gesture.up(at: ProcessInfo.processInfo.systemUptime)) }
-    func hotkeyChord() { deliver(gesture.chord()) }
+    func hotkeyUp() {
+        deliver(gesture.up(at: ProcessInfo.processInfo.systemUptime))
+        dropPreRoll()
+    }
+    func hotkeyChord() {
+        deliver(gesture.chord())
+        dropPreRoll()
+    }
+
+    /// Right ⌥ (one modifier key): open the microphone on the press, before the gesture knows whether it is a
+    /// dictation, so its first words are not lost to `HotkeyGesture.armDelay`. The audio stays in `mic`, in memory and
+    /// at most a second, and is sent only if this press starts a dictation (`begin`); otherwise `dropPreRoll` closes
+    /// the microphone and drops it unsent.
+    private func openOnPress(at t: TimeInterval) {
+        guard !machine.state.isActive, !isBlocked(), Permissions.microphoneGranted, !mic.isOpen else { return }
+        do {
+            try mic.open()
+            preRollPress = t
+        } catch {
+            mic.close()   // `begin` tries again and reports the failure
+        }
+    }
+
+    /// Closes a microphone opened on a press (all of them, or only `press`'s) that has not become a dictation.
+    private func dropPreRoll(of press: TimeInterval? = nil) {
+        guard let opened = preRollPress, press == nil || press == opened else { return }
+        preRollPress = nil
+        if !machine.state.isActive { mic.close() }
+    }
     func escape() { send(.escape) }
 
     private func deliver(_ events: [DictationEvent]) {
@@ -226,8 +260,12 @@ final class DictationController {
             onChange?()
         }
         for effect in effects { run(effect) }
-        // After the effects: the stop cue plays once capture has ended, and the start cue before the mic opens (see begin).
-        if let cue = SoundCue.cue(from: before, to: machine.state, enabled: settings.soundsEnabled) { Sounds.play(cue) }
+        // After the effects: the stop cue plays once capture has ended, and the start cue as the microphone opens (see
+        // begin). The microphone never waits for the cue; its window is zeroed in what is sent.
+        if let cue = SoundCue.cue(from: before, to: machine.state, enabled: settings.soundsEnabled) {
+            if cue == .start { mic.excludeCue(at: ProcessInfo.processInfo.systemUptime, length: Sounds.startCueWindow()) }
+            Sounds.play(cue)
+        }
     }
 
     private func renderStatus() {
@@ -292,11 +330,16 @@ final class DictationController {
         hud.model.styleName = startOptions.correction ? CorrectionProfile.name(for: startOptions.correctionProfile, in: health) : nil
         hud.model.wordWaveform = startOptions.wordTimings
         hud.show()
-        // The start cue plays right after this (see `send`); the microphone must not open before it is over.
-        let micMayOpen = ContinuousClock.now + .seconds(Sounds.startDelay())
-
+        startedAt = ProcessInfo.processInfo.systemUptime
+        preRollPress = nil   // a microphone opened on the press is this dictation's now
+        chirpLog.info("microphone authorization=\(Permissions.microphone.rawValue, privacy: .public) accessibility=\(Permissions.accessibilityGranted, privacy: .public)")
+        // With access granted the microphone opens now, before the start cue plays (see `send`): no task hop, no wait.
+        // Audio from before the socket is ready queues in the stream session.
+        if Permissions.microphoneGranted {
+            startStreaming(epoch: myEpoch)
+            return
+        }
         Task {
-            chirpLog.info("microphone authorization=\(Permissions.microphone.rawValue, privacy: .public) accessibility=\(Permissions.accessibilityGranted, privacy: .public)")
             guard await Permissions.requestMicrophone() else {
                 if epoch == myEpoch, machine.state.isActive {
                     Permissions.openSettings(.microphone)
@@ -304,9 +347,6 @@ final class DictationController {
                 }
                 return
             }
-            // Let the start cue finish before the microphone opens, so it is never part of the recording:
-            // min(cue length + 20 ms, 300 ms), counted from when the cue started (a permission wait counts too).
-            try? await Task.sleep(until: micMayOpen, clock: .continuous)
             guard epoch == myEpoch, machine.state == .connecting || machine.state == .listening else { return }
             startStreaming(epoch: myEpoch)
         }
@@ -344,17 +384,22 @@ final class DictationController {
                 self.send(.toggle)
             }
         }
-        do {
-            try capture.start(onFailure: { [weak self] in
-                Task { @MainActor in
-                    guard let self, self.epoch == myEpoch, self.machine.state.isActive else { return }
-                    self.send(.failed("The microphone stopped — check the input device"))
-                }
-            }) { sink.handle($0) }
-        } catch {
-            send(.failed(error is CaptureError ? "No microphone input device" : "Could not start the microphone"))
+        do { try mic.open() } catch {
+            mic.close()
+            // Called from `begin`, inside `send`: report the failure after it returns.
+            let message = error is CaptureError ? "No microphone input device" : "Could not start the microphone"
+            Task { @MainActor [weak self] in
+                guard let self, self.epoch == myEpoch, self.machine.state.isActive else { return }
+                self.send(.failed(message))
+            }
             return
         }
+        mic.attach(onFailure: { [weak self] in
+            Task { @MainActor in
+                guard let self, self.epoch == myEpoch, self.machine.state.isActive else { return }
+                self.send(.failed("The microphone stopped — check the input device"))
+            }
+        }) { frame, muted in sink.handle(frame, muted: muted) }
         captureStartedAt = .now
         eventTask = Task { [weak self] in
             await session.open()
@@ -452,7 +497,13 @@ final class DictationController {
     }
 
     private func stopCapture() {
-        capture.stop()
+        // Timings only: how long after the dictation started the microphone opened (negative: it was already open from
+        // the press) and when its first frame arrived.
+        if let opened = mic.openedAt {
+            let first = mic.firstFrameAt.map { String(Int((($0 - startedAt) * 1000).rounded())) } ?? "-"
+            chirpLog.info("dictation mic open_ms=\(Int(((opened - self.startedAt) * 1000).rounded()), privacy: .public) first_frame_ms=\(first, privacy: .public)")
+        }
+        mic.close()
         if let start = captureStartedAt {
             let d = (ContinuousClock.now - start).components
             capturedSeconds = Double(d.seconds) + Double(d.attoseconds) / 1e18
@@ -548,8 +599,9 @@ final class DictationController {
             if final.canUseRaw { shown = FinalResult(text: final.raw, corrected: false, correctionError: "replace") }
             else { shown.text = final.raw }
         }
-        keep(early, final: shown, text: shown.text.trimmingCharacters(in: .whitespacesAndNewlines),
-             secureField: SystemInsertion.focusedFieldIsSecure())
+        let secure = SystemInsertion.focusedFieldIsSecure()
+        keep(early, final: shown, text: shown.text.trimmingCharacters(in: .whitespacesAndNewlines), secureField: secure)
+        watchEdits(early, text: shown.text, raw: final.raw, secureField: secure)
         show(early, final: shown)
         await pressReturn(after: early)
     }
@@ -629,13 +681,27 @@ extension DictationController {
         bundleID.map(settings.historyExcludedApps.contains) ?? false
     }
 
-    /// Learn from my edits: after a verified AX insertion whose span is known, watch that field for the user's fixes.
-    /// Never a secure field, an excluded app, or while learning (or history) is off.
+    /// Learn from my edits: after an insertion, watch that field for the user's fixes. A verified AX write says where it
+    /// went; a paste (Chromium, Electron) or an unconfirmed write is looked for in the field once the app applies it.
+    /// Never a secure field, an excluded app, or while learning (or history) is off. The log names the gate, never the text.
     fileprivate func watchEdits(_ outcome: InsertionOutcome, text: String, raw: String, secureField: Bool) {
-        guard !privateDictation, !privateSession.isActive, let learning, settings.learningEnabled, outcome == .inserted(.ax), !secureField,
-              !Self.excludedFromHistory(target.bundleID), let range = inserter.lastAXRange,
-              let field = AXWatchedField.focused() else { return }
-        learning.watcher.watch(field, inserted: text, range: range, raw: raw, bundleID: target.bundleID, appName: target.name)
+        guard let learning else { return }
+        let target = self.target, app = target.bundleID ?? "-"
+        func skip(_ gate: String) { chirpLog.info("learn skip gate=\(gate, privacy: .public) app=\(app, privacy: .public)") }
+        let plan = LearnWatchPlan.plan(learningEnabled: settings.learningEnabled, historyEnabled: settings.historyEnabled,
+                                       isPrivate: privateDictation || privateSession.isActive,
+                                       excluded: Self.excludedFromHistory(target.bundleID), secureField: secureField,
+                                       outcome: outcome, axRange: inserter.lastAXRange)
+        if case .skip(let gate) = plan { return skip(gate) }
+        if case .watch(let range) = plan, let field = AXWatchedField.focused() {
+            learning.watcher.watch(field, inserted: text, range: range, raw: raw, bundleID: target.bundleID, appName: target.name)
+            return
+        }
+        if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier { AXWatchedField.requestAccessibility(pid: pid) }
+        Task {
+            await learning.watcher.watchPasted({ AXWatchedField.focused() }, inserted: text, raw: raw, bundleID: target.bundleID,
+                                               appName: target.name)
+        }
     }
 
     /// The HUD's small "Learned: Kubernetes" the first time a correction becomes active (never over a dictation).
@@ -694,13 +760,16 @@ final class CaptureSink: @unchecked Sendable {
     /// Total capture ceiling; the socket wrapper rolls individual segments below the protocol limit.
     static let limitSeconds = RollingDictationSegmenter.maxTotal
 
-    func handle(_ frame: Data) {
+    /// `muted`: the frame was zeroed for the start cue. It is sent and counted, but the silence and auto-stop
+    /// detectors do not hear it (as before, when the microphone opened after the cue).
+    func handle(_ frame: Data, muted: Bool = false) {
         session.sendAudio(frame)
-        let level = Level(pcm16: frame)
+        let level = muted ? .zero : Level(pcm16: frame)
         let (silent, paused, limit, elapsed) = lock.withLock { () -> (Bool, Bool, Bool, TimeInterval) in
             clock += Double(frame.count / 2) / PCMConverter.sampleRate
             let limit = !limitSent && clock >= Self.limitSeconds
             if limit { limitSent = true }
+            guard !muted else { return (false, false, limit, clock) }
             return (guardState.feed(level, at: clock), autoStop?.feed(level, at: clock) ?? false, limit, clock)
         }
         onLevel(level, elapsed)
