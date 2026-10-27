@@ -480,7 +480,8 @@ final class ChirpSettingsUITests: XCTestCase {
     /// Pushed pages (iPhone) go back one level per tap; the two-pane iPad always shows the rows.
     @MainActor private func openCategory(_ row: String, _ app: XCUIApplication) {
         for _ in 0..<4 where !app.buttons[row].exists {
-            let back = app.navigationBars.buttons["BackButton"]
+            // Only the system Back button (navigation bar or floating toolbar, #329): the root page has none.
+            let back = app.buttons["BackButton"].firstMatch
             guard back.exists else { break }
             back.tap()
         }

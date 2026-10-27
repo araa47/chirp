@@ -27,6 +27,23 @@ extension XCUIApplication {
         _ = control.waitForExistence(timeout: 2)
     }
 
+    /// The system Back button of a pushed page, wherever the system draws it. iOS 27.1 on a compact iPhone screen (the
+    /// iPhone Duo's cover screen) puts it in a floating toolbar with no navigation bar at all (#329), so it is found by
+    /// the system's `BackButton` identifier, else as the navigation bar's first button.
+    @MainActor var backButton: XCUIElement {
+        let system = buttons["BackButton"].firstMatch
+        return system.exists ? system : navigationBars.buttons.element(boundBy: 0)
+    }
+
+    /// Taps Back on a pushed page once it appears.
+    @MainActor func tapBack(timeout: TimeInterval = 5, file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !backButton.exists, Date() < deadline { _ = buttons["BackButton"].firstMatch.waitForExistence(timeout: 0.5) }
+        let back = backButton
+        XCTAssertTrue(back.exists, "No Back button", file: file, line: line)
+        if back.exists { back.tap() }
+    }
+
     /// Settings → a category row, from any tab.
     @MainActor func openSettingsPage(_ id: String) {
         selectChirpTab("Settings")
