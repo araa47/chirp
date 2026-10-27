@@ -98,7 +98,9 @@ jobs:
       - run: uv run pytest -q -m onnx -rs
         timeout-minutes: 10
 
+  # macOS runner minutes cost 10x Linux: by hand only (`gh workflow run server.yml --ref <branch>`).
   intel-mac:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15-intel
     timeout-minutes: 20
     defaults:

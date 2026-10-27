@@ -1,18 +1,9 @@
 name: mac
 
-# macOS runner minutes cost 10x Linux: run only when `mac/**` or this file change, not for prose nothing reads (the
-# READMEs and mac/docs). Other markdown stays in: tests read mac/Assets/ThirdParty/NOTICES.md.
+# Not started by pushes or pull requests: macOS runner minutes cost 10x Linux. The gate for `mac/**` is
+# `scripts/local-gate.sh` (full suite on a Mac, result posted on the tested commit as `local/mac-full`, see
+# docs/TESTING.md). Start this by hand on a branch when a hosted run is wanted: `gh workflow run mac.yml --ref <branch>`.
 on:
-  pull_request:
-    paths: &paths
-      - "mac/**"
-      - "!mac/README.md"
-      - "!mac/docs/**"
-      - "!mac/scripts/speaker-bench/README.md"
-      - ".github/workflows/mac.yml"
-  push:
-    branches: [main]
-    paths: *paths
   workflow_dispatch:
 
 concurrency:
