@@ -148,7 +148,7 @@ struct NoteDetailView: View {
             Button("Stop current and continue here") { Task { await notes.stopAndContinue() } }
             Button("Go to recording", action: openRecording)
         }
-        .task(id: notes.document.id) { player.stop(); editing = false; await notes.refreshAudio() }
+        .task(id: notes.document.id) { player.stop(); editing = notes.takeEditRequest(notes.document.id); await notes.refreshAudio() }
         .onChange(of: notes.totalAudioBytes) { _, _ in Task { await notes.refreshAudio() } }
         .onChange(of: editing) { _, value in notes.setEditing(value); editorFocused = value }
         .onDisappear { player.stop(); notes.setEditing(false); Task { await notes.settleJournal() } }

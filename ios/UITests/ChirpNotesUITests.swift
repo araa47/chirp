@@ -426,6 +426,87 @@ final class ChirpNotesUITests: XCTestCase {
                       "the rename replaced the name in the notes")
     }
 
+    /// "This turn is" (A2-10): one of Person 1's turns goes to Maya, then to a new person; their other turns stay, and the
+    /// choice is sealed in the note (it survives a relaunch).
+    @MainActor func testThisTurnIsReassignsOneTurn() {
+        let pad = UIDevice.current.userInterfaceIdiom == .pad
+        if pad { XCUIDevice.shared.orientation = .landscapeLeft }
+        let app = launch(["--chirp-notes-gallery", "--chirp-speakers-gallery"])
+        func openTranscript() {
+            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'chirp.notes.row.' AND label CONTAINS 'Lantern kickoff'")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10)); row.tap()
+            app.buttons["chirp.notes.transcript.open"].tap()
+        }
+        openTranscript()
+        // Segment 1 reads Person 1, Maya, Person 1.
+        let first = app.buttons["chirp.notes.speaker.chip.1.0"], last = app.buttons["chirp.notes.speaker.chip.1.2"]
+        XCTAssertTrue(last.waitForExistence(timeout: 5))
+        XCTAssertEqual(last.label, "Person 1")
+        // A submenu's items lose their accessibility identifiers, and the chips behind the menu share their labels: find
+        // the choice by label inside the menu's collection view.
+        func reassign(_ person: String, screenshot name: String? = nil) {
+            if !last.isHittable { Self.element("chirp.notes.transcript", in: app).swipeUp(velocity: .slow) }
+            last.tap()
+            let submenu = app.buttons["chirp.notes.speaker.reassign"]
+            XCTAssertTrue(submenu.waitForExistence(timeout: 5)); submenu.tap()
+            let choice = app.collectionViews.buttons[person].firstMatch
+            XCTAssertTrue(choice.waitForExistence(timeout: 5), "This turn is → \(person)")
+            if let name { screenshot(name, app) }
+            choice.tap()
+        }
+        reassign("Maya", screenshot: "notes-speakers-this-turn")
+        XCTAssertTrue(Self.waitFor(last, "label == 'Maya'", timeout: 5))
+        XCTAssertEqual(first.label, "Person 1", "Person 1's other turns stay theirs")
+        reassign("New person")
+        XCTAssertTrue(Self.waitFor(last, "label == 'Person 3'", timeout: 5))
+        XCTAssertEqual(first.label, "Person 1")
+        screenshot("notes-speakers-new-person", app)
+
+        app.terminate(); app.launch(); Self.openNotes(app)
+        openTranscript()
+        XCTAssertTrue(Self.waitFor(last, "label == 'Person 3'", timeout: 10), "the reassignment is kept in the sealed note")
+        XCTAssertEqual(first.label, "Person 1")
+    }
+
+    /// New note (A2-7): a blank note opens ready to type with no recording, is "Untitled note" until typed in, and a note
+    /// that is recording keeps recording.
+    @MainActor func testNewNoteTypesWithoutStoppingARecording() {
+        let pad = UIDevice.current.userInterfaceIdiom == .pad
+        let app = launch()
+        let new = app.buttons["chirp.notes.new"]
+        XCTAssertTrue(new.waitForExistence(timeout: 10))
+        XCTAssertEqual(new.label, "New note")
+        new.tap()
+        let editor = app.textViews["chirp.notes.editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), "New note opens the editor")
+        XCTAssertEqual(app.buttons["chirp.notes.title"].label, "Rename Untitled note")
+        XCTAssertFalse(app.buttons["chirp.notes.stop"].exists, "nothing records")
+        // New note opens ready to type; `hasKeyboardFocus` is readable only through a predicate.
+        if !Self.waitFor(editor, "hasKeyboardFocus == true", timeout: 3) { editor.tap() }
+        editor.typeText("Groceries\nBread and figs")
+        screenshot("notes-new-note", app)
+        app.buttons["chirp.notes.edit"].tap()
+        XCTAssertTrue(Self.waitFor(app.buttons["chirp.notes.title"], "label == 'Rename Groceries'", timeout: 5))
+        backToLibrary(app)
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'chirp.notes.row.' AND label CONTAINS 'Groceries'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "the typed note is kept")
+
+        // While one note records, New note opens beside it.
+        XCTAssertTrue(Self.waitFor(app.buttons["chirp.notes.record"].firstMatch, "isEnabled == true", timeout: 20))
+        app.buttons["chirp.notes.record"].firstMatch.tap()
+        XCTAssertTrue(Self.waitFor(Self.element("chirp.notes.status", in: app), "label == 'Recording'"))
+        backToLibrary(app)
+        XCTAssertTrue(app.buttons["chirp.notes.recordingRow"].waitForExistence(timeout: 5))
+        new.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["chirp.notes.jumpRecording"].waitForExistence(timeout: 5), "the recording goes on")
+        if pad { XCTAssertTrue(app.buttons["chirp.notes.recordingRow"].exists) }
+        app.buttons["chirp.notes.jumpRecording"].tap()
+        XCTAssertTrue(app.buttons["chirp.notes.stop"].waitForExistence(timeout: 5))
+        app.buttons["chirp.notes.stop"].tap()
+        XCTAssertTrue(Self.waitFor(Self.element("chirp.notes.status", in: app), "label == 'Stopped'", timeout: 20))
+    }
+
     /// Labels are on by default: no switch to flip and no consent (the synthetic Mac has the model), the chips follow, and
     /// Turn off in Settings is the one explicit choice.
     @MainActor func testLabelSpeakersAreOnByDefaultAndSettingsTurnsThemOff() {

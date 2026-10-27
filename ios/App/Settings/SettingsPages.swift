@@ -283,9 +283,9 @@ struct KeyboardPage: View {
 struct ShortcutsPage: View {
     @ObservedObject private var hardware = HardwareShortcutController.shared
 
-    // Current bindings in NotesLibraryView and LiveNotesView. A2-7 will move ⌘N to New note.
+    // The bindings in NotesLibraryView and LiveNotesView: ⌘N is New note, as on the Mac and Android (A2-7).
     static let notesShortcuts: [(title: String, keys: String)] = [
-        ("Record", "⌘N"),
+        ("New note", "⌘N"),
         ("Record / Stop note", "⇧⌘R"),
         ("Pause / Resume note", "⇧⌘P"),
         ("Search notes", "⌘F"),

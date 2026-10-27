@@ -363,6 +363,9 @@ shows a list and detail, with a trailing transcript inspector.
   segments of at most 45 seconds. Notes and a keyboard session never share the
   microphone. Continue recording appends to an existing note with a dated
   capture boundary; browsing other notes leaves the recording running.
+- **New note** (beside Record, ⌘N with a keyboard) opens a blank note ready to
+  type. It needs no computer or microphone, a note that is recording keeps
+  recording, and a blank note is kept only once you type or rename it.
 - Notes open in **reading mode** with headings, bullets, tappable task boxes,
   and Decision/Question callouts. **Edit** switches to Markdown editing.
   Structuring waits while you type, up to 10 seconds after the last keystroke.
@@ -401,7 +404,9 @@ Notes) shows who said what. The transcript starts each person's turn with a colo
 a name on a tinted capsule (**Person 1**, **Person 2**…, numbered in the order
 they first speak; the inspector on iPad, a sheet on iPhone). Tap a capsule for
 **Rename…** (everywhere in the note, with an optional *also replace* in the
-notes text), **Same person as** (merge) and **Separate**. The notes the computer
+notes text), **This turn is** (just that turn, to another person or a **New
+person**; later labels and Re-transcribe keep it), **Same person as** (merge) and
+**Separate**. The notes the computer
 structures read `Name: …` lines, so decisions and tasks say who owns them, and
 exports show the names. Your own computer's server tells the voices apart; the note’s
 session averages stay in its memory, while voices you name can be saved in its library. If the computer has no speaker model yet, the phone asks it to fetch the
@@ -460,8 +465,8 @@ Notes library screenshots (synthetic text only):
 ![iPad split view, dark](../docs/screenshots/ios/ipad-notes-reading-dark.png)
 ![iPad transcript inspector, light](../docs/screenshots/ios/ipad-notes-transcript-audio-light.png)
 
-Hardware keyboard: ⌘N new recording, ⌘F search, ⌥⌘T transcript, ⌘⇧R
-record/stop, ⌘⇧P pause/resume. Shortcuts retain Start, Pause/resume and Stop
+Hardware keyboard: ⌘N new note (typed, no recording), ⌘F search, ⌥⌘T
+transcript, ⌘⇧R record/stop, ⌘⇧P pause/resume. Shortcuts retain Start, Pause/resume and Stop
 Chirp Live Notes.
 
 ## Dictate from any app (keyboard)

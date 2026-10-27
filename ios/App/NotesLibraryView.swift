@@ -34,7 +34,7 @@ struct NotesLibraryView: View {
                     libraryList.navigationSplitViewColumnWidth(min: 320, ideal: 350, max: 380)
                 } detail: {
                     if !selectedID.isEmpty { detail }
-                    else { NotesEmptyView(title: "A little room to think", message: "Choose a note, or start a new recording.") }
+                    else { NotesEmptyView(title: "A little room to think", message: "Choose a note, or start a new one.") }
                 }.navigationSplitViewStyle(.balanced)
             } else {
                 NavigationStack {
@@ -135,7 +135,7 @@ struct NotesLibraryView: View {
                     }
                     if notes.entries.isEmpty && notes.recordingID == nil {
                         Section {
-                            NotesEmptyView(title: "Your notes will live here", message: "Tap Record and talk. Chirp turns it into notes.", privacy: true)
+                            NotesEmptyView(title: "Your notes will live here", message: "Tap New note to type, or Record to turn a conversation into notes.", privacy: true)
                                 .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                         }
                     }
@@ -265,13 +265,19 @@ struct NotesLibraryView: View {
                     }.disabled(selection.isEmpty).tint(Color.chirp.record).buttonStyle(.bordered)
                 }
                 Spacer()
+                // New note types a note here, with no computer or microphone, and never stops a recording (A2-7).
+                Button { Task { await newNote() } } label: { Image(systemName: "square.and.pencil").frame(minWidth: 44, minHeight: 44) }
+                    .buttonStyle(.bordered).buttonBorderShape(.circle).accessibilityLabel("New note")
+                    .keyboardShortcut("n", modifiers: .command)
+                    .accessibilityShowsLargeContentViewer().accessibilityIdentifier("chirp.notes.new")
                 Button(action: dictate) { Image(systemName: "mic").frame(minWidth: 44, minHeight: 44) }
                     .buttonStyle(.bordered).buttonBorderShape(.circle).accessibilityLabel("Dictate")
                     .accessibilityShowsLargeContentViewer()
                 Button { if notes.isActive { confirmRecording = true } else { Task { await startRecording() } } } label: {
                     Label("Record", systemImage: "record.circle").font(.headline).padding(.vertical, 8).lineLimit(1)
                 }.buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Color.chirp.koi)
-                    .foregroundStyle(Color.chirp.onKoi).keyboardShortcut("n", modifiers: .command)
+                    // ⇧⌘R records from the library; with a note open, its own Record / Stop owns the shortcut.
+                    .foregroundStyle(Color.chirp.onKoi).keyboardShortcut(selectedID.isEmpty ? KeyboardShortcut("r", modifiers: [.command, .shift]) : nil)
                     .accessibilityShowsLargeContentViewer()
                     .accessibilityIdentifier("chirp.notes.record")
             }
@@ -308,6 +314,10 @@ struct NotesLibraryView: View {
     }
 
     private func startRecording() async { await notes.newRecording(); selectedID = notes.document.id.uuidString }
+    private func newNote() async {
+        searchFocused = false; selecting = false; selection = []
+        await notes.newNote(); selectedID = notes.document.id.uuidString
+    }
     private func open(_ id: UUID) async {
         await notes.open(id)
         guard notes.document.id == id else { return }

@@ -302,6 +302,24 @@ final class LiveNotesController: ObservableObject {
         await record()
     }
 
+    /// New note (⌘N, the library's New note): a blank typed note that opens ready to type. It needs no pairing or
+    /// microphone, a note that is recording keeps recording, and it is kept once you type or rename it (as on the Mac).
+    func newNote() async {
+        await ready()
+        newNotes()
+        editRequest = document.id
+    }
+
+    /// The note New note made, until its editor opens for typing.
+    @Published private(set) var editRequest: UUID?
+
+    /// True once for note `id` after New note: the detail opens its editor.
+    func takeEditRequest(_ id: UUID) -> Bool {
+        guard editRequest == id else { return false }
+        editRequest = nil
+        return true
+    }
+
     /// Explicit History hand-off. Nothing is copied automatically; capture stays with its own note.
     /// Returns the destination id, or nil for empty input / an unavailable destination.
     @discardableResult
@@ -798,6 +816,12 @@ final class LiveNotesController: ObservableObject {
         selected.voices.name(id, name: SpeakerFixups.cleanName(name), remember: rememberVoices && remember)
         fixSpeakers { SpeakerFixups.rename(person, to: name, replaceInNotes: replaceInNotes, in: &$0) }
         rememberPending(in: selected)
+    }
+    /// "This turn is": one transcript turn goes to `person` (nil: a new person). The turn is marked as the user's, so
+    /// later labels and a re-transcribe keep it, and the transcript, export and structuring use that person.
+    func reassignTurn(segment: Int, turn: Int, to person: Int?) {
+        guard !isRetranscribing else { return }
+        fixSpeakers { $0.reassignTurns([SpeakerTurnRef(segment: segment, index: turn)], to: person); return [] }
     }
     func mergeSpeaker(_ person: Int, into target: Int) { fixSpeakers { $0.mergeSpeaker(person, into: target); return [] } }
     func separateSpeaker(_ person: Int) { fixSpeakers { $0.separateSpeaker(person); return [] } }

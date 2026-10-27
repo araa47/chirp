@@ -2,8 +2,8 @@ import ChirpCore
 import ChirpIOSCore
 import SwiftUI
 
-/// Live Notes speaker labels (#201, Pond #151): the capsule that starts a person's turn, its menu (rename, same person
-/// as, separate), the rename sheet and the status line while the Mac fetches its model. Names are note content and are
+/// Live Notes speaker labels (#201, Pond #151): the capsule that starts a person's turn, its menu (rename, this turn
+/// is, same person as, separate), the rename sheet and the status line while the Mac fetches its model. Names are note content and are
 /// never logged.
 
 /// The canonical speaker chip (#271 2.3), the same as the Mac's and Android's: a colour dot and the name in the person's
@@ -57,6 +57,16 @@ struct SpeakerTurnsView: View {
                                 .accessibilityIdentifier("chirp.notes.speaker.rename")
                             Button("Name speakers…", systemImage: "person.2", action: nameAll)
                                 .accessibilityIdentifier("chirp.notes.speaker.nameAll")
+                            // Just this turn, as on the Mac and Android (A2-10): the rest of this person's turns stay.
+                            Menu("This turn is", systemImage: "arrow.left.arrow.right") {
+                                ForEach(menu.mergeTargets, id: \.self) { id in
+                                    Button(roster.displayName(id)) { notes.reassignTurn(segment: segmentIndex, turn: turnIndex, to: id) }
+                                        .accessibilityIdentifier("chirp.notes.speaker.turn.\(id)")
+                                }
+                                if !menu.mergeTargets.isEmpty { Divider() }
+                                Button("New person", systemImage: "person.badge.plus") { notes.reassignTurn(segment: segmentIndex, turn: turnIndex, to: nil) }
+                                    .accessibilityIdentifier("chirp.notes.speaker.turn.new")
+                            }.accessibilityIdentifier("chirp.notes.speaker.reassign")
                             if !menu.mergeTargets.isEmpty {
                                 Menu("Same person as", systemImage: "person.2") {
                                     ForEach(menu.mergeTargets, id: \.self) { id in
@@ -72,7 +82,7 @@ struct SpeakerTurnsView: View {
                         } label: {
                             SpeakerChip(name: menu.name, colorIndex: roster.colorIndex(turn.person), recognised: notes.recognisedVoice(turn.person) != nil)
                         }
-                        .accessibilityValue(notes.recognisedVoice(turn.person) == nil ? "" : "Recognised").accessibilityLabel(menu.name).accessibilityHint("Rename, merge or separate this speaker")
+                        .accessibilityValue(notes.recognisedVoice(turn.person) == nil ? "" : "Recognised").accessibilityLabel(menu.name).accessibilityHint("Rename, merge or reassign this speaker")
                         .accessibilityIdentifier("chirp.notes.speaker.chip.\(segmentIndex).\(turnIndex)")
                         if turnIndex > 0 {
                             Text(clock(turn.start)).font(ChirpType.timer(.caption)).foregroundStyle(Color.chirp.inkMuted)

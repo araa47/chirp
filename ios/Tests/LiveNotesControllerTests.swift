@@ -47,7 +47,7 @@ struct LiveNotesControllerTests {
         }
     }
 
-    func fixture(root: URL? = nil, voiceLibrary: TestVoiceLibrary? = nil, voiceMatches: [ServerVoiceMatch] = [], secrets: MemorySecretStore = MemorySecretStore(), health: Health = LiveNotesController.syntheticHealth,
+    func fixture(root: URL? = nil, paired: Bool = true, voiceLibrary: TestVoiceLibrary? = nil, voiceMatches: [ServerVoiceMatch] = [], secrets: MemorySecretStore = MemorySecretStore(), health: Health = LiveNotesController.syntheticHealth,
                  reorganize: @escaping @Sendable (NotesReorganizeRequest) async throws -> NotesReorganizeResponse = { LiveNotesController.syntheticReorganize($0) },
                  structure: @escaping @Sendable (NotesStructureRequest) async throws -> NotesStructureResponse = { LiveNotesController.syntheticStructure($0) },
                  retranscribe: (() -> SyntheticTransport)? = nil) throws -> Fixture {
@@ -55,7 +55,7 @@ struct LiveNotesControllerTests {
         let store = try NotesStore(root: root, secrets: secrets)
         let values = Values(), audio = SyntheticNotesAudio()
         var deps = LiveNotesController.Dependencies(
-            server: { ServerConfig(baseURL: URL(string: "https://synthetic.test.ts.net/chirp")!, token: "synthetic-only") },
+            server: { paired ? ServerConfig(baseURL: URL(string: "https://synthetic.test.ts.net/chirp")!, token: "synthetic-only") : nil },
             correctionAllowed: { _ in true },
             otherCaptureActive: { values.otherCapture },
             http: URLSession(configuration: .ephemeral),
@@ -286,6 +286,37 @@ struct LiveNotesControllerTests {
         await f.notes.stop()
     }
 
+    /// New note (A2-7): a typed note with no computer, kept once typed in; a blank one is never kept.
+    @Test func newNoteTypesWithoutAComputerAndIsKeptOnceTyped() async throws {
+        let f = try fixture(paired: false); defer { f.clean() }
+        await f.notes.newNote()
+        let id = f.notes.document.id
+        #expect(NoteMeta.displayTitle(f.notes.document) == "Untitled note")
+        #expect(f.notes.takeEditRequest(id) && !f.notes.takeEditRequest(id), "the editor opens once")
+        await f.notes.settleJournal()
+        #expect(f.notes.entries.isEmpty, "a blank note is not kept")
+        f.notes.edit("Shopping\n- [ ] Bread")
+        await f.notes.settleJournal()
+        #expect(f.notes.entries.map(\.id) == [id])
+        #expect(try await f.store.libraryStore.record(id).document.text == "Shopping\n- [ ] Bread")
+        #expect(f.values.transports.isEmpty && !f.audio.isRunning, "no stream and no microphone")
+    }
+
+    @Test func newNoteNeverStopsARecording() async throws {
+        let f = try fixture(); defer { f.clean() }
+        await f.notes.record()
+        try await eventually("recording") { f.notes.state == .recording }
+        let active = f.notes.document.id
+        await f.notes.newNote()
+        #expect(f.notes.document.id != active && f.notes.state == .idle)
+        #expect(f.notes.recordingID == active && f.audio.isRunning && f.notes.isActive)
+        f.notes.edit("Typed while it records")
+        await f.notes.settleJournal()
+        #expect(f.notes.entries.contains { $0.id == f.notes.document.id })
+        await f.notes.stop()
+        #expect(f.notes.document.text == "Typed while it records")
+    }
+
     actor OrganizeGate {
         private var continuation: CheckedContinuation<NotesReorganizeResponse, Never>?
         private var released = false
@@ -397,7 +428,7 @@ struct LiveNotesControllerTests {
 
     @Test func notesShortcutTableMatchesCurrentBindings() {
         #expect(ShortcutsPage.notesShortcuts.map(\.title) == [
-            "Record", "Record / Stop note", "Pause / Resume note", "Search notes", "Show or hide transcript",
+            "New note", "Record / Stop note", "Pause / Resume note", "Search notes", "Show or hide transcript",
         ])
         #expect(ShortcutsPage.notesShortcuts.map(\.keys) == ["⌘N", "⇧⌘R", "⇧⌘P", "⌘F", "⌥⌘T"])
     }
@@ -537,5 +568,38 @@ struct LiveNotesControllerTests {
         let stored = try await f.store.libraryStore.record(f.notes.document.id).document
         #expect(stored.segments.compactMap(\.turns) == f.notes.document.segments.compactMap(\.turns))
         #expect(stored.roster.displayName(2) == "Maya" && stored.roster.displayName(1) == "Person 1")
+    }
+
+    /// "This turn is" (A2-10): one turn moves, the person's other turns stay, and the override is sealed in the note.
+    @Test func thisTurnIsMovesOneTurnToAPersonOrANewOne() async throws {
+        let f = try fixture(health: speakerHealth(.ready)); defer { f.clean() }
+        await f.notes.refreshHealth()
+        await f.notes.record()
+        try await eventually("recording") { f.notes.state == .recording }
+        await f.notes.stop()
+        try await eventually("labelled segment") { f.notes.document.segments.contains { $0.turns?.count == 2 } }
+        let index = try #require(f.notes.document.segments.firstIndex { $0.turns?.count == 2 })
+        f.notes.renameSpeaker(2, to: "Maya", replaceInNotes: false)
+
+        f.notes.reassignTurn(segment: index, turn: 0, to: 2)
+        var turns = try #require(f.notes.document.segments[index].turns)
+        #expect(turns.map(\.person) == [2, 2] && turns[0].manual && !turns[1].manual)
+        #expect(f.notes.document.roster.displayName(1) == "Person 1", "the rest of Person 1 is untouched")
+
+        f.notes.reassignTurn(segment: index, turn: 1, to: nil)
+        turns = try #require(f.notes.document.segments[index].turns)
+        #expect(turns.map(\.person) == [2, 3] && turns[1].manual)
+        #expect(f.notes.document.roster.displayName(3) == "Person 3")
+        // The export and the next structuring pass read the effective person.
+        #expect(f.notes.markdown.contains(" Maya:** ") && f.notes.markdown.contains(" Person 3:** "))
+        #expect(f.notes.document.labelledText(f.notes.document.segments[index]).hasPrefix("Maya: "))
+
+        await f.notes.settleJournal()
+        let stored = try await f.store.libraryStore.record(f.notes.document.id).document
+        #expect(stored.segments[index].turns == turns)
+
+        // A turn that is not there changes nothing.
+        f.notes.reassignTurn(segment: index, turn: 9, to: 1)
+        #expect(f.notes.document.segments[index].turns == turns)
     }
 }

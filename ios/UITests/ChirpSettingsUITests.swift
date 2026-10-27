@@ -66,7 +66,7 @@ final class ChirpSettingsUITests: XCTestCase {
         func row(_ title: String, _ keys: String) -> XCUIElement {
             app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", title, keys)).firstMatch
         }
-        for (title, keys) in [("Record", "⌘N"), ("Record / Stop note", "⇧⌘R"),
+        for (title, keys) in [("New note", "⌘N"), ("Record / Stop note", "⇧⌘R"),
                               ("Pause / Resume note", "⇧⌘P"), ("Search notes", "⌘F"),
                               ("Show or hide transcript", "⌥⌘T")] {
             XCTAssertTrue(row(title, keys).waitForExistence(timeout: 5), "Missing shortcut: \(title) \(keys)")
