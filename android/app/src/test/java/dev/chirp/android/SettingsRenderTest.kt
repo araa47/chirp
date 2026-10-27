@@ -62,6 +62,7 @@ class SettingsRenderTest {
 
     private fun shot(prefix: String, shown: SettingsPage?, night: Boolean, font: Float = 1f, cropAt: String? = null) {
         compose.runOnIdle { page.value = shown; dark.value = night; fontScale.floatValue = font }
+        compose.mainClock.advanceTimeBy(2000); compose.waitForIdle()
         save("$prefix-${if (night) "dark" else "light"}", cropAt)
     }
 
@@ -92,6 +93,31 @@ class SettingsRenderTest {
             File(output, "settings-connection-forget-${if (night) "dark" else "light"}.png").outputStream().use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
             }
+            compose.onNodeWithText("Cancel").performClick()
+        }
+    }
+
+    @Test fun `history stop and delete confirmations in light and dark`() {
+        start()
+        fun dialog(title: String, name: String) {
+            compose.onNodeWithText(title).assertIsDisplayed()
+            compose.mainClock.advanceTimeBy(2000); compose.waitForIdle()
+            val target = compose.onNode(isRoot() and hasAnyDescendant(hasText(title)))
+            val bitmap = notesScreenshot(target)
+            File(output, "settings-$name.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        }
+        for (night in listOf(false, true)) {
+            shot("history-dialog-context", SettingsPage.History, night)
+            compose.onNodeWithText("Keep dictation history on this phone").performClick()
+            compose.onNodeWithText("Keep dictation history on this phone").performClick()
+            val theme = if (night) "dark" else "light"
+            dialog("Turn off dictation history?", "history-turn-off-$theme")
+            compose.onNodeWithText("Turn off, keep history").performClick()
+            compose.onNodeWithText("Keep dictation history on this phone").assertIsOff()
+            compose.onNodeWithText("Delete history").performScrollTo().performClick()
+            dialog("Delete dictation history?", "history-delete-$theme")
             compose.onNodeWithText("Cancel").performClick()
         }
     }

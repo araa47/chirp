@@ -119,7 +119,7 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
         (s.serverNotice, s.serverFixMessage) = serverNotice()
         s.cleanupStyle = settings.correctionProfile
         s.stylePrompts = settings.correctionPrompts
-        s.cleanupEnabled = settings.correction
+        s.cleanupEnabled = settings.permitsCorrection(health: health())
         s.offerRaw = settings.showRawAfterCleanup
         s.insertRawFirst = settings.insertRawFirst
         s.showChanges = settings.showChangesAfterCleanup
@@ -939,7 +939,7 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
         alert.alertStyle = .warning
         alert.messageText = HistorySettingsText.clearTitle
         alert.informativeText = HistorySettingsText.clearDetail(count)
-        alert.addButton(withTitle: "Clear History")
+        alert.addButton(withTitle: "Delete History")
         alert.addButton(withTitle: "Cancel")
         alert.buttons[0].hasDestructiveAction = true
         alert.beginSheetModal(for: window) { [weak self] response in

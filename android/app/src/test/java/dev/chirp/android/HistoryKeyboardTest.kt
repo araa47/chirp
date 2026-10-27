@@ -78,7 +78,7 @@ class HistoryKeyboardTest {
     @Test fun `history off records nothing and the panel offers one tap opt in`() {
         dictate()
         assertEquals("Synthetic.", host.editor.committed); assertFalse(file.exists())
-        strip.history.performClick()
+        strip.history.performClick(); advance(0)
         assertEquals(KeyboardHistory.State.OPT_IN, history.state)
         assertEquals(View.VISIBLE, panel.visibility)
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS, keys.importantForAccessibility)
@@ -90,6 +90,19 @@ class HistoryKeyboardTest {
         assertTrue(texts(panel).any { it.startsWith("No dictations yet") })
         dictate("Second.", "second")
         assertEquals(listOf("Second."), store.entries().map { it.text })
+    }
+
+    @Test fun `off keeps old dictations available for insertion in the keyboard`() {
+        store.enable()
+        store.record("Retained fixture", null, null, host.info)
+        store.disable()
+        strip.history.performClick(); advance(0)
+        assertEquals(KeyboardHistory.State.LIST, history.state)
+        assertTrue(texts(panel).any { it.contains("Retained fixture") })
+        assertTrue(panel.subtitle.text.contains("History off"))
+        history.insertEntry(store.entries().single())
+        assertEquals("Retained fixture", host.editor.committed)
+        assertFalse(store.enabled)
     }
 
     @Test fun `inserted finals record clean-up raw and app and use raw records what was inserted`() {

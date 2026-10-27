@@ -137,12 +137,29 @@ class HistoryScreenTest {
         compose.onNodeWithText("Turn on").performClick()
         compose.onNodeWithText("Keep dictation history on this phone").assertIsOff().performClick()
         assertTrue(store.enabled)
-        compose.onNodeWithText("Clear history").assertExists()
+        compose.onNodeWithText("Delete history").assertExists()
         compose.onNodeWithText("7 days").performScrollTo().assertIsSelected()
         record("Meet at the pier at noon")
         compose.onNodeWithText("Keep dictation history on this phone").performScrollTo().performClick()
         compose.onNodeWithText("Turn off and delete").performClick()
         compose.waitUntil(5000) { !store.enabled && !File(context.filesDir, DictationHistory.FILE_NAME).exists() }
+    }
+
+    @Test fun `history kept while off remains searchable and can be deleted`() {
+        record("Retained fixture")
+        store.disable()
+        show()
+        reveal("Retained fixture")
+        compose.onNodeWithText("Search history").assertExists()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("History settings").performClick()
+        compose.onNodeWithText("Keep dictation history on this phone").assertIsOff()
+        compose.onNodeWithText("Delete history").performScrollTo().performClick()
+        compose.onNodeWithText("Delete dictation history?").assertExists()
+        val deleteButtons = compose.onAllNodesWithText("Delete history")
+        deleteButtons[deleteButtons.fetchSemanticsNodes().lastIndex].performClick()
+        compose.waitUntil(5000) { store.entries().isEmpty() }
+        assertFalse(store.enabled)
     }
 
     @Test fun `long press offers add to note which creates then appends through the library`() {
@@ -205,7 +222,7 @@ class HistoryScreenTest {
         compose.onNodeWithText("No dictations yet").assertExists()
         compose.onNodeWithContentDescription("More options").performClick()
         compose.onNodeWithText("History settings").performClick()
-        compose.onNodeWithText("24 hours").performScrollTo().performClick()
+        compose.onNodeWithText("1 day").performScrollTo().performClick()
         compose.waitUntil(5000) { store.retention == HistoryRetention.DAY }
     }
 }

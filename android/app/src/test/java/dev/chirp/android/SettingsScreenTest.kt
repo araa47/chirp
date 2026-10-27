@@ -168,7 +168,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("Keep audio with notes").performScrollTo().assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
         open(SettingsPage.History)
-        compose.onNodeWithText("Keep for").assertDoesNotExist()   // history is off: only the opt-in row shows
+        compose.onNodeWithText("Keep for").assertExists()   // retention also applies to history kept while off
         compose.onNodeWithText("Keep dictation history on this phone").performClick()
         compose.onNodeWithText("Keep for").assertExists()
         compose.onNodeWithText("Keep audio with notes").assertDoesNotExist()

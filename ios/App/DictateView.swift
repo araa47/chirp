@@ -24,6 +24,7 @@ struct DictateView: View {
     /// The finished text as the user edited it; nil until they do. A new dictation or Use raw starts over.
     @State private var edited: String?
     @State private var editing = false
+    @State private var cleanupConsent = false
     @State private var saveNotice = ""
     @FocusState private var editorFocused: Bool
 
@@ -52,6 +53,11 @@ struct DictateView: View {
                 }
             }
         }
+        .confirmationDialog("Enable clean-up?", isPresented: $cleanupConsent, titleVisibility: .visible) {
+            Button("Enable for this destination") { model.setCleanup(true) }
+        } message: {
+            Text(model.cleanupDisclosure + " Changes to this destination suspend consent.")
+        }
         .background(Color.chirp.background)
         .navigationTitle("Dictate").navigationBarTitleDisplayMode(.inline)
         .onChange(of: model.phase, initial: true) { _, phase in
@@ -68,6 +74,7 @@ struct DictateView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: ChirpSpacing.s16) {
                 statusLine
+                cleanupPicker
                 banner
                 page
                 // At accessibility text sizes the controls scroll with the page instead of covering it.
@@ -102,6 +109,29 @@ struct DictateView: View {
             }
             Spacer(minLength: 0)
         }
+    }
+
+    private var cleanupOn: Bool { model.health.map { model.preferences.permitsCorrection(health: $0) } ?? false }
+
+    private var cleanupPicker: some View {
+        Menu {
+            Button("Raw") { model.setCleanup(false) }
+            ForEach(model.profiles) { profile in
+                Button(profile.name) {
+                    model.selectStyle(profile.id)
+                    if model.health?.correctionLeavesMachine == true && !cleanupOn { cleanupConsent = true }
+                    else { model.setCleanup(true) }
+                }
+            }
+        } label: {
+            Label(cleanupOn ? (model.profiles.first { $0.id == model.preferences.styleID }?.name ?? "Default") : "Raw",
+                  systemImage: "wand.and.stars")
+        }
+        .buttonStyle(.capsuleChip)
+        .disabled(active || !model.cleanupCanEnable)
+        .accessibilityLabel("Clean-up style")
+        .accessibilityValue(cleanupOn ? (model.profiles.first { $0.id == model.preferences.styleID }?.name ?? "Default") : "Raw")
+        .accessibilityIdentifier("chirp.dictation.style")
     }
 
     var status: String {

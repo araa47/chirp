@@ -80,8 +80,74 @@ struct PairingTests {
     }
 }
 
+struct DefaultsMigrationTests {
+    @Test func correctionDefaultsOnlyWhenUnsetAndKeepsExplicitChoices() throws {
+        let local = Health(correction: "available", correctionLeavesMachine: false)
+        let external = Health(correction: "available", correctionLeavesMachine: true, correctionHost: "cleanup.example")
+        let decoder = JSONDecoder()
+        let unset = try decoder.decode(IOSPreferences.self, from: Data("{}".utf8))
+        #expect(unset.permitsCorrection(health: local))
+        #expect(!unset.permitsCorrection(health: external))
+        #expect(!unset.permitsCorrection(health: Health(correction: "available")))
+        for choice in [true, false] {
+            let old = Data("{\"correction\":\(choice),\"styleID\":\"chat\",\"prompts\":{},\"sessionDuration\":\"fiveMinutes\",\"privacyMode\":false,\"consentHost\":\"cleanup.example\"}".utf8)
+            let saved = try decoder.decode(IOSPreferences.self, from: old)
+            #expect(saved.correction == choice && saved.styleID == "chat")
+            #expect(saved.permitsCorrection(health: local) == choice)
+            #expect(saved.permitsCorrection(health: external) == choice)
+            #expect(try decoder.decode(IOSPreferences.self, from: JSONEncoder().encode(saved)) == saved)
+        }
+    }
+}
+
 struct HistoryTests {
-    @Test func defaultOffCiphertextAndDisableDeleteKey() throws {
+    @Test func unsetHistorySettingsUseDefaultsAndExplicitChoicesSurvive() throws {
+        let decoder = JSONDecoder()
+        let defaults = try decoder.decode(HistorySettings.self, from: Data("{}".utf8))
+        #expect(!defaults.enabled && defaults.retention == .week)
+        for enabled in [true, false] {
+            for retention in HistoryRetention.allCases {
+                let data = Data("{\"enabled\":\(enabled),\"retention\":\"\(retention.rawValue)\"}".utf8)
+                let settings = try decoder.decode(HistorySettings.self, from: data)
+                #expect(settings.enabled == enabled && settings.retention == retention)
+                #expect(try decoder.decode(HistorySettings.self, from: JSONEncoder().encode(settings)) == settings)
+            }
+        }
+    }
+    @Test func switchingOffKeepsReadableHistoryAndKeyUntilExpiryOrExplicitDeletion() throws {
+        let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let clock = TestClock(), secrets = MemorySecretStore()
+        let store = try HistoryStore(root: root, secrets: secrets, now: clock.now)
+        try store.setEnabled(true); try store.setRetention(.day)
+        let entry = try #require(try store.record(text: "fixture"))
+        let key = try secrets.read(account: HistoryStore.keyAccount)
+        try store.setEnabled(false)
+        let reopened = try HistoryStore(root: root, secrets: secrets, now: clock.now)
+        #expect(!(try reopened.settings().enabled))
+        #expect(try reopened.entries().map(\.id) == [entry.id])
+        #expect(try secrets.read(account: HistoryStore.keyAccount) == key)
+        #expect(try reopened.record(text: "late completion") == nil)
+        clock.advance(86_401)
+        #expect(try reopened.entries().isEmpty)
+        try reopened.clear()
+        #expect(!(try reopened.settings().enabled))
+        #expect(try secrets.read(account: HistoryStore.keyAccount) == nil)
+    }
+    @Test func deleteRetainedEntryWhileOffAndShortenRetention() throws {
+        let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let clock = TestClock()
+        let store = try HistoryStore(root: root, secrets: MemorySecretStore(), now: clock.now)
+        try store.setEnabled(true)
+        let entry = try #require(try store.record(text: "old fixture"))
+        clock.advance(172_800)
+        let newer = try #require(try store.record(text: "new fixture"))
+        try store.setEnabled(false)
+        try store.delete(id: newer.id)
+        #expect(try store.entries().map(\.id) == [entry.id])
+        try store.setRetention(.day)
+        #expect(try store.entries().isEmpty)
+    }
+    @Test func defaultOffCiphertextAndExplicitDeleteKey() throws {
         let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let secrets = MemorySecretStore(); let history = try HistoryStore(root: root, secrets: secrets)
         #expect(!(try history.settings().enabled)); #expect(try history.record(text: "ignored") == nil)
@@ -93,7 +159,7 @@ struct HistoryTests {
         #expect(!bytes.contains(Data("transcript-sentinel".utf8))); #expect(!bytes.contains(Data("raw-sentinel".utf8)))
         #expect(try history.entries().first?.raw == "raw-sentinel")
         #expect(try file.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
-        try history.setEnabled(false)
+        try history.setEnabled(false, deleteHistory: true)
         #expect(!FileManager.default.fileExists(atPath: file.path)); #expect(try secrets.read(account: HistoryStore.keyAccount) == nil)
         #expect(try history.record(text: "racing completion") == nil)
     }
@@ -120,7 +186,7 @@ struct HistoryTests {
         try history.clear(); try history.record(text: "secret")
         try secrets.delete(account: HistoryStore.keyAccount)
         #expect(throws: CoreError.corrupt) { try history.entries() }
-        try history.setEnabled(false); #expect(try history.entries().isEmpty)
+        try history.setEnabled(false, deleteHistory: true); #expect(try history.entries().isEmpty)
     }
     @Test func rawUpdateIsAtomicAndTamperFailsClosed() throws {
         let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
@@ -145,7 +211,7 @@ struct HistoryTests {
         let entry = try #require(try history.record(text: "cleaned", raw: "raw", corrected: true))
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<30 { group.addTask { _ = try? another.useRaw(id: entry.id) } }
-            group.addTask { try? history.setEnabled(false) }
+            group.addTask { try? history.setEnabled(false, deleteHistory: true) }
         }
         #expect(try history.useRaw(id: entry.id) == nil)
         #expect(try history.entries().isEmpty)
@@ -159,7 +225,7 @@ struct HistoryTests {
         try first.setEnabled(true)
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<30 { group.addTask { _ = try? second.record(text: "racing") } }
-            group.addTask { try? first.setEnabled(false) }
+            group.addTask { try? first.setEnabled(false, deleteHistory: true) }
         }
         #expect(try first.entries().isEmpty)
         #expect(try secrets.read(account: HistoryStore.keyAccount) == nil)
@@ -285,7 +351,7 @@ struct PreferenceAndDiagnosticTests {
     @Test func defaultsConsentAndPersistence() throws {
         let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let store = try PreferenceStore(root: root); var preferences = try store.load()
-        #expect(!preferences.correction); #expect(preferences.sessionDuration == .fiveMinutes)
+        #expect(preferences.correction); #expect(preferences.sessionDuration == .fiveMinutes)
         preferences.correction = true
         let external = Health(correction: "available", correctionLeavesMachine: true, correctionHost: "llm.example")
         #expect(!preferences.permitsCorrection(health: external))

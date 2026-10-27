@@ -19,10 +19,17 @@ public struct HistorySettings: Codable, Sendable, Equatable {
     public var retention: HistoryRetention = .week
     public var generation = UUID()
     public init() {}
+    private enum CodingKeys: String, CodingKey { case enabled, retention, generation }
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try values.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        retention = try values.decodeIfPresent(HistoryRetention.self, forKey: .retention) ?? .week
+        generation = try values.decodeIfPresent(UUID.self, forKey: .generation) ?? UUID()
+    }
 }
 
 /// Disk state is authoritative under the same process-safe lock as Keychain changes. No cached enabled flag/key.
-/// A racing record either precedes disable (then is deleted) or follows it (then cannot recreate a key/file).
+/// Disabling fences new writers; only an explicit delete removes retained entries and their key.
 public final class HistoryStore: Sendable {
     public static let keyAccount = "history.aes.v1"
     private let sealed: SealedStorage
@@ -37,13 +44,13 @@ public final class HistoryStore: Sendable {
         try sealed.files.load(HistorySettings.self, "settings.json", max: 4096) ?? HistorySettings()
     }
     public func settings() throws -> HistorySettings { try sealed.files.transaction { try settingsLocked() } }
-    public func setEnabled(_ enabled: Bool) throws {
+    public func setEnabled(_ enabled: Bool, deleteHistory: Bool = false) throws {
         try sealed.files.transaction {
             var settings = try settingsLocked()
             settings.enabled = enabled; settings.generation = UUID()
-            // Persist the disabled fence BEFORE deleting. A failed delete still blocks every future writer.
+            // Persist the disabled fence before an optional delete; racing writers cannot recreate deleted history.
             try sealed.files.save(settings, "settings.json", max: 4096)
-            if !enabled {
+            if !enabled && deleteHistory {
                 try sealed.files.remove("entries.sealed")
                 try sealed.secrets.delete(account: Self.keyAccount)
             }
@@ -53,7 +60,7 @@ public final class HistoryStore: Sendable {
         try sealed.files.transaction {
             var settings = try settingsLocked(); settings.retention = retention
             try sealed.files.save(settings, "settings.json", max: 4096)
-            if settings.enabled { try save(prune(try load(), settings: settings)) }
+            try save(prune(try load(), settings: settings))
         }
     }
     @discardableResult
@@ -80,10 +87,6 @@ public final class HistoryStore: Sendable {
     public func entries() throws -> [HistoryEntry] {
         try sealed.files.transaction {
             let settings = try settingsLocked()
-            guard settings.enabled else {
-                try sealed.files.remove("entries.sealed"); try sealed.secrets.delete(account: Self.keyAccount)
-                return []
-            }
             let entries = try prune(load(), settings: settings)
             if entries.isEmpty { try sealed.files.remove("entries.sealed") } else { try save(entries) }
             return entries.reversed()
@@ -91,7 +94,6 @@ public final class HistoryStore: Sendable {
     }
     public func delete(id: UUID) throws {
         try sealed.files.transaction {
-            guard try settingsLocked().enabled else { return }
             try save(load().filter { $0.id != id })
         }
     }

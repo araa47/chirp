@@ -658,7 +658,7 @@ Nothing transcript-like ever appears on the lock screen.
 
 ## Clean-up and styles
 
-**Settings → Dictation**. Clean-up starts off. The row's summary line says
+**Settings → Dictation**. Clean-up defaults on when it runs locally on your computer; explicit existing choices are preserved. Dictate shows the current Raw/style state in a menu beside the dictation. The row's summary line says
 where it runs — "Sends final text to \<host\>" for an external destination —
 and enabling an external destination takes an explicit per-destination consent
 that suspends when the destination changes. Styles come from your computer's
@@ -684,11 +684,10 @@ Settings and History screenshots (synthetic content; iPhone light and dark, the 
 ## History (off by default)
 
 **History** tab: "Keep encrypted history on this device" is off initially.
-When on: at most 200 nonempty finals, 4 MiB total, retention 24 hours / 7 days
+When on: at most 200 nonempty finals, 4 MiB total, retention 1 day / 7 days
 (default) / 30 days, searchable, with per-entry copy, copy-original, delete and
-a Clear all action. Entries are AES-GCM encrypted with a device-only Keychain
-key, excluded from backups and never synced. Turning history off deletes the
-ciphertext and the key. Cancelled and empty utterances are never recorded, and
+a Delete history action. Entries are AES-GCM encrypted with a device-only Keychain
+key, excluded from backups and never synced. Turning history off stops new entries and offers to keep or delete existing history. Retained entries stay readable until they expire or Delete history removes them and the key. Cancelled and empty utterances are never recorded, and
 the **Pause dictation history** switch (Settings → Privacy & history, or Chirp Keyboard's Style menu; it stays on until you turn it off) keeps an utterance out of history —
 but Chirp cannot detect every editor's private mode, so switch it on yourself
 when it matters; surrounding editor text is never collected.

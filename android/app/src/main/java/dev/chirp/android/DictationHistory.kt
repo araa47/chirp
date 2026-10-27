@@ -26,7 +26,7 @@ internal class HistoryEntry(val id: String, val time: Long, val text: String, va
 }
 
 internal enum class HistoryRetention(val days: Int, val label: String) {
-    DAY(1, "24 hours"), WEEK(7, "7 days"), MONTH(30, "30 days");
+    DAY(1, "1 day"), WEEK(7, "7 days"), MONTH(30, "30 days");
     val millis get() = days * 86_400_000L
     companion object { fun of(days: Int) = entries.firstOrNull { it.days == days } ?: WEEK }
 }
@@ -35,7 +35,7 @@ internal enum class HistoryRetention(val days: Int, val label: String) {
  * On-by-default dictation history that never leaves this phone. Entries live only in credential-encrypted
  * app storage (unavailable before first unlock), are sealed with an Android Keystore AES-GCM key,
  * and are excluded from backup/transfer. Nothing here is logged or added to diagnostics.
- * Turning history off or clearing it deletes the file and its key.
+ * Turning history off stops new entries. Explicit deletion removes the file and its key.
  */
 internal class DictationHistory(
     context: Context,
@@ -51,15 +51,18 @@ internal class DictationHistory(
     val enabled get() = prefs.getBoolean("enabled", true)
     var retention: HistoryRetention
         get() = HistoryRetention.of(prefs.getInt("retention_days", HistoryRetention.WEEK.days))
-        set(value) { prefs.edit { putInt("retention_days", value.days) }; if (enabled && available) synchronized(LOCK) { save(load()) } }
+        set(value) { prefs.edit { putInt("retention_days", value.days) }; if (available) synchronized(LOCK) { save(load()) } }
 
     /** False before first unlock or for a device-protected context, where history must never be written. */
     val available: Boolean get() = !deviceProtected && !app.isDeviceProtectedStorage &&
         app.getSystemService(UserManager::class.java)?.isUserUnlocked != false
 
     fun enable() { prefs.edit { putBoolean("enabled", true) } }
-    /** Turning history off is also a delete: the ciphertext and its key are removed. */
-    fun disable() = synchronized(LOCK) { prefs.edit { putBoolean("enabled", false) }; clear() }
+    /** Fence new writers, optionally deleting retained entries and the key under the same lock. */
+    fun disable(deleteHistory: Boolean = false) = synchronized(LOCK) {
+        prefs.edit { putBoolean("enabled", false) }
+        if (deleteHistory) clear()
+    }
 
     fun clear() = synchronized(LOCK) {
         AtomicFile(file).delete()
@@ -68,7 +71,7 @@ internal class DictationHistory(
     }
 
     /** Newest first, already pruned to the retention window and entry limit. */
-    fun entries(): List<HistoryEntry> = if (!enabled || !available) emptyList() else synchronized(LOCK) {
+    fun entries(): List<HistoryEntry> = if (!available) emptyList() else synchronized(LOCK) {
         val stored = read()
         val kept = prune(stored)
         if (kept.size != stored.size) save(kept)
@@ -97,15 +100,15 @@ internal class DictationHistory(
 
     fun delete(id: String) = update(id) { null }
 
-    /** Undo of [delete]: puts the entry back where it was, unless history went off or it has since expired. */
+    /** Undo of [delete]: puts the entry back where it was, unless it has since expired. */
     fun restore(entry: HistoryEntry) {
-        if (!enabled || !available) return
+        if (!available) return
         synchronized(LOCK) { save(prune((load().filter { it.id != entry.id } + entry).sortedBy { it.time })) }
     }
 
     /** Cheap check on keyboard show: decrypts only when the oldest entry may have expired. */
     fun pruneIfDue() {
-        if (!enabled || !available) return
+        if (!available) return
         val oldest = prefs.getLong("oldest", Long.MAX_VALUE)
         if (oldest != Long.MAX_VALUE && clock() - oldest > retention.millis) synchronized(LOCK) { save(load()) }
     }

@@ -268,7 +268,7 @@ public final class SettingsForm {
     public let historyRetention = NSPopUpButton(frame: .zero, pullsDown: false)
     public let historyApps = HistoryAppsList()
     public let openHistory = NSButton(title: "Open History…", target: nil, action: nil)
-    public let clearHistory = NSButton(title: "Clear…", target: nil, action: nil)
+    public let clearHistory = NSButton(title: "Delete History…", target: nil, action: nil)
     private let historyStatus = NSTextField(labelWithString: "")
     /// Dictation › Learn from my edits: the switch and the Learned list.
     public let learnFromEdits = NSButton(checkboxWithTitle: LearnedText.toggle, target: nil, action: nil)
@@ -429,7 +429,7 @@ public final class SettingsForm {
         historyEnabled.setAccessibilityLabel(HistorySettingsText.keep)
         historyRetention.setAccessibilityLabel("Keep dictations for")
         openHistory.setAccessibilityLabel("Open Dictation History")
-        clearHistory.setAccessibilityLabel("Clear dictation history")
+        clearHistory.setAccessibilityLabel("Delete dictation history")
         showLearned.bezelStyle = .rounded; showLearned.controlSize = .small
         showLearned.setAccessibilityLabel("Show what Chirp learned from your edits")
         learnFromEdits.setAccessibilityLabel(LearnedText.toggle)

@@ -139,7 +139,7 @@ public enum HistorySettingsText {
         n == 0 ? "Chirp will stop keeping your dictations." :
             "Chirp will stop keeping new dictations. Delete the \(count(n).lowercased()) already kept on this Mac too?"
     }
-    public static let clearTitle = "Clear dictation history?"
+    public static let clearTitle = "Delete dictation history?"
     public static func clearDetail(_ n: Int) -> String {
         "\(count(n)) will be deleted from this Mac, with the key that encrypts them. This can’t be undone."
     }

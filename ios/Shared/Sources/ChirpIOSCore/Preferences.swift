@@ -8,7 +8,7 @@ public enum SessionDuration: String, Codable, Sendable, CaseIterable {
     }
 }
 public struct IOSPreferences: Codable, Sendable, Equatable {
-    public var correction = false
+    public var correction = true
     public var styleID = "default"
     public var prompts: [String: String] = [:]
     public var sessionDuration: SessionDuration = .fiveMinutes
@@ -31,6 +31,24 @@ public struct IOSPreferences: Codable, Sendable, Equatable {
     /// The pause that stops it, one of `AutoStopDetector.silenceChoices`; nil is the default (2 s).
     public var pauseSeconds: Double?
     public init() {}
+    private enum CodingKeys: String, CodingKey {
+        case correction, styleID, prompts, sessionDuration, privacyMode, consentHost, spokenCommands, autoEnter, hardwareShortcut, learnFromEdits, stopOnPause, pauseSeconds
+    }
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        correction = try values.decodeIfPresent(Bool.self, forKey: .correction) ?? true
+        styleID = try values.decodeIfPresent(String.self, forKey: .styleID) ?? "default"
+        prompts = try values.decodeIfPresent([String: String].self, forKey: .prompts) ?? [:]
+        sessionDuration = try values.decodeIfPresent(SessionDuration.self, forKey: .sessionDuration) ?? .fiveMinutes
+        privacyMode = try values.decodeIfPresent(Bool.self, forKey: .privacyMode) ?? false
+        consentHost = try values.decodeIfPresent(String.self, forKey: .consentHost)
+        spokenCommands = try values.decodeIfPresent(Bool.self, forKey: .spokenCommands)
+        autoEnter = try values.decodeIfPresent(String.self, forKey: .autoEnter)
+        hardwareShortcut = try values.decodeIfPresent(HardwareShortcut.self, forKey: .hardwareShortcut)
+        learnFromEdits = try values.decodeIfPresent(Bool.self, forKey: .learnFromEdits)
+        stopOnPause = try values.decodeIfPresent(Bool.self, forKey: .stopOnPause)
+        pauseSeconds = try values.decodeIfPresent(Double.self, forKey: .pauseSeconds)
+    }
     public var learning: Bool { learnFromEdits != false }
     /// The pause length offered nearest to the stored one.
     public var pauseLength: TimeInterval {

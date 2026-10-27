@@ -163,7 +163,7 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
     val open = if (select == null) own else selected
     val choose: (String?) -> Unit = select ?: { own = it }
     dev.chirp.android.AppShortcutActions(dev.chirp.android.AppCommand.Search to {
-        if (enabled) { searchFocus.requestFocus(); true } else false
+        if (enabled || !entries.isNullOrEmpty()) { searchFocus.requestFocus(); true } else false
     })
     LaunchedEffect(reload, enabled) { entries = withContext(Dispatchers.IO) { history.entries() } }
     // New dictations arrive from the keyboard while this screen is in the background.
@@ -209,7 +209,7 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
             // Off or empty there is nothing to show beside the list: one centred column instead.
             val wide = maxWidth >= LIST_DETAIL
-            val twoPane = wide && enabled && !entries.isNullOrEmpty()
+            val twoPane = wide && !entries.isNullOrEmpty()
             Row(if (twoPane) Modifier.fillMaxSize() else Modifier.widthIn(max = 600.dp).fillMaxSize()) {
                 Column(if (twoPane) Modifier.weight(.45f).widthIn(max = 480.dp).fillMaxHeight() else Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -225,13 +225,13 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
                             }
                         }
                     }
-                    if (enabled) DockedSearchBar(inputField = {
+                    if (enabled || !entries.isNullOrEmpty()) DockedSearchBar(inputField = {
                         SearchBarDefaults.InputField(query, { query = it }, { }, expanded = false, onExpandedChange = { },
                             modifier = Modifier.focusRequester(searchFocus), placeholder = { Text("Search history") }, leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
                             trailingIcon = if (query.isEmpty()) null else ({ IconButton({ query = "" }) { Icon(painterResource(R.drawable.ic_close), "Clear search") } }))
                     }, expanded = false, onExpandedChange = { }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { }
                     when {
-                        !enabled -> EmptyHistory(R.drawable.ic_history, "Dictation history is off",
+                        !enabled && entries.isNullOrEmpty() -> EmptyHistory(R.drawable.ic_history, "Dictation history is off",
                             "Turn it on to keep recent dictations here, encrypted on this phone only.", "Turn on") { settings = true }
                         entries == null -> Unit
                         shown.isEmpty() && query.isNotBlank() -> EmptyHistory(R.drawable.ic_search, "No matches", "Nothing in your history matches. Try other words.")
@@ -256,7 +256,7 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
                     .background(MaterialTheme.colorScheme.surfaceContainer)) {
                     if (current != null) Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
                         HistoryDetail(current, now(), zone, actions)
-                    } else Text(if (enabled && shown.isNotEmpty()) "Select a dictation to see it in full." else "", Modifier.align(Alignment.Center).padding(24.dp),
+                    } else Text(if (shown.isNotEmpty()) "Select a dictation to see it in full." else "", Modifier.align(Alignment.Center).padding(24.dp),
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

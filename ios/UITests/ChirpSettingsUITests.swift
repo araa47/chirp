@@ -142,9 +142,11 @@ final class ChirpSettingsUITests: XCTestCase {
         XCTAssertTrue(waitFor(commands, "value == '0'"))
     }
 
-    /// Clean-up enabling takes the consent dialog; a cancelled dialog leaves it off.
+    /// Clean-up that leaves the computer takes the consent dialog; a cancelled dialog leaves it off.
+    /// (Local clean-up is on by default and needs no dialog: see testDictationStyleShowsRawAndCurrentStyle.)
     @MainActor func testCleanupConsent() {
-        let app = pairedApp()
+        let app = launch(["--chirp-external-cleanup"])
+        app.pair(link: XCUIApplication.syntheticPairingLink)
         app.openDictation()
         let cleanup = element("chirp.cleanup.enabled", in: app)
         XCTAssertTrue(cleanup.waitForExistence(timeout: 5))
@@ -192,6 +194,7 @@ final class ChirpSettingsUITests: XCTestCase {
         app.selectChirpTab("Dictate")
         app.buttons["chirp.dictation.start"].tap()
         XCTAssertTrue(app.buttons["chirp.dictation.stop"].waitForExistence(timeout: 5))
+        XCTAssertTrue(waitFor(app.staticTexts["transcript"], "label == 'synthetic words'"))
         app.buttons["chirp.dictation.stop"].tap()
         XCTAssertTrue(app.staticTexts["Finished"].waitForExistence(timeout: 5))
 
@@ -330,24 +333,47 @@ final class ChirpSettingsUITests: XCTestCase {
         screenshot("settings-connection", app)
     }
 
-    /// Turning history off is confirmed and then clears the list.
+    /// Off fences new dictations while keeping the old ones accessible; Delete history works while off.
     @MainActor func testTurningHistoryOffIsConfirmed() {
         let app = pairedApp()
         app.openSettingsPage("chirp.settings.privacy")
         let toggle = element("chirp.history.enabled", in: app)
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-        if toggle.value as? String != "1" {
-            toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
-        }
+        toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
         XCTAssertTrue(waitFor(toggle, "value == '1'"))
+        app.selectChirpTab("Dictate")
+        app.buttons["chirp.dictation.start"].tap()
+        XCTAssertTrue(app.buttons["chirp.dictation.stop"].waitForExistence(timeout: 5))
+        app.buttons["chirp.dictation.stop"].tap()
+        XCTAssertTrue(app.staticTexts["Finished"].waitForExistence(timeout: 5))
+        app.openSettingsPage("chirp.settings.privacy")
+        for (appearance, name) in [(XCUIDevice.Appearance.light, "light"), (.dark, "dark")] {
+            XCUIDevice.shared.appearance = appearance
+            screenshot("history-settings-" + name, app)
+        }
         toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
-        XCTAssertTrue(app.buttons["Turn off and delete"].waitForExistence(timeout: 5), "No turn-off confirmation")
-        // A dialog's cancel button can appear a beat after its destructive one.
+        XCTAssertTrue(app.buttons["Turn Off and Delete"].waitForExistence(timeout: 5))
         dismissDialog(app)
-        XCTAssertTrue(waitFor(toggle, "value == '1'"), "Cancelling must leave history on")
+        XCTAssertTrue(waitFor(toggle, "value == '1'"), "Cancelling keeps history on")
         toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
-        app.buttons["Turn off and delete"].tap()
+        for (appearance, name) in [(XCUIDevice.Appearance.light, "light"), (.dark, "dark")] {
+            XCUIDevice.shared.appearance = appearance
+            screenshot("history-turn-off-" + name, app)
+        }
+        app.buttons["Turn Off, Keep History"].tap()
         XCTAssertTrue(waitFor(toggle, "value == '0'"))
+        app.selectChirpTab("History")
+        XCTAssertTrue(app.staticTexts["Synthetic words."].waitForExistence(timeout: 5), "Retained dictations remain readable")
+        screenshot("history-retained-while-off", app)
+        app.openSettingsPage("chirp.settings.privacy")
+        let delete = app.buttons["chirp.history.clear"]
+        if !delete.isHittable { app.swipeUp() }
+        delete.tap()
+        app.buttons["Delete History"].tap()
+        XCTAssertTrue(waitFor(toggle, "value == '0'"), "Deletion keeps the switch off")
+        app.selectChirpTab("History")
+        XCTAssertTrue(app.staticTexts["History is off"].waitForExistence(timeout: 5))
+        XCUIDevice.shared.appearance = .light
     }
 
     /// At the largest accessibility text size the Settings home and Dictation pages must not run past either

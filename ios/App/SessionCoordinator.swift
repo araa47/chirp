@@ -201,7 +201,7 @@ final class SessionCoordinator: ObservableObject {
         endSession()
         do { try services?.pairing.clear(); config = nil; paired = false; health = nil; profiles = []; pairedDevice = nil }
         catch { notice = SessionFailure.storage.localizedDescription }
-        preferences.correction = false; preferences.consentHost = nil; savePreferences()
+        preferences.consentHost = nil; savePreferences()
     }
 
     func checkConnection() async {
@@ -240,9 +240,8 @@ final class SessionCoordinator: ObservableObject {
     }
 
     private func applyHealth(_ value: Health) {
-        let changed = health?.correctionLeavesMachine != value.correctionLeavesMachine || health?.correctionHost != value.correctionHost
-        if changed || !value.correctionAvailable {
-            preferences.correction = false; preferences.consentHost = nil; savePreferences()
+        if value.correctionLeavesMachine != true || preferences.consentHost != value.correctionHost || !value.correctionAvailable {
+            preferences.consentHost = nil; savePreferences()
         }
         health = value; debugRetention = value.debugRetention == true
     }

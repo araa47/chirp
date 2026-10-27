@@ -113,7 +113,7 @@ struct HistoryView: View {
     }
 
     @ViewBuilder private var content: some View {
-        if !enabled {
+        if !enabled && entries.isEmpty {
             emptyState(symbol: "clock.arrow.circlepath", title: "History is off",
                        body: "Turn it on to keep recent dictations here, encrypted on this device only.",
                        actionTitle: "Turn on", actionID: "chirp.history.turnOn") { change { try $0.setEnabled(true) } }
@@ -131,7 +131,7 @@ struct HistoryView: View {
     private var list: some View {
         List {
             Section {
-                Text("What you dictated, encrypted on this device only")
+                Text(enabled ? "What you dictated, encrypted on this device only" : "History is off. Existing dictations stay until they expire or you delete them.")
                     .font(.subheadline).foregroundStyle(Color.chirp.inkMuted)
                     .dynamicTypeSize(...DynamicTypeSize.accessibility1) // an aside: it must not fill the screen at AX5
                     .frame(maxWidth: .infinity, alignment: .leading)

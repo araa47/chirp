@@ -158,13 +158,13 @@ struct DictationPage: View {
         SettingsPageScroll {
             SettingsGroup(title: "Clean-up") {
                 SwitchRow(title: "Clean up final text",
-                          isOn: model.preferences.correction,
+                          isOn: model.health.map { model.preferences.permitsCorrection(health: $0) } ?? false,
                           summary: model.cleanupDisclosure,
                           symbol: "text.badge.checkmark",
                           infoTitle: "Clean-up",
-                          infoBody: "Starts off. Audio is recognized on your computer. Clean-up only receives the final transcript after you stop. Changes to the clean-up destination suspend consent.",
+                          infoBody: "On by default when clean-up runs on your computer. Audio is recognized on your computer. Clean-up only receives the final transcript after you stop. Changes to the clean-up destination suspend consent.",
                           identifier: "chirp.cleanup.enabled", disabled: !model.cleanupCanEnable || model.phase == .correcting,
-                          set: { on in if on { consent = true } else { model.setCleanup(false) } })
+                          set: { on in if on && model.health?.correctionLeavesMachine == true { consent = true } else { model.setCleanup(on) } })
             }
             StylesList(model: model)
             StopDictationGroup(model: model)
@@ -354,7 +354,7 @@ struct PrivacyPage: View {
                           summary: SettingsSummary.history(on: history.enabled),
                           symbol: "lock.shield",
                           infoTitle: "Keep dictation history",
-                          infoBody: "Off initially. At most 200 nonempty finals. AES-GCM encrypted with a device-only Keychain key, excluded from backup. Disabling deletes history and its key.",
+                          infoBody: "Off initially. At most 200 nonempty finals. AES-GCM encrypted with a device-only Keychain key, excluded from backup. Turning off stops new entries; existing dictations stay until they expire or you delete history.",
                           identifier: "chirp.history.enabled",
                           set: { on in if on { change { try $0.setEnabled(true) } } else { confirmOff = true } })
                 if history.enabled {
@@ -367,19 +367,19 @@ struct PrivacyPage: View {
                               infoBody: "Stays on until you turn it off, here or in Chirp Keyboard’s Style menu. Dictation history is kept; new dictations aren’t added. Chirp cannot detect every editor’s private mode, so pause before private dictation. No surrounding editor text is collected.",
                               identifier: "chirp.settings.private",
                               set: { on in model.preferences.privacyMode = on; model.savePreferences() })
-                    SettingsItem {
-                        Text("Keep for").font(.subheadline).foregroundStyle(Color.chirp.inkMuted)
-                        ChoiceChips(options: HistoryRetention.allCases,
-                                    selection: Binding(get: { history.retention },
-                                                       set: { option in
-                                           history.retention = option
-                                           change { try $0.setRetention(option) }
-                                       }),
-                                    label: { $0.label })
-                    }
-                    ActionRow(title: "Clear all history", symbol: "trash", destructive: true) { confirmClear = true }
-                        .accessibilityIdentifier("chirp.history.clear")
                 }
+                SettingsItem {
+                    Text("Keep for").font(.subheadline).foregroundStyle(Color.chirp.inkMuted)
+                    ChoiceChips(options: HistoryRetention.allCases,
+                                selection: Binding(get: { history.retention },
+                                                   set: { option in
+                                        history.retention = option
+                                        change { try $0.setRetention(option) }
+                                    }),
+                                label: { $0.label })
+                }
+                ActionRow(title: "Delete history", symbol: "trash", destructive: true) { confirmClear = true }
+                    .accessibilityIdentifier("chirp.history.clear")
             }
             SettingsGroup(title: "What Chirp keeps") {
                 SettingsItem {
@@ -393,14 +393,16 @@ struct PrivacyPage: View {
             }
         }
         .confirmationDialog("Turn off dictation history?", isPresented: $confirmOff, titleVisibility: .visible) {
-            Button("Turn off and delete", role: .destructive) { change { try $0.setEnabled(false) } }
+            Button("Turn Off, Keep History") { change { try $0.setEnabled(false) } }
+            Button("Turn Off and Delete", role: .destructive) { change { try $0.setEnabled(false, deleteHistory: true) } }
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes every saved dictation from this device. New dictations won’t be saved.")
+            Text("New dictations won’t be saved. Keep existing dictations until they expire, or delete them from this device now.")
         }
-        .confirmationDialog("Clear dictation history?", isPresented: $confirmClear, titleVisibility: .visible) {
-            Button("Clear all", role: .destructive) { change { try $0.clear() } }
+        .confirmationDialog("Delete dictation history?", isPresented: $confirmClear, titleVisibility: .visible) {
+            Button("Delete History", role: .destructive) { change { try $0.clear() } }
         } message: {
-            Text("History stays on for new dictations.")
+            Text("This deletes every saved dictation and its encryption key from this device. This can’t be undone. The Keep dictation history setting stays the same.")
         }
     }
 

@@ -109,8 +109,8 @@ For iPhone or iPad, point the agent at [ios/README.md](ios/README.md) → Instal
 - **Dictation is transient.** Audio and text live in memory for one dictation, then they're gone. Logs hold timings and error codes, never what you said.
 - **Notes stay on the device that recorded them**, kept until you delete them (or after 1 year, 90 or 30 days if you choose). They're never synced or indexed; on Android they're encrypted with a Keystore key, and on the Mac and the desktop app the files are readable only by your user account.
 - **Audio with notes is opt-in** (off by default) and never leaves the device. (Desktop Notes keep text only; they don't store audio.)
-- **Dictation history** is encrypted and stays on the device. It is **on by default on the Mac (30 days; 1, 7, 90 days or Forever) and on Android (7 days; 24 hours or 30 days)**, and **off until you turn it on on iPhone and iPad** (then 7 days; 24 hours or 30 days). Turning it off on a phone deletes what is kept.
-- The speech server listens only on your machine's loopback address, phones reach it only through your tailnet, and every phone pairs with its own revocable token. Clean-up runs on the same machine; if you point it elsewhere, every client says where text goes.
+- **Dictation history** is encrypted and stays on the device. It is **on by default on the Mac (30 days) and Android (7 days)**, and **off by default on iPhone and iPad** (7 days when enabled). Every platform offers 1, 7 and 30 days; the Mac also offers 90 days and Forever. Explicit choices stay as you set them. Turning history off stops new entries; existing entries stay until they expire or you choose **Delete history**.
+- The speech server listens only on your machine's loopback address, phones reach it only through your tailnet, and every phone pairs with its own revocable token. Clean-up defaults on in the Mac, iOS and Android apps when the paired computer offers local clean-up; explicit choices are preserved. An external clean-up destination still needs consent and shows where text goes.
 
 Full details: [docs/privacy.md](docs/privacy.md).
 

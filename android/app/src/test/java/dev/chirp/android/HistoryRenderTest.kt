@@ -64,7 +64,7 @@ class HistoryRenderTest {
                     bitmap.recycle()
                     return root.measuredHeight
                 }
-                ime.store.disable()
+                ime.store.disable(deleteHistory = true)
                 val keyboardHeight = render(null) // keyboard-idle-*.png already shows the closed strip.
                 assertEquals(View.VISIBLE, strip.history.visibility)
                 strip.history.performClick()
@@ -76,13 +76,16 @@ class HistoryRenderTest {
                 ime.store.record("Pick up oat milk, lemons and coffee beans", null, "Keep Notes", ime.info)
                 strip.history.performClick(); strip.history.performClick()
                 assertEquals("History keeps the keyboard height", keyboardHeight, render("keyboard-history"))
+                ime.store.disable()
+                strip.history.performClick(); strip.history.performClick()
+                assertEquals("Retained history keeps the keyboard height", keyboardHeight, render("keyboard-history-retained"))
                 val panel = keys.findViewWithTag<HistoryPanel>(KeyboardHistory.TAG)
                 assertEquals(View.VISIBLE, panel.visibility)
                 assertEquals(root.findViewById<View>(helium314.keyboard.latin.R.id.keyboard_view_wrapper).height, panel.height)
                 assertTrue(ime.onKeyDown(KeyEvent.KEYCODE_BACK, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)))
                 assertTrue(ime.onKeyUp(KeyEvent.KEYCODE_BACK, KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK)))
                 assertEquals(View.GONE, panel.visibility)
-                ime.store.disable()
+                ime.store.disable(deleteHistory = true)
             }
         } finally { service.destroy() }
     }

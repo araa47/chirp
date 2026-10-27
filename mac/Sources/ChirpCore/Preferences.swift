@@ -84,10 +84,16 @@ public final class Preferences: @unchecked Sendable {
         get { defaults.bool(forKey: "spokenCommands") }
         set { defaults.set(newValue, forKey: "spokenCommands") }
     }
-    /// Clean-up (the server's `correction` flag). Off by default.
+    /// Clean-up (the server’s `correction` flag). Unset follows verified on-computer capability.
     public var correction: Bool {
-        get { defaults.bool(forKey: "correction") }
+        get { defaults.object(forKey: "correction") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "correction") }
+    }
+    /// An explicit choice survives upgrades. The automatic default never enables an external or unknown destination.
+    public func permitsCorrection(health: Health?) -> Bool {
+        guard let health, health.correctionAvailable else { return false }
+        if let choice = defaults.object(forKey: "correction") as? Bool { return choice }
+        return health.correctionLeavesMachine == false
     }
     /// Whether the HUD offers "Use raw" after a cleaned-up insertion. On by default.
     public var showRawAfterCleanup: Bool {

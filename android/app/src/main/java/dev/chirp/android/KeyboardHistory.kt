@@ -112,7 +112,7 @@ internal class KeyboardHistory(
 
     fun open() {
         val view = panel ?: return
-        state = when { !store.available -> State.LOCKED; !store.enabled -> State.OPT_IN; else -> State.LOADING }
+        state = when { !store.available -> State.LOCKED; else -> State.LOADING }
         view.visibility = View.VISIBLE
         // The accessibility framework still serves HeliBoard's virtual key nodes under
         // NO_HIDE_DESCENDANTS; an invisible view leaves the tree entirely. Layout is unchanged.
@@ -133,7 +133,7 @@ internal class KeyboardHistory(
         strip?.historyOpen(false)
     }
 
-    fun shown() { if (store.enabled) io { store.pruneIfDue() } }
+    fun shown() { io { store.pruneIfDue() } }
 
     fun destroy() { close(); wrapper?.removeOnLayoutChangeListener(follow); wrapper = null; panel = null; strip = null; keys = null }
 
@@ -146,7 +146,7 @@ internal class KeyboardHistory(
         val id = ++generation
         io {
             val result = try { store.entries() } catch (_: Exception) { emptyList() }
-            handler.post { if (id == generation && state == State.LOADING) { entries = result; state = State.LIST; render() } }
+            handler.post { if (id == generation && state == State.LOADING) { entries = result; state = if (!store.enabled && result.isEmpty()) State.OPT_IN else State.LIST; render() } }
         }
     }
 
@@ -190,7 +190,7 @@ internal class KeyboardHistory(
     private fun render() {
         val view = panel ?: return
         view.list.removeAllViews()
-        view.subtitle.text = "Encrypted on this phone · ${store.retention.label}"
+        view.subtitle.text = if (store.enabled) "Encrypted on this phone · ${store.retention.label}" else "History off · kept for ${store.retention.label}"
         view.manage.visibility = if (state == State.LOCKED) View.GONE else View.VISIBLE
         when (state) {
             State.CLOSED -> Unit

@@ -23,6 +23,32 @@ private struct FailingKeys: HistoryKeyStore {
 }
 
 @Suite(.serialized) struct DictationHistoryTests {
+    @Test func defaultsFollowLocalCapabilityAndPreserveEveryExplicitChoice() throws {
+        let suite = "chirp-defaults-test-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let local = Health(correction: "available", correctionLeavesMachine: false)
+        let external = Health(correction: "available", correctionLeavesMachine: true, correctionHost: "cleanup.example")
+        let fresh = Preferences(defaults: defaults)
+        #expect(fresh.historyEnabled && fresh.historyRetention == .thirtyDays)
+        #expect(fresh.permitsCorrection(health: local))
+        #expect(!fresh.permitsCorrection(health: external))
+        #expect(!fresh.permitsCorrection(health: nil))
+        #expect(!fresh.permitsCorrection(health: Health(correction: "available")))
+        #expect(defaults.object(forKey: "correction") == nil)
+        for choice in [true, false] {
+            for retention in DictationRetention.allCases {
+                defaults.set(choice, forKey: "correction")
+                defaults.set(choice, forKey: "historyEnabled")
+                defaults.set(retention.rawValue, forKey: "historyRetention")
+                let reopened = Preferences(defaults: defaults)
+                #expect(reopened.correction == choice && reopened.historyEnabled == choice)
+                #expect(reopened.historyRetention == retention)
+                #expect(reopened.permitsCorrection(health: local) == choice)
+                #expect(reopened.permitsCorrection(health: external) == choice)
+            }
+        }
+    }
     private func entry(_ text: String, raw: String? = nil, at date: Date, app: String = "com.apple.TextEdit") -> DictationEntry {
         DictationEntry(date: date, text: text, raw: raw, bundleID: app, appName: "TextEdit", duration: 3.2, style: raw == nil ? nil : "default")
     }

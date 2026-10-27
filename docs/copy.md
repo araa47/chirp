@@ -59,8 +59,8 @@ Titles and buttons are exact. Message text is the canonical wording; add counts 
 | Forget the pairing | Forget this computer? | You’ll need to scan a new code to dictate. This also ends the session. | **Forget** (destructive) · Cancel |
 | Forget one saved voice | Forget <name>? | Removes <name>’s voice from your computer for every device. Names in existing notes stay. This can’t be undone. | **Forget** (destructive) · Cancel |
 | Forget all saved voices | Forget all voices? | Removes all saved voices from your computer for every device. Names in existing notes stay. This can’t be undone. | **Forget** (destructive) · Cancel |
-| Turn off dictation history | Turn off dictation history? | This deletes every saved dictation from this <device>. New dictations won’t be saved. | **Turn off and delete** (destructive) · Keep history |
-| Clear dictation history | Clear dictation history? | History stays on for new dictations. | **Clear all** (destructive) · Cancel |
+| Turn off dictation history | Turn off dictation history? | New dictations won’t be saved. Keep existing dictations until they expire, or delete them from this <device> now. | **Turn off, keep history** · **Turn off and delete** (destructive) · Cancel |
+| Delete dictation history | Delete dictation history? | This deletes every saved dictation and its encryption key from this <device>. This can’t be undone. The Keep dictation history setting stays the same. | **Delete history** (destructive) · Cancel |
 | Delete one note’s audio | Delete audio? | This deletes this note’s audio. The text and transcript stay. The menu shows the size in MB, in the phone’s locale. | **Delete audio** (destructive) · Cancel |
 
 Notes: on the Mac the voice and pairing messages say “this Mac”/“your Chirp server” instead of “your computer”. The pairing dialog’s Cancel replaces Android’s “Keep pairing”, and “Forget <host>?” becomes “Forget this computer?” (a host name is a server name; do not show it as a title). Use the button name that carries the verb (“Delete Permanently”, “Forget”), never a bare “OK”, “Yes” or “Delete Forever”.

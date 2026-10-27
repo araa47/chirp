@@ -24,9 +24,10 @@ import Testing
         let (defaults, name) = makeDefaults()
         defer { defaults.removePersistentDomain(forName: name) }
         let prefs = Preferences(defaults: defaults)
-        #expect(prefs.startOptions() == StartOptions(client: "mac", correction: false))
-        prefs.correction.toggle()
         #expect(prefs.startOptions() == StartOptions(client: "mac", correction: true))
+        prefs.correction = false
+        #expect(prefs.startOptions() == StartOptions(client: "mac", correction: false))
+        prefs.correction = true
         #expect(ClientMessage.start(prefs.startOptions()).contains("\"correction\":true"))
     }
 

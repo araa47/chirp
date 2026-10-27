@@ -10,6 +10,16 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class CleanupStylesTest {
     private val profiles = listOf("default", "chat", "email", "code", "notes", "custom").map { CorrectionProfile(it, it) }
+    @Test fun `local cleanup default preserves explicit choices after reopening`() {
+        val context = RuntimeEnvironment.getApplication()
+        val store = SettingsStore(context)
+        store.health = Health(true, false, true, false, null)
+        assertTrue(store.correction)
+        listOf(false, true).forEach { choice ->
+            store.correction = choice
+            assertEquals(choice, SettingsStore(context).correction)
+        }
+    }
     @Test fun `exact package defaults overrides removals and missing profiles`() {
         val cases = mapOf("com.slack" to "chat", "com.whatsapp" to "chat", "com.discord" to "chat",
             "com.google.android.apps.messaging" to "chat", "com.samsung.android.messaging" to "chat",

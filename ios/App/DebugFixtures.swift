@@ -11,7 +11,9 @@ final class SyntheticHTTP: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        let health = #"{"ok":true,"ready":true,"engine":"synthetic","debug_retention":false,"correction":"available","correction_leaves_machine":false,"device":"Synthetic test device"}"#
+        // `--chirp-external-cleanup` makes clean-up leave the computer, so the consent dialog can be exercised.
+        let leaves = ProcessInfo.processInfo.arguments.contains("--chirp-external-cleanup")
+        let health = #"{"ok":true,"ready":true,"engine":"synthetic","debug_retention":false,"correction":"available","correction_leaves_machine":\#(leaves),"# + (leaves ? #""correction_host":"synthetic.example","# : "") + #""device":"Synthetic test device"}"#
         let profiles = #"{"profiles":[{"id":"default","name":"Default","description":"Synthetic test style","rewrites":false,"prompt":"Keep all words.","max_prompt_chars":4000}]}"#
         guard let url = request.url, let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type":"application/json"]) else { return }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

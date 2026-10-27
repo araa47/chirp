@@ -34,7 +34,7 @@ class DictationHistoryTest {
     private val text = EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }
     private fun editor(type: Int, options: Int = 0) = EditorInfo().apply { inputType = type; imeOptions = options }
 
-    @Before fun reset() { PrivateSession.set(false); history.disable() }
+    @Before fun reset() { PrivateSession.set(false); history.disable(deleteHistory = true) }
 
     @Test fun `explicit history opt out stores nothing`() {
         assertFalse(history.enabled)
@@ -51,6 +51,45 @@ class DictationHistoryTest {
         assertFalse(DictationHistory(context, keys).enabled)
         history.enable()
         assertTrue(DictationHistory(context, keys).enabled)
+    }
+
+    @Test fun `retention defaults only when unset and all explicit values survive reopening`() {
+        val prefs = context.getSharedPreferences("chirp_history", 0)
+        prefs.edit().remove("retention_days").commit()
+        assertEquals(HistoryRetention.WEEK, DictationHistory(context, keys).retention)
+        HistoryRetention.entries.forEach { choice ->
+            prefs.edit().putInt("retention_days", choice.days).commit()
+            assertEquals(choice, DictationHistory(context, keys).retention)
+        }
+    }
+
+    @Test fun `turning off keeps history readable and blocks new entries until expiry or delete`() {
+        history.enable(); history.retention = HistoryRetention.DAY
+        val entry = history.record("fixture", null, null, text)!!
+        val key = keys.key
+        history.disable()
+        val reopened = DictationHistory(context, keys) { now }
+        assertFalse(reopened.enabled)
+        assertEquals(entry.id, reopened.entries().single().id)
+        assertSame(key, keys.key)
+        assertNull(reopened.record("late completion", null, null, text))
+        now += 86_400_001L
+        reopened.pruneIfDue()
+        assertTrue(reopened.entries().isEmpty()); assertFalse(file.exists())
+        reopened.clear()
+        assertNull(keys.key); assertFalse(reopened.enabled)
+    }
+
+    @Test fun `existing entries can be deleted or expired with a shorter retention while off`() {
+        history.enable(); history.retention = HistoryRetention.MONTH
+        val old = history.record("old fixture", null, null, text)!!
+        now += 2 * 86_400_000L
+        val newer = history.record("new fixture", null, null, text)!!
+        history.disable()
+        history.delete(newer.id)
+        assertEquals(old.id, history.entries().single().id)
+        history.retention = HistoryRetention.DAY
+        assertTrue(history.entries().isEmpty())
     }
 
     @Test fun `private session skips every final and preserves existing history`() {
@@ -151,12 +190,12 @@ class DictationHistoryTest {
         now += 86_400_000L; history.pruneIfDue(); assertFalse(file.exists())
     }
 
-    @Test fun `turning history off deletes entries and key and clear keeps it on`() {
+    @Test fun `explicit deletion removes entries and key and clear keeps the switch unchanged`() {
         history.enable(); history.record("one", null, null, text); history.record("two", null, null, text)
         history.clear()
         assertTrue(history.enabled); assertFalse(file.exists()); assertNull(keys.key)
         history.record("three", null, null, text)
-        history.disable()
+        history.disable(deleteHistory = true)
         assertFalse(history.enabled); assertFalse(file.exists()); assertNull(keys.key)
         history.enable(); assertTrue(history.entries().isEmpty())
     }

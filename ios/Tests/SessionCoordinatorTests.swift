@@ -317,10 +317,25 @@ struct SessionCoordinatorTests {
         #expect(try f.stores.history.entries().isEmpty)
     }
 
-    @Test func cleanupRequiresExplicitKnownDestinationConsent() {
+    @Test func cleanupChoiceSurvivesHealthRefreshAndForgetPairing() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        await f.model.checkConnection()
+        #expect(f.model.health.map { f.model.preferences.permitsCorrection(health: $0) } == true)
+        for choice in [false, true] {
+            f.model.setCleanup(choice)
+            await f.model.checkConnection()
+            #expect(f.model.preferences.correction == choice)
+            #expect(try f.stores.preferences.load().correction == choice)
+        }
+        f.model.setCleanup(false)
+        f.model.forgetPairing()
+        #expect(!f.model.preferences.correction)
+    }
+
+    @Test func localCleanupDefaultsOnAndExternalRequiresKnownDestinationConsent() {
         var preferences = IOSPreferences()
         let local = Health(correction: "available", correctionLeavesMachine: false)
-        #expect(!preferences.permitsCorrection(health: local))
+        #expect(preferences.permitsCorrection(health: local))
         preferences.correction = true
         #expect(preferences.permitsCorrection(health: local))
         let external = Health(correction: "available", correctionLeavesMachine: true, correctionHost: "synthetic.example")

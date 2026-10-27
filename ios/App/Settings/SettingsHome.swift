@@ -228,7 +228,7 @@ extension SessionCoordinator {
     var dictationSummary: String {
         var parts: [String] = []
         if let health, health.correctionAvailable {
-            parts.append(preferences.correction ? "Clean-up on" : "Clean-up off")
+            parts.append(preferences.permitsCorrection(health: health) ? "Clean-up on" : "Clean-up off")
         } else if paired {
             parts.append("No clean-up from your computer")
         }
@@ -251,9 +251,9 @@ extension SessionDuration {
 }
 
 extension HistoryRetention {
-    /// "24 hours", "7 days", "30 days": what Keep for offers and the Privacy summary shows.
+    /// "1 day", "7 days", "30 days": what Keep for offers and the Privacy summary shows.
     var label: String {
-        switch self { case .day: "24 hours"; case .week: "7 days"; case .month: "30 days" }
+        switch self { case .day: "1 day"; case .week: "7 days"; case .month: "30 days" }
     }
 }
 

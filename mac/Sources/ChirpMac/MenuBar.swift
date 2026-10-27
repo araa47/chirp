@@ -170,7 +170,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         inputs.inputs = InputDevice.all().map(\.input)
         inputs.defaultInput = InputDevice.systemDefault()?.input
         inputs.chosenInputUID = settings.inputDeviceUID
-        inputs.cleanupOn = settings.correction
+        inputs.cleanupOn = settings.permitsCorrection(health: controller.health)
         inputs.showChanges = settings.showChangesAfterCleanup
         inputs.styleID = settings.correctionProfile
         inputs.rawOfferOpen = controller.rawOffer.isOpen
@@ -291,7 +291,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
     @objc private func useRaw() { controller.rawOffer.take() }
     @objc private func pickInput(_ sender: NSMenuItem) { settings.inputDeviceUID = sender.representedObject as? String }
-    @objc private func toggleCleanup() { settings.correction.toggle() }
+    @objc private func toggleCleanup() { settings.correction = !settings.permitsCorrection(health: controller.health) }
     @objc private func pickStyle(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         settings.correctionProfile = id

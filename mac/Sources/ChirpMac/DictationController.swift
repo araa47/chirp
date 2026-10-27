@@ -324,6 +324,7 @@ final class DictationController {
         if privateDictation { learning?.watcher.cancel() } else { learning?.watcher.finish() }
         startOptions = settings.startOptions(frontmostBundleID: frontmost?.bundleIdentifier,
                                              available: health?.correctionProfiles)
+        startOptions.correction = settings.permitsCorrection(health: health)
         if !privateDictation, settings.learningEnabled, let learning, !Self.excludedFromHistory(target.bundleID) {
             startOptions.learned = learning.payload(for: target.bundleID)
         }
