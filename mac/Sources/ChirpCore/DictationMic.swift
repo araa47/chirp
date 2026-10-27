@@ -9,16 +9,22 @@ import Foundation
 public final class DictationMic: @unchecked Sendable {
     /// At most this much audio is held before a sink is attached.
     public static let preRollLimit: TimeInterval = 1
+    /// A frame that arrives this much later than its samples' time means the input heard nothing for a while (a route
+    /// change stopped it, or it was slow to start): longer than a capture buffer (2048 samples at 8 kHz) plus latency.
+    static let gapTolerance: TimeInterval = 0.35
 
     private let capture: AudioCapture
     private let now: @Sendable () -> TimeInterval
     private let lock = NSLock()
-    private var held: [(offset: Int, frame: Data)] = []
+    private var held: [(position: Int, frame: Data)] = []
     private var heldBytes = 0
     private var sink: (@Sendable (Data, Bool) -> Void)?
     private var onFailure: (@Sendable () -> Void)?
     /// Samples captured since the microphone opened, including any dropped from the pre-roll.
     private var samples = 0
+    /// Samples' worth of time the input heard nothing since it opened (`gapTolerance`): a sample's time is `anchor` plus
+    /// its offset plus this, so the cue is zeroed where it was heard.
+    private var lost = 0
     /// The uptime of sample 0, and of the first frame's arrival.
     private var anchor: TimeInterval?
     private var firstFrame: TimeInterval?
@@ -39,7 +45,7 @@ public final class DictationMic: @unchecked Sendable {
     public func open() throws {
         guard !isOpen else { return }
         lock.withLock {
-            held = []; heldBytes = 0; samples = 0; anchor = nil; firstFrame = nil; sink = nil; onFailure = nil
+            held = []; heldBytes = 0; samples = 0; lost = 0; anchor = nil; firstFrame = nil; sink = nil; onFailure = nil
         }
         try capture.start(onFailure: { [weak self] in
             guard let self else { return }
@@ -63,8 +69,8 @@ public final class DictationMic: @unchecked Sendable {
     public func attach(onFailure: (@Sendable () -> Void)? = nil, _ sink: @escaping @Sendable (Data, Bool) -> Void) {
         lock.withLock {
             self.onFailure = onFailure
-            for (offset, frame) in held {
-                let (out, muted) = mute(frame, at: offset)
+            for (position, frame) in held {
+                let (out, muted) = mute(frame, at: position)
                 sink(out, muted)
             }
             held = []; heldBytes = 0
@@ -82,29 +88,36 @@ public final class DictationMic: @unchecked Sendable {
     private func receive(_ frame: Data) {
         let t = now()
         lock.withLock {
+            let rate = PCMConverter.sampleRate
             let offset = samples
             samples += frame.count / 2
             if firstFrame == nil { firstFrame = t }
-            if anchor == nil { anchor = t - Double(frame.count / 2) / PCMConverter.sampleRate }
+            if anchor == nil { anchor = t - Double(frame.count / 2) / rate }
+            // Late by more than a buffer: the input stopped or started late. This frame ends as it arrives.
+            if let anchor {
+                let late = t - (anchor + Double(samples + lost) / rate)
+                if late > Self.gapTolerance { lost += Int((late * rate).rounded()) }
+            }
+            let position = offset + lost
             guard let sink else {
-                held.append((offset, frame))
+                held.append((position, frame))
                 heldBytes += frame.count
                 let limit = Int(Self.preRollLimit * PCMConverter.sampleRate) * 2
                 while heldBytes > limit, !held.isEmpty { heldBytes -= held.removeFirst().frame.count }
                 return
             }
-            let (out, muted) = mute(frame, at: offset)
+            let (out, muted) = mute(frame, at: position)
             sink(out, muted)
         }
     }
 
-    /// `frame` (starting at sample `offset`) with the cue's samples zeroed, and whether all of it was.
-    private func mute(_ frame: Data, at offset: Int) -> (Data, Bool) {
+    /// `frame` (starting `position` samples after `anchor`) with the cue's samples zeroed, and whether all of it was.
+    private func mute(_ frame: Data, at position: Int) -> (Data, Bool) {
         let count = frame.count / 2
         guard let cue, let anchor, count > 0 else { return (frame, false) }
         let rate = PCMConverter.sampleRate
-        let from = max(0, Int(((cue.start - anchor) * rate).rounded(.down)) - offset)
-        let to = min(count, Int(((cue.end - anchor) * rate).rounded(.up)) - offset)
+        let from = max(0, Int(((cue.start - anchor) * rate).rounded(.down)) - position)
+        let to = min(count, Int(((cue.end - anchor) * rate).rounded(.up)) - position)
         guard from < to else { return (frame, false) }
         // A copy from index 0: capture frames can be slices with a nonzero startIndex.
         var out = frame.withUnsafeBytes { Data($0) }
