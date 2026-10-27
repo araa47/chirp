@@ -1,4 +1,5 @@
 name: android
+# throwaway: exercises pr-closed-cancel on a PR into the PR branch, never merged
 
 on:
   pull_request:
