@@ -6,6 +6,14 @@ import Testing
 /// Scriptable engine: counts installs and removals so a leaked tap shows up as an imbalance. No hardware.
 final class FakeEngine: CaptureEngine, @unchecked Sendable {
     var format: AVAudioFormat? = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+    var resumeSucceeds = false
+    var resumeAttempts = 0
+    var onReset: (() -> Void)?
+    func resetForCapture() { onReset?() }
+    func resumeAfterConfigurationChange() -> Bool {
+        resumeAttempts += 1
+        return resumeSucceeds
+    }
     var startError: Error?
     var taps = 0                // currently installed
     var installs = 0, removes = 0, stops = 0
@@ -133,6 +141,32 @@ final class FrameBox: @unchecked Sendable {
         let capture = AudioCapture(engine: engine)
         #expect(throws: CaptureError.self) { try capture.start { _ in } }
         #expect(engine.installs == 0 && !capture.isRunning)
+    }
+
+    @Test func unchangedInputResumesWithoutReplacingItsTapOrConverter() throws {
+        let engine = FakeEngine(), box = FrameBox()
+        let capture = AudioCapture(engine: engine)
+        try capture.start { box.add($0) }
+        engine.deliver(seconds: 0.025)
+        engine.resumeSucceeds = true
+        for _ in 0..<10 { engine.changeConfiguration() }
+        engine.deliver(seconds: 0.2)
+        #expect(engine.resumeAttempts == 10)
+        #expect(engine.installs == 1 && engine.removes == 0 && engine.stops == 0)
+        #expect(capture.isRunning && box.count > 0)
+        capture.stop()
+        #expect(engine.taps == 0 && !engine.hasChangeHandler)
+    }
+
+    @Test func engineRefreshPrecedesReadingTheInputFormat() throws {
+        let engine = FakeEngine()
+        engine.format = nil
+        engine.onReset = { engine.format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1) }
+        let capture = AudioCapture(engine: engine), box = FrameBox()
+        try capture.start { box.add($0) }
+        engine.deliver(seconds: 0.2)
+        #expect(capture.isRunning && engine.installs == 1 && box.count > 0)
+        capture.stop()
     }
 
     @Test func aDeviceChangeRebuildsTheTapOnTheNewFormat() throws {

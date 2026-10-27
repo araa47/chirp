@@ -7,6 +7,10 @@ public enum CaptureError: Error { case noInputDevice, converter }
 public protocol CaptureEngine: AnyObject {
     /// The input's native format; nil when there is no input device (a 0 Hz or 0-channel format).
     var inputFormat: AVAudioFormat? { get }
+    /// Resume an unchanged input without replacing its tap. False requests a full rebuild.
+    func resumeAfterConfigurationChange() -> Bool
+    /// Refresh stale graph formats before the input format is read. Preserve a valid graph.
+    func resetForCapture()
     func installTap(_ block: @escaping @Sendable (AVAudioPCMBuffer) -> Void)
     func removeTap()
     func prepare()
@@ -23,6 +27,8 @@ public protocol CaptureEngine: AnyObject {
 }
 
 extension CaptureEngine {
+    public func resumeAfterConfigurationChange() -> Bool { false }
+    public func resetForCapture() {}
     public var inputName: String? { nil }
     public func fallBack() -> Bool { false }
 }
@@ -68,6 +74,7 @@ public final class AudioCapture: @unchecked Sendable {
     }
 
     private func install() throws {
+        engine.resetForCapture()
         guard let format = engine.inputFormat else { throw CaptureError.noInputDevice }
         guard let converter = PCMConverter(from: format) else { throw CaptureError.converter }
         lock.withLock { self.converter = converter; tapInstalled = true }
@@ -85,6 +92,10 @@ public final class AudioCapture: @unchecked Sendable {
     /// the next input and then wait for one).
     private func rebuild() {
         guard isRunning else { return }
+        // Output-route changes (common when Bluetooth enters hands-free mode) stop
+        // AVAudioEngine even if the input format is unchanged. Preserve the tap and
+        // converter rather than tearing down the headset and negotiating again.
+        if engine.resumeAfterConfigurationChange() { return }
         let before = engine.inputName
         removeTapIfInstalled()
         do { try install() } catch {

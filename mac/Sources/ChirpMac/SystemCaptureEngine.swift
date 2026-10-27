@@ -12,6 +12,8 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
     private let pickedDevice: @Sendable () -> AudioObjectID?
     /// The device the input unit is pinned to; nil while it follows the system default.
     private var pinned: AudioObjectID?
+    private var tapFormat: AVAudioFormat?
+    private var lastCaptureFormat: AVAudioFormat?
     /// After a failed rebuild: 1 follows the system default even if the picked device is back, 2 pins the
     /// built-in microphone. Reset when capture ends.
     private var fallbackStep = 0
@@ -26,10 +28,28 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
         }
     }
 
+    /// Bluetooth can negotiate a new hardware sample rate as recording starts. The old
+    /// engine caches its output format even after a configuration-change notification.
+    /// Rebuild only when that input format changes. Reusing a valid graph avoids
+    /// repeated Bluetooth route negotiation and the audio loss it causes.
+    func resetForCapture() {
+        if let lastCaptureFormat {
+            let hardware = engine.inputNode.inputFormat(forBus: 0)
+            if hardware.sampleRate == lastCaptureFormat.sampleRate,
+               hardware.channelCount == lastCaptureFormat.channelCount { return }
+        }
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+        observer = nil
+        engine.stop()
+        engine = AVAudioEngine()
+        pinned = nil
+        observe()
+    }
+
     var inputFormat: AVAudioFormat? {
         applyPickedDevice()
         inputName = pinned.flatMap(InputDevice.name) ?? InputDevice.systemDefault()?.input.name
-        let format = engine.inputNode.outputFormat(forBus: 0)
+        let format = engine.inputNode.inputFormat(forBus: 0)
         return format.sampleRate > 0 && format.channelCount > 0 ? format : nil
     }
 
@@ -60,12 +80,24 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
         pinned = wanted
     }
 
-    func installTap(_ block: @escaping @Sendable (AVAudioPCMBuffer) -> Void) {
-        let input = engine.inputNode
-        input.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { buffer, _ in block(buffer) }
+    func resumeAfterConfigurationChange() -> Bool {
+        if engine.isRunning { return true }
+        guard let tapFormat else { return false }
+        let hardware = engine.inputNode.inputFormat(forBus: 0)
+        guard hardware.sampleRate == tapFormat.sampleRate,
+              hardware.channelCount == tapFormat.channelCount else { return false }
+        do { try engine.start(); return true } catch { return false }
     }
 
-    func removeTap() { engine.inputNode.removeTap(onBus: 0) }
+    func installTap(_ block: @escaping @Sendable (AVAudioPCMBuffer) -> Void) {
+        let input = engine.inputNode
+        let format = inputFormat
+        tapFormat = format
+        lastCaptureFormat = format
+        input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in block(buffer) }
+    }
+
+    func removeTap() { engine.inputNode.removeTap(onBus: 0); tapFormat = nil }
     func prepare() { engine.prepare() }
     func start() throws { try engine.start() }
     func stop() { engine.stop() }
@@ -79,8 +111,13 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
     private func observe() {
         if let observer { NotificationCenter.default.removeObserver(observer) }
         observer = nil
-        guard let handler = onConfigurationChange else { return }
+        guard onConfigurationChange != nil else { return }
+        let observedEngine = engine
         observer = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { _ in handler() }
+            forName: .AVAudioEngineConfigurationChange, object: observedEngine, queue: .main) { [weak self, weak observedEngine] _ in
+                guard let self, let observedEngine, self.engine === observedEngine,
+                      !observedEngine.isRunning, let handler = self.onConfigurationChange else { return }
+                handler()
+            }
     }
 }
