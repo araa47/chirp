@@ -1,3 +1,5 @@
+import AppKit
+import QuartzCore
 import SwiftUI
 
 /// The Pond motif: three concentric koi rings expanding out of the mic — *the* "Chirp is listening"
@@ -36,9 +38,8 @@ public struct Ripple: View {
             } else if let phase {
                 rings(phase: phase)
             } else {
-                TimelineView(.animation) { context in
-                    rings(phase: Self.clockPhase(at: context.date, level: level))
-                }
+                AnimatedRipple(period: Self.period(level: level), color: color)
+                    .accessibilityHidden(true)
             }
         }
         .frame(width: side, height: side)
@@ -74,5 +75,110 @@ public struct Ripple: View {
             .strokeBorder(staticColor, lineWidth: max(side / 14, 1.2) + side / 8 * min(max(level, 0), 1))
             .padding(side * 0.14)
             .accessibilityHidden(true)
+    }
+}
+
+/// Core Animation owns the live clock. Avoid an escaping TimelineView content
+/// callback, which appears in repeated-HUD EXC_BAD_ACCESS crash reports.
+private struct AnimatedRipple: NSViewRepresentable {
+    let period: Double
+    let color: Color
+
+    func makeNSView(context: Context) -> RippleLayerView {
+        let view = RippleLayerView(frame: .zero)
+        view.configure(period: period, color: NSColor(color))
+        return view
+    }
+
+    func updateNSView(_ view: RippleLayerView, context: Context) {
+        view.configure(period: period, color: NSColor(color))
+    }
+}
+
+/// No SwiftUI state wrappers or per-frame main-actor callbacks. Geometry, colour
+/// and playback speed update in place, without restarting the rings on every level.
+final class RippleLayerView: NSView {
+    private(set) var rings: [CAShapeLayer] = []
+    private var period: Double?
+    private var ringColor = NSColor.clear
+    private var strokeWidth: CGFloat?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        for index in 0..<3 {
+            let ring = CAShapeLayer()
+            ring.fillColor = nil
+            ring.opacity = 0
+            let scale = CABasicAnimation(keyPath: "transform.scale")
+            scale.fromValue = 1
+            scale.toValue = 1.8
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0.5
+            fade.toValue = 0
+            let group = CAAnimationGroup()
+            group.animations = [scale, fade]
+            group.duration = Ripple.periodAtSilence
+            group.repeatCount = .infinity
+            group.timeOffset = Double(index) * group.duration / 3
+            group.timingFunction = CAMediaTimingFunction(name: .linear)
+            layer?.addSublayer(ring)
+            ring.add(group, forKey: "chirp.ripple")
+            rings.append(ring)
+        }
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    func configure(period: Double, color: NSColor) {
+        ringColor = color
+        updateColors()
+        guard self.period != period else { return }
+        self.period = period
+        let now = CACurrentMediaTime()
+        for ring in rings {
+            let current = ring.convertTime(now, from: nil)
+            ring.speed = Float(Ripple.periodAtSilence / period)
+            ring.beginTime = now
+            ring.timeOffset = current
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let side = min(bounds.width, bounds.height)
+        let diameter = side / 1.8
+        let rect = CGRect(x: -diameter / 2, y: -diameter / 2, width: diameter, height: diameter)
+        let width = max(side / 12, 1.2)
+        let strokeChanged = strokeWidth != width
+        strokeWidth = width
+        for ring in rings {
+            ring.position = CGPoint(x: bounds.midX, y: bounds.midY)
+            ring.path = CGPath(ellipseIn: rect, transform: nil)
+            ring.lineWidth = width
+            if strokeChanged, let group = ring.animation(forKey: "chirp.ripple")?.copy() as? CAAnimationGroup {
+                let stroke = CABasicAnimation(keyPath: "lineWidth")
+                stroke.fromValue = width
+                stroke.toValue = width * 0.65 / 1.8
+                group.animations = (group.animations ?? []).filter { ($0 as? CABasicAnimation)?.keyPath != "lineWidth" } + [stroke]
+                group.beginTime = ring.convertTime(CACurrentMediaTime(), from: nil)
+                ring.add(group, forKey: "chirp.ripple")
+            }
+        }
+        CATransaction.commit()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateColors()
+    }
+
+    private func updateColors() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            for ring in rings { ring.strokeColor = ringColor.cgColor }
+        }
     }
 }
