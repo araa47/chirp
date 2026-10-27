@@ -9,9 +9,12 @@ final class FakeEngine: CaptureEngine, @unchecked Sendable {
     var resumeSucceeds = false
     var resumeAttempts = 0
     var onReset: (() -> Void)?
+    /// Runs as a resume is tried (the real engine refreshes `inputName` there).
+    var onResume: (() -> Void)?
     func resetForCapture() { onReset?() }
     func resumeAfterConfigurationChange() -> Bool {
         resumeAttempts += 1
+        onResume?()
         return resumeSucceeds
     }
     var startError: Error?
@@ -232,6 +235,20 @@ final class FrameBox: @unchecked Sendable {
         #expect(box.count > 0 && engine.taps == 1)
         capture.stop()
         #expect(engine.taps == 0)
+    }
+
+    @Test func aResumeOnAnotherInputOfTheSameFormatSaysWhich() throws {
+        let engine = FakeEngine()
+        let events = InputEvents()
+        let capture = AudioCapture(engine: engine)
+        try capture.start(onInput: { events.add($0) }) { _ in }
+        engine.resumeSucceeds = true
+        engine.onResume = { engine.inputName = "MacBook Pro Microphone" }   // the default moved; same 48 kHz mono
+        engine.changeConfiguration()
+        engine.changeConfiguration()                    // same input again: nothing more
+        #expect(events.events == [.switched("MacBook Pro Microphone")])
+        #expect(engine.resumeAttempts == 2 && engine.installs == 1 && engine.removes == 0)
+        capture.stop()
     }
 
     @Test func aRebuildOnTheSameInputSaysNothing() throws {

@@ -7,7 +7,7 @@ public enum CaptureError: Error { case noInputDevice, converter }
 public protocol CaptureEngine: AnyObject {
     /// The input's native format; nil when there is no input device (a 0 Hz or 0-channel format).
     var inputFormat: AVAudioFormat? { get }
-    /// Resume an unchanged input without replacing its tap. False requests a full rebuild.
+    /// Resume an unchanged input without replacing its tap, refreshing `inputName`. False requests a full rebuild.
     func resumeAfterConfigurationChange() -> Bool
     /// Refresh stale graph formats before the input format is read. Preserve a valid graph.
     func resetForCapture()
@@ -92,25 +92,28 @@ public final class AudioCapture: @unchecked Sendable {
     /// the next input and then wait for one).
     private func rebuild() {
         guard isRunning else { return }
+        let before = engine.inputName
         // Output-route changes (common when Bluetooth enters hands-free mode) stop
         // AVAudioEngine even if the input format is unchanged. Preserve the tap and
         // converter rather than tearing down the headset and negotiating again.
-        if engine.resumeAfterConfigurationChange() { return }
-        let before = engine.inputName
-        removeTapIfInstalled()
-        do { try install() } catch {
-            let (failure, input, wasWaiting) = lock.withLock { (onFailure, onInput, waiting) }
-            guard let input else {
-                unwind()
-                failure?()
-                return
-            }
-            guard fallBack() else {
-                removeTapIfInstalled()
-                engine.stop()
-                lock.withLock { converter = nil; waiting = true }
-                if !wasWaiting { input(.lost) }
-                return
+        // A resume can land on another input of the same format (the default changed):
+        // it is reported like a rebuild.
+        if !engine.resumeAfterConfigurationChange() {
+            removeTapIfInstalled()
+            do { try install() } catch {
+                let (failure, input, wasWaiting) = lock.withLock { (onFailure, onInput, waiting) }
+                guard let input else {
+                    unwind()
+                    failure?()
+                    return
+                }
+                guard fallBack() else {
+                    removeTapIfInstalled()
+                    engine.stop()
+                    lock.withLock { converter = nil; waiting = true }
+                    if !wasWaiting { input(.lost) }
+                    return
+                }
             }
         }
         let (input, wasWaiting) = lock.withLock { () -> ((@Sendable (CaptureInputEvent) -> Void)?, Bool) in

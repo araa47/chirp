@@ -48,7 +48,7 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
 
     var inputFormat: AVAudioFormat? {
         applyPickedDevice()
-        inputName = pinned.flatMap(InputDevice.name) ?? InputDevice.systemDefault()?.input.name
+        refreshInputName()
         let format = engine.inputNode.inputFormat(forBus: 0)
         return format.sampleRate > 0 && format.channelCount > 0 ? format : nil
     }
@@ -80,13 +80,21 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
         pinned = wanted
     }
 
+    private func refreshInputName() {
+        inputName = pinned.flatMap(InputDevice.name) ?? InputDevice.systemDefault()?.input.name
+    }
+
     func resumeAfterConfigurationChange() -> Bool {
-        if engine.isRunning { return true }
-        guard let tapFormat else { return false }
-        let hardware = engine.inputNode.inputFormat(forBus: 0)
-        guard hardware.sampleRate == tapFormat.sampleRate,
-              hardware.channelCount == tapFormat.channelCount else { return false }
-        do { try engine.start(); return true } catch { return false }
+        if !engine.isRunning {
+            guard let tapFormat else { return false }
+            let hardware = engine.inputNode.inputFormat(forBus: 0)
+            guard hardware.sampleRate == tapFormat.sampleRate,
+                  hardware.channelCount == tapFormat.channelCount else { return false }
+            do { try engine.start() } catch { return false }
+        }
+        // The unpinned unit follows the system default, which may be another input now.
+        refreshInputName()
+        return true
     }
 
     func installTap(_ block: @escaping @Sendable (AVAudioPCMBuffer) -> Void) {
