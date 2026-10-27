@@ -25,6 +25,9 @@ public enum InsertionPolicy {
         // Chromium browsers
         "com.google.Chrome", "com.google.Chrome.canary", "org.chromium.Chromium", "com.brave.Browser",
         "com.microsoft.edgemac", "company.thebrowser.Browser", "com.vivaldi.Vivaldi", "com.operasoftware.Opera",
+        "com.citrolabs.ego.lite", // ego Lite's web text fields
+        // ChatGPT/Codex also needs paste for its web-backed composer.
+        "com.openai.codex",
         // Electron apps
         "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92" /* Cursor */, "com.tinyspeck.slackmacgap",
         "com.hnc.Discord", "notion.id", "com.microsoft.teams2", "md.obsidian",

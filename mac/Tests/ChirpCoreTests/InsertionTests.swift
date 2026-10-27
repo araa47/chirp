@@ -52,6 +52,34 @@ final class FakeSystem {
         }
     }
 
+    @Test(arguments: ["com.openai.codex", "com.citrolabs.ego.lite"])
+    func webBackedEditorsPasteWithoutAttemptingAnAXWrite(bundleID: String) async {
+        let sys = FakeSystem(), board = FakePasteboard()
+        sys.bundle = bundleID
+        // These fields may accept AXSelectedText without applying it. Once attempted,
+        // the late-write safety rule correctly prevents an automatic paste fallback.
+        sys.ax = .unverified
+        let inserter = sys.inserter(board: board)
+        #expect(await inserter.insert("dictated text") == .inserted(.paste))
+        #expect(sys.calls == ["paste"])
+        #expect(board.text == "dictated text")
+        await inserter.settle()
+        #expect(board.text == "user clipboard")
+    }
+
+    @Test(arguments: ["com.openai.codex", "com.citrolabs.ego.lite"])
+    func webBackedEditorsKeepSecureInputAndPermissionFallbacks(bundleID: String) async {
+        let sys = FakeSystem(), board = FakePasteboard()
+        sys.bundle = bundleID
+        sys.trusted = false
+        #expect(await sys.inserter(board: board).insert("dictated text") == .copied)
+        #expect(sys.calls.isEmpty)
+        sys.trusted = true
+        sys.secure = true
+        #expect(await sys.inserter(board: board).insert("private") == .refusedSecure)
+        #expect(sys.calls.isEmpty && board.text == "dictated text")
+    }
+
     // MARK: AX
 
     @Test func verifiedAXLeavesPasteboardAlone() async {
