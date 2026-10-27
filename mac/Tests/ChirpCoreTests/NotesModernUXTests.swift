@@ -141,6 +141,31 @@ import Testing
         #expect(purged == [id])
     }
 
+    /// The alert's Delete Permanently purges the presented note whether SwiftUI resets `isPresented` (dropping the
+    /// request) before or after the button's action, and never a note that is no longer in Recently Deleted.
+    @Test func deletePermanentlyPurgesThePresentedNoteWhicheverWayTheAlertCloses() throws {
+        let library = NotesLibraryModel()
+        let first = NotesLibraryEntry(id: UUID(), title: "One", createdAt: Date(), updatedAt: Date(), deletedAt: Date(), audioBytes: 1)
+        let second = NotesLibraryEntry(id: UUID(), title: "Two", createdAt: Date(), updatedAt: Date(), deletedAt: Date(), audioBytes: 1)
+        library.deleted = [first, second]
+        var purged: [UUID] = []
+        library.onPurge = { id in purged.append(id); library.deleted.removeAll { $0.id == id } }
+        // Binding reset first: the request is gone when the action runs.
+        library.requestPurge(first.id)
+        let presented = try #require(library.confirmingPurge)
+        library.resolvePurge(confirm: false)
+        NotesView.purgeConfirmed(presented, in: library)
+        #expect(purged == [first.id] && library.confirmingPurge == nil)
+        // Action first, then the binding reset: one purge, and the reset is harmless.
+        library.requestPurge(second.id)
+        NotesView.purgeConfirmed(try #require(library.confirmingPurge), in: library)
+        library.resolvePurge(confirm: false)
+        #expect(purged == [first.id, second.id] && library.deleted.isEmpty && library.confirmingPurge == nil)
+        // A stale presentation purges nothing.
+        NotesView.purgeConfirmed(first, in: library)
+        #expect(purged == [first.id, second.id])
+    }
+
     /// Review evidence, not a check: `CHIRP_MODERN_UX_RENDER=<dir> mac/scripts/test.sh --filter renderOwnedReviewMatrix`.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["CHIRP_MODERN_UX_RENDER"] != nil))
     func renderOwnedReviewMatrix() throws {

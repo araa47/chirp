@@ -120,11 +120,14 @@ public struct NotesView: View {
         } message: {
             Text("Only one note records at a time. The recording note keeps everything it has so far.")
         }
+        // The alert hands the presented entry to its buttons: SwiftUI may reset the binding (which drops the request)
+        // before it runs the action, so Delete Permanently must not depend on `confirmingPurge` still being set.
         .alert("Delete “\(library.confirmingPurge?.title ?? "note")” permanently?",
-               isPresented: Binding(get: { library.confirmingPurge != nil }, set: { if !$0 { library.resolvePurge(confirm: false) } })) {
-            Button("Delete Permanently", role: .destructive) { library.resolvePurge(confirm: true) }
+               isPresented: Binding(get: { library.confirmingPurge != nil }, set: { if !$0 { library.resolvePurge(confirm: false) } }),
+               presenting: library.confirmingPurge) { entry in
+            Button("Delete Permanently", role: .destructive) { Self.purgeConfirmed(entry, in: library) }
             Button("Cancel", role: .cancel) { library.resolvePurge(confirm: false) }
-        } message: {
+        } message: { _ in
             Text("This deletes the note and any kept audio. This can’t be undone.")
         }
         .alert(NotesLibraryText.emptyTrashTitle, isPresented: $library.confirmingEmpty) {
@@ -167,6 +170,15 @@ private extension String {
 
 /// The note: banners for what needs attention, the title and editor (one scrolling page), the status lines, the
 /// Hearing strip while recording, and the quiet meta bar (where structuring sends text, kept exports).
+extension NotesView {
+    /// Delete Permanently for the entry the alert presented, whichever order SwiftUI resets the binding and runs the action.
+    /// Re-requesting keeps the model's guard: only a note still in Recently Deleted is purged, once.
+    static func purgeConfirmed(_ entry: NotesLibraryEntry, in library: NotesLibraryModel) {
+        library.requestPurge(entry.id)
+        library.resolvePurge(confirm: true)
+    }
+}
+
 struct NotesDetail: View {
     @Bindable var model: NotesModel
     let active: NotesModel
