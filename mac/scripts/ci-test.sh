@@ -11,8 +11,9 @@ cd "$(dirname "$0")/.."
 ISOLATED="NotesBudgetTests NotesLongRecorderTests NotesLayoutTests NotesLongSessionTests NotesOrganizeRecorderTests NotesOverlapRouterTests NotesPauseSessionTests NotesPauseTests NotesRecorderTests NotesReorganizeRecorderTests NotesSoakTests ServerSpeakersRecorderTests SpeakerRecorderTests StreamBoundsTests StreamSessionTests RollingDictationTests NotesRetranscribeTests NotesRetranscribeSessionTests"
 SKIPPED="GeneratedSoundTests SnapshotTests"
 re() { echo "$*" | tr ' ' '\n' | paste -sd'|' -; }
-swift build --build-tests >/dev/null
-swift test list 2>/dev/null > /tmp/chirp-tests
+# Keep the build quiet, but show compiler errors when it fails.
+swift build --build-tests >/tmp/chirp-build 2>&1 || { tail -100 /tmp/chirp-build; exit 1; }
+swift test list 2>/tmp/chirp-list > /tmp/chirp-tests || { cat /tmp/chirp-list; exit 1; }
 ./scripts/test.sh --skip-build --skip "$(re $ISOLATED $SKIPPED)"
 fail=0
 for suite in $ISOLATED; do
