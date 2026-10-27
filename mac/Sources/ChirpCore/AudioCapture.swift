@@ -60,6 +60,15 @@ public final class AudioCapture: @unchecked Sendable {
 
     public var isRunning: Bool { lock.withLock { onFrame != nil } }
 
+    /// Whether an engine stopped by a configuration change can restart as it is, keeping its tap and converter:
+    /// only on the device capture should use now (a picked device that went away goes back through the device
+    /// choice) and while the input still has the tap's rate and channel count.
+    public static func canResume<Device: Equatable>(on pinned: Device?, wanted: Device?, tap: AVAudioFormat?,
+                                                    input: AVAudioFormat) -> Bool {
+        guard let tap, pinned == wanted else { return false }
+        return input.sampleRate == tap.sampleRate && input.channelCount == tap.channelCount
+    }
+
     /// Starts capturing. `onFailure` runs when the engine cannot be rebuilt after an input-device change; with
     /// `onInput` it never does: the rebuild falls back to other inputs, then waits for one (and reports each step).
     public func start(onInput: (@Sendable (CaptureInputEvent) -> Void)? = nil, onFailure: (@Sendable () -> Void)? = nil,

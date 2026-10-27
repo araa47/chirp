@@ -172,6 +172,21 @@ final class FrameBox: @unchecked Sendable {
         capture.stop()
     }
 
+    @Test func onlyTheWantedDeviceWithTheTapsFormatResumesInPlace() {
+        let mono48 = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+        let mono24 = AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1)!
+        let stereo48 = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
+        let usb = 7, builtIn = 3
+        #expect(AudioCapture.canResume(on: Int?.none, wanted: nil, tap: mono48, input: mono48))  // follows the default
+        #expect(AudioCapture.canResume(on: usb, wanted: usb, tap: mono48, input: mono48))        // picked, still there
+        #expect(!AudioCapture.canResume(on: usb, wanted: nil, tap: mono48, input: mono48))       // picked one unplugged
+        #expect(!AudioCapture.canResume(on: usb, wanted: builtIn, tap: mono48, input: mono48))   // falling back
+        #expect(!AudioCapture.canResume(on: nil, wanted: usb, tap: mono48, input: mono48))       // picked one is back
+        #expect(!AudioCapture.canResume(on: usb, wanted: usb, tap: mono48, input: mono24))       // rate changed
+        #expect(!AudioCapture.canResume(on: usb, wanted: usb, tap: mono48, input: stereo48))     // channels changed
+        #expect(!AudioCapture.canResume(on: usb, wanted: usb, tap: nil, input: mono48))          // no tap (waiting)
+    }
+
     @Test func aDeviceChangeRebuildsTheTapOnTheNewFormat() throws {
         let engine = FakeEngine()
         let box = FrameBox()
