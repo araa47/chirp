@@ -1,12 +1,18 @@
 name: mac
 
-# macOS runner minutes cost 10x Linux: run only when `mac/**` or this file change.
+# macOS runner minutes cost 10x Linux: run only when `mac/**` or this file change, not for prose nothing reads (the
+# READMEs and mac/docs). Other markdown stays in: tests read mac/Assets/ThirdParty/NOTICES.md.
 on:
   pull_request:
-    paths: ["mac/**", ".github/workflows/mac.yml"]
+    paths: &paths
+      - "mac/**"
+      - "!mac/README.md"
+      - "!mac/docs/**"
+      - "!mac/scripts/speaker-bench/README.md"
+      - ".github/workflows/mac.yml"
   push:
     branches: [main]
-    paths: ["mac/**", ".github/workflows/mac.yml"]
+    paths: *paths
   workflow_dispatch:
 
 concurrency:
