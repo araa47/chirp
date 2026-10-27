@@ -38,7 +38,7 @@ import Testing
     }
 
     /// The dark sidebar selection uses koiContainer; its warm ink dims for the snippet and meta lines but
-    /// stays readable (the snippet at body-text contrast, the meta as UI-level 3:1).
+    /// stays readable at body-text contrast (#303: the meta line is text people read, not a 3:1 UI mark).
     @Test func sidebarSelectionInkStaysReadableOnTheKoiPill() {
         func blend(_ a: ChirpColor.RGB, over b: ChirpColor.RGB, alpha: Double) -> ChirpColor.RGB {
             (r: a.r * alpha + b.r * (1 - alpha), g: a.g * alpha + b.g * (1 - alpha), b: a.b * alpha + b.b * (1 - alpha))
@@ -46,7 +46,7 @@ import Testing
         let koi = ChirpColor.Pond.koiContainer.dark
         #expect(contrast(ChirpColor.Pond.onKoiContainer.dark, koi) >= 4.5)
         #expect(contrast(blend(ChirpColor.Pond.onKoiContainer.dark, over: koi, alpha: RowInk.snippetOnPill), koi) >= 4.5)
-        #expect(contrast(blend(ChirpColor.Pond.onKoiContainer.dark, over: koi, alpha: RowInk.metaOnPill), koi) >= 3)
+        #expect(contrast(blend(ChirpColor.Pond.onKoiContainer.dark, over: koi, alpha: RowInk.metaOnPill), koi) >= 4.5)
     }
 
     /// `record` is the record/stop dot, not body text: WCAG AA for UI components is 3:1.

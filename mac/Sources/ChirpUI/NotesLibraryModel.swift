@@ -170,6 +170,28 @@ public final class NotesLibraryModel {
     public var renameText = ""
     public var toast: NotesToast?
     private var toastSerial = 0
+    /// View ▸ Bigger/Smaller Text: this window's content size (the editor, transcript, library and banners).
+    public let textSize = ChirpTextSize()
+    /// View ▸ Read Formatted Note: the note without Markdown syntax, its tasks as checkboxes.
+    public var readingNote = false
+    /// Delete Now in Recently Deleted waits for this confirmation.
+    public var confirmingPurge: NotesLibraryEntry?
+    /// The library list has keyboard focus (AppKit's first responder), drawn apart from the selection.
+    public var sidebarFocused = false
+    /// The window is too narrow for a transcript column, so the transcript sits under the note. The window's creator
+    /// seeds it from the window size, so a window that opens narrow (or wide) never flips its inspector on the first
+    /// layout; `windowResized` keeps it current.
+    public var transcriptBelow = false
+    var transcriptBelowHeight = NotesViewMetrics.compactTranscriptHeight(windowHeight: NotesViewMetrics.minimumSize.height)
+    /// The transcript's last size while it sat under the note in a narrow window; for tests.
+    @ObservationIgnored var compactTranscriptSize = CGSize.zero
+
+    public func windowResized(_ size: CGSize) {
+        let below = NotesViewMetrics.compactTranscript(windowWidth: size.width)
+        if below != transcriptBelow { transcriptBelow = below }
+        let height = NotesViewMetrics.compactTranscriptHeight(windowHeight: size.height)
+        if height != transcriptBelowHeight { transcriptBelowHeight = height }
+    }
     /// The transcript inspector (⌥⌘T) and View ▸ Show Markdown.
     public var showsInspector = false
     public var showMarkdown = false
@@ -248,6 +270,15 @@ public final class NotesLibraryModel {
     /// Restore Previous Transcript shows: a re-transcribe kept a version, and no run holds the note.
     public func canRestoreTranscript(_ model: NotesModel) -> Bool {
         model.document.previousTranscript != nil && !model.state.isActive && !isRetranscribing(model.document.id)
+    }
+
+    /// Only confirmation can cross the irreversible purge boundary. Stale requests are harmless.
+    public func requestPurge(_ id: UUID) { confirmingPurge = deleted.first { $0.id == id } }
+    public func resolvePurge(confirm: Bool) {
+        let request = confirmingPurge
+        confirmingPurge = nil
+        guard confirm, let id = request?.id, deleted.contains(where: { $0.id == id }) else { return }
+        onPurge(id)
     }
 
     public func setInspector(_ on: Bool) {

@@ -10,14 +10,38 @@ public enum NotesViewMetrics {
     /// The library sidebar's width range, and the transcript inspector's.
     static let sidebar = (min: CGFloat(260), ideal: CGFloat(280), max: CGFloat(320))
     static let inspector = (min: CGFloat(260), ideal: CGFloat(300), max: CGFloat(420))
+    /// Below this width the transcript moves under the note: sidebar + note + inspector would crush the note's measure.
+    static let transcriptColumnMinWindow: CGFloat = 1000
+    public static func compactTranscript(windowWidth: CGFloat) -> Bool { windowWidth < transcriptColumnMinWindow }
+    public static func compactTranscriptHeight(windowHeight: CGFloat) -> CGFloat { min(300, max(160, windowHeight * 0.38)) }
 }
 
-/// Label colours as AppKit's semantic colours: they follow Increase Contrast like `.primary`/`.secondary`, and keep
-/// their value inside vibrant sidebars, selected rows and the inspector, where a hierarchical style can turn dark.
+/// Text inks that keep their value inside vibrant sidebars, selected rows and the inspector, where a hierarchical
+/// style can turn dark. Secondary text is Pond's muted ink (at least 4.5:1 on the editor, sidebar and selected rows;
+/// AppKit's secondary/tertiary label colours measured 1.9–4:1 there); Increase Contrast turns it into full ink.
 enum NotesInk {
     static let primary = Color(nsColor: .labelColor)
-    static let secondary = Color(nsColor: .secondaryLabelColor)
-    static let tertiary = Color(nsColor: .tertiaryLabelColor)
+    static let secondary = Color(nsColor: muted)
+    static let tertiary = secondary
+
+    /// AppKit reports Increase Contrast through the high-contrast appearances (and the workspace flag); either one
+    /// turns muted text into full ink.
+    static let muted = NSColor(name: "ChirpNotesMuted") { appearance in
+        let match = appearance.bestMatch(from: [.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua])
+        let c = mutedInk(dark: match == .darkAqua || match == .accessibilityHighContrastDarkAqua,
+                         increaseContrast: match == .accessibilityHighContrastAqua || match == .accessibilityHighContrastDarkAqua
+                             || NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
+        return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)
+    }
+
+    static func mutedInk(dark: Bool, increaseContrast: Bool) -> ChirpColor.RGB {
+        switch (dark, increaseContrast) {
+        case (false, false): ChirpColor.Pond.inkMuted.light
+        case (true, false): ChirpColor.Pond.inkMuted.dark
+        case (false, true): ChirpColor.Pond.ink.light
+        case (true, true): ChirpColor.Pond.ink.dark
+        }
+    }
 }
 
 /// The Live Notes window: the notes library as the sidebar, the note as the detail, and its transcript as a trailing
@@ -43,13 +67,27 @@ public struct NotesView: View {
                 .navigationSplitViewColumnWidth(min: NotesViewMetrics.sidebar.min, ideal: NotesViewMetrics.sidebar.ideal,
                                                 max: NotesViewMetrics.sidebar.max)
         } detail: {
-            detail
-                .inspector(isPresented: Binding(get: { library.showsInspector }, set: { library.setInspector($0) })) {
+            VStack(spacing: 0) {
+                detail
+                // Narrow windows: a third column would leave the note about 160 pt of text, so the same transcript sits
+                // under the note instead. It is not modal: typing, recording and replay all keep working.
+                if library.transcriptBelow, library.showsInspector {
+                    Divider()
                     NotesInspector(model: shown, library: library)
-                        .inspectorColumnWidth(min: NotesViewMetrics.inspector.min, ideal: NotesViewMetrics.inspector.ideal,
-                                              max: NotesViewMetrics.inspector.max)
+                        .frame(height: library.transcriptBelowHeight)
+                        .background(Color.chirp.surfaceRaised)
+                        .onGeometryChange(for: CGSize.self, of: \.size) { library.compactTranscriptSize = $0 }
                 }
+            }
+            // The user's choice survives resizing: only the presentation changes with the width.
+            .inspector(isPresented: Binding(get: { library.showsInspector && !library.transcriptBelow },
+                                            set: { if !library.transcriptBelow { library.setInspector($0) } })) {
+                NotesInspector(model: shown, library: library)
+                    .inspectorColumnWidth(min: NotesViewMetrics.inspector.min, ideal: NotesViewMetrics.inspector.ideal,
+                                          max: NotesViewMetrics.inspector.max)
+            }
         }
+        .onGeometryChange(for: CGSize.self, of: \.size) { library.windowResized($0) }
         .searchable(text: $library.query, placement: .sidebar, prompt: "Search notes")
         .toolbar { NotesToolbar(model: model, library: library) }
         .navigationTitle(library.selection == .recentlyDeleted ? NotesLibraryText.recentlyDeleted : shown.displayTitle)
@@ -58,6 +96,10 @@ public struct NotesView: View {
         .overlay(alignment: .bottom) { if let toast = library.toast { NotesToastView(library: library, toast: toast) } }
         .sheet(isPresented: Binding(get: { shown.reviewing != nil }, set: { if !$0 { shown.closeReview() } })) {
             OrganizeReviewSheet(model: shown)
+        }
+        .sheet(isPresented: $library.readingNote) {
+            NotesFormattedReader(model: shown) { library.readingNote = false }
+                .environment(\.chirpTextScale, library.textSize.factor)
         }
         .sheet(item: $library.retranscribeOffer) { RetranscribeSheet(library: library, offer: $0) }
         .sheet(item: $library.transcriptChanges) { TranscriptChangesSheet(library: library, changes: $0) }
@@ -78,6 +120,13 @@ public struct NotesView: View {
         } message: {
             Text("Only one note records at a time. The recording note keeps everything it has so far.")
         }
+        .alert("Delete “\(library.confirmingPurge?.title ?? "note")” permanently?",
+               isPresented: Binding(get: { library.confirmingPurge != nil }, set: { if !$0 { library.resolvePurge(confirm: false) } })) {
+            Button("Delete Permanently", role: .destructive) { library.resolvePurge(confirm: true) }
+            Button("Cancel", role: .cancel) { library.resolvePurge(confirm: false) }
+        } message: {
+            Text("This deletes the note and any kept audio. This can’t be undone.")
+        }
         .alert(NotesLibraryText.emptyTrashTitle, isPresented: $library.confirmingEmpty) {
             Button(NotesLibraryText.deletePermanently, role: .destructive) { library.onEmptyTrash() }
             Button("Cancel", role: .cancel) {}
@@ -86,6 +135,7 @@ public struct NotesView: View {
         }
         // The app accent (koi): system controls in Notes follow it, bundled or not.
         .tint(Color.chirp.koi)
+        .environment(\.chirpTextScale, library.textSize.factor)
     }
 
     /// The toolbar's second line: what the recorder is doing, or when the note was last edited.
@@ -149,7 +199,7 @@ struct NotesDetail: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             NotesStatusLines(model: model)
-            if isRecorder, model.state.isLive, !model.hearingText.isEmpty { HearingStrip(parts: model.hearingParts, text: model.hearingText) }
+            if isRecorder, model.state.isLive, !model.hearingText.isEmpty { HearingStrip(parts: model.hearingParts, text: model.hearingText, paused: model.isPaused) }
             NotesMetaBar(model: model)
         }
         // Under the toolbar too, so the title bar sits on the page.
@@ -180,7 +230,7 @@ struct NotesTitleHeader: View {
                 get: { model.titleDraft ?? (model.isBlank && model.document.userTitle == nil ? "" : model.document.title) },
                 set: { model.titleDraft = $0; model.onTitleEdit($0) }), axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(ChirpType.noteTitle(26))
+                .pondFont(26, weight: .semibold, design: .serif)
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(NotesInk.primary)
                 .onSubmit { model.focusRequest += 1 }
@@ -191,6 +241,7 @@ struct NotesTitleHeader: View {
         .padding(.bottom, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(width: width)
+        .environment(\.chirpTextScale, library.textSize.factor)
     }
 
     private var meta: some View {
@@ -201,19 +252,26 @@ struct NotesTitleHeader: View {
         let open = d.openTodoCount()
         if open > 0 { facts.append("☐ " + NotesLibraryText.open(open)) }
         if let bytes = entry?.audioBytes, bytes > 0 { facts.append("Audio " + NotesLibraryText.size(bytes)) }
-        return HStack(spacing: 8) {
-            if model.state.isLive {
-                Circle().fill(Color.chirp.record).frame(width: 7, height: 7).accessibilityHidden(true)
-                Text(model.isPaused ? NotesStatus.paused : NotesLibraryText.recording)
-                    .font(ChirpType.meta.weight(.semibold))
-                    .foregroundStyle(Color.chirp.record)
+        let line = Text(facts.joined(separator: "  ·  ")).pondFont(.meta).foregroundStyle(NotesInk.secondary)
+        // One line while it fits; otherwise the state sits above the facts, so neither wraps into a narrow column.
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { state(entry); line.fixedSize() }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) { state(entry) }
+                line.fixedSize(horizontal: false, vertical: true)
             }
-            if entry?.recovered == true { RecoveredBadge() }
-            Text(facts.joined(separator: "  ·  "))
-                .font(ChirpType.meta)
-                .foregroundStyle(NotesInk.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    @ViewBuilder private func state(_ entry: NotesLibraryEntry?) -> some View {
+        if model.state.isLive {
+            Image(systemName: model.isPaused ? "pause.circle" : "record.circle.fill")
+                .foregroundStyle(model.isPaused ? NotesInk.secondary : Color.chirp.record).accessibilityHidden(true)
+            Text(model.isPaused ? NotesStatus.paused : NotesLibraryText.recording)
+                .pondFont(.meta, weight: .semibold)
+                .foregroundStyle(model.isPaused ? NotesInk.secondary : Color.chirp.record)
+        }
+        if entry?.recovered == true { RecoveredBadge() }
     }
 }
 
@@ -224,7 +282,7 @@ struct RecoveredBadge: View {
 
     var body: some View {
         Text(NotesLibraryText.recovered)
-            .font(.system(size: 10.5, weight: .semibold))
+            .pondFont(12, weight: .semibold)
             .foregroundStyle(onPill ? Color.chirp.onKoiContainer : Color.chirp.moon)
             .padding(.horizontal, 6)
             .padding(.vertical, 1)
@@ -247,7 +305,8 @@ struct NotesToolbar: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             let note = library.selection != .recentlyDeleted
-            if note || model.state.isActive { RecordControl(model: model, library: library) }
+            // Toolbar chrome stays native size; View ▸ Bigger Text enlarges the content.
+            if note || model.state.isActive { RecordControl(model: model, library: library).environment(\.chirpTextScale, 1) }
             if model.state.isLive { PauseButton(model: model) }
             if model.callAudioAvailable, note || model.state.isActive { SourcesButton(model: model) }
             if note, shown.voiceEditAvailable { VoiceEditButton(model: shown) }
@@ -279,7 +338,7 @@ struct RecordControl: View {
                 } label: {
                     HStack(spacing: 7) {
                         if model.isPaused {
-                            Image(systemName: "pause.circle.fill").foregroundStyle(Color.chirp.record)
+                            Image(systemName: "pause.circle.fill").foregroundStyle(NotesInk.secondary)
                         } else {
                             Ripple(level: Double(model.level), reduceMotion: model.reduceMotion, phase: model.ripplePhase,
                                    color: .chirp.record, staticColor: .chirp.record, side: 18)
@@ -288,25 +347,25 @@ struct RecordControl: View {
                                 // The call side's own ripple: both sources show they are heard.
                                 Ripple(level: Double(model.callLevel), reduceMotion: model.reduceMotion, phase: model.ripplePhase,
                                        side: 18)
-                                    .overlay(Image(systemName: "speaker.wave.2.fill").font(.system(size: 7, weight: .bold))
+                                    .overlay(Image(systemName: "speaker.wave.2.fill").pondFont(7, weight: .bold)
                                         .foregroundStyle(Color.chirp.koi))
                                     .help(NotesSourcesText.capturing(model.sources))
                             }
                         }
                         Text(model.displayTitle)
-                            .font(.callout.weight(.medium))
+                            .pondFont(.callout, weight: .medium)
                             .lineLimit(1)
                             .frame(maxWidth: 170, alignment: .leading)
                             .fixedSize(horizontal: true, vertical: false)
                         Text(model.elapsedText)
-                            .font(ChirpType.timer(13))
+                            .pondFont(13, weight: .medium, digits: true)
                             .foregroundStyle(NotesInk.secondary)
                     }
                     .padding(.horizontal, 4)
                     .onGeometryChange(for: CGSize.self, of: \.size) { model.probe.recordLabel = $0 }
                 }
                 .help("Go to the recording note")
-                .accessibilityLabel("Recording \(model.displayTitle)\(model.capturingCall ? " with call audio" : ""), \(model.elapsedText). Go to the recording note")
+                .accessibilityLabel("\(model.isPaused ? "Paused" : "Recording") \(model.displayTitle)\(model.capturingCall ? " with call audio" : ""), \(model.elapsedText). Go to the recording note")
                 Button(action: model.onRecordToggle) {
                     Image(systemName: "stop.fill").foregroundStyle(Color.chirp.record)
                 }
@@ -424,8 +483,11 @@ struct NotesEmptyState: View {
     let model: NotesModel
     let library: NotesLibraryModel
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.chirpTextScale) private var textScale
 
     var body: some View {
+        GeometryReader { viewport in
+        ScrollView {
         VStack(spacing: 0) {
             ZStack {
                 ForEach(0..<3) { i in
@@ -440,25 +502,26 @@ struct NotesEmptyState: View {
                 if let glyph = ChirpBrand.tinted(.chirp.koi, size: 50) {
                     Image(nsImage: glyph)
                 } else {
-                    Image(systemName: "note.text").font(.system(size: 34, weight: .light)).foregroundStyle(Color.chirp.koi)
+                    Image(systemName: "note.text").pondFont(34, weight: .light).foregroundStyle(Color.chirp.koi)
                 }
             }
             .frame(height: 180)
             .accessibilityHidden(true)
             Text(NotesLibraryText.emptyTitle)
-                .font(ChirpType.noteTitle(24))
+                .pondFont(24, weight: .semibold, design: .serif)
                 .foregroundStyle(NotesInk.primary)
                 .padding(.top, 18)
             Text(NotesLibraryText.emptyBody)
-                .font(.system(size: 13))
+                .pondFont(13)
                 .foregroundStyle(NotesInk.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 340)
                 .padding(.top, 8)
-            HStack(spacing: 6) {
-                ForEach(KeycapRow.keys(model.notesKey), id: \.self) { NotesKeycap(key: $0) }
+            let hintLayout = textScale > 1.3 ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 6))
+            hintLayout {
+                HStack(spacing: 6) { ForEach(KeycapRow.keys(model.notesKey), id: \.self) { NotesKeycap(key: $0) } }
                 Text("starts a note from any app")
-                    .font(.system(size: 12))
+                    .pondFont(12)
                     .foregroundStyle(NotesInk.secondary)
                     .padding(.leading, 4)
             }
@@ -480,12 +543,16 @@ struct NotesEmptyState: View {
             }
             .padding(.top, 24)
             Label(NotesLibraryText.emptyPrivacy, systemImage: "lock.fill")
-                .font(.system(size: 11.5))
+                .pondFont(12)
                 .foregroundStyle(NotesInk.tertiary)
                 .padding(.top, 28)
         }
         .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: viewport.size.height)
+        }
+        }
+        .pondFont(.callout)
         .background(Color.chirp.surface.ignoresSafeArea())
     }
 }
@@ -505,7 +572,7 @@ struct NotesKeycap: View {
 
     var body: some View {
         Text(key)
-            .font(.system(size: 12.5, weight: .medium, design: .rounded))
+            .pondFont(12.5, weight: .medium, design: .rounded)
             .foregroundStyle(NotesInk.primary)
             .frame(minWidth: 24, minHeight: 24)
             .padding(.horizontal, key.count > 1 ? 6 : 0)
@@ -524,14 +591,14 @@ struct NotesToastView: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Text(toast.text).font(.callout).foregroundStyle(NotesInk.primary)
+            Text(toast.text).pondFont(.callout).foregroundStyle(NotesInk.primary)
             if let id = toast.undo {
                 Button("Undo") {
                     library.onRestore(id)
                     library.toast = nil
                 }
                 .buttonStyle(.plain)
-                .font(.callout.weight(.semibold))
+                .pondFont(.callout, weight: .semibold)
                 .foregroundStyle(Color.chirp.koi)
                 .keyboardShortcut("z", modifiers: .command)
             }
@@ -543,7 +610,7 @@ struct NotesToastView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .font(.callout.weight(.semibold))
+                .pondFont(.callout, weight: .semibold)
                 .foregroundStyle(Color.chirp.koi)
                 Button("Undo") {
                     library.toast = nil
@@ -553,7 +620,7 @@ struct NotesToastView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .font(.callout.weight(.semibold))
+                .pondFont(.callout, weight: .semibold)
                 .foregroundStyle(Color.chirp.koi)
             }
         }
@@ -583,9 +650,9 @@ struct ErrorBanner: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 14)).foregroundStyle(Color.chirp.record).accessibilityHidden(true)
+            Image(systemName: "exclamationmark.triangle.fill").pondFont(14).foregroundStyle(Color.chirp.record).accessibilityHidden(true)
             Text(text)
-                .font(.callout)
+                .pondFont(.callout)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if let action { Button(action.title, action: action.run).controlSize(.small) }
@@ -606,7 +673,7 @@ private struct LongRunNotice: View {
         HStack(spacing: 10) {
             Image(systemName: "clock.badge.exclamationmark").foregroundStyle(Color.chirp.moon).accessibilityHidden(true)
             Text(NotesStatus.longRun(hours: model.longRunHours) + " — the microphone is still open.")
-                .font(.callout)
+                .pondFont(.callout)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button(NotesStatus.stopRecording, action: model.onRecordToggle).controlSize(.small)
             Button(NotesStatus.keepGoing) { model.keepGoing() }.controlSize(.small).keyboardShortcut(.defaultAction)
@@ -627,11 +694,11 @@ private struct RecoveryBanner: View {
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: "arrow.counterclockwise.circle.fill")
-                .font(.system(size: 15))
+                .pondFont(15)
                 .foregroundStyle(Color.chirp.koi)
                 .accessibilityHidden(true)
             Text(offer.text)
-                .font(.callout)
+                .pondFont(.callout)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button("Keep", action: model.onRecoveryKeep)
@@ -659,10 +726,10 @@ private struct ExplanationBanner: View {
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: "text.badge.star")
-                .font(.system(size: 15))
+                .pondFont(15)
                 .foregroundStyle(Color.chirp.moon)
             Text(text)
-                .font(.callout)
+                .pondFont(.callout)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if model.offersModels {
@@ -691,12 +758,12 @@ private struct SpeakerModelBanner: View {
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             if notice.failed {
-                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 14)).foregroundStyle(Color.chirp.moon).accessibilityHidden(true)
+                Image(systemName: "exclamationmark.triangle.fill").pondFont(14).foregroundStyle(Color.chirp.moon).accessibilityHidden(true)
             } else {
-                Image(systemName: "arrow.down.circle").font(.system(size: 14)).foregroundStyle(Color.chirp.moon).accessibilityHidden(true)
+                Image(systemName: "arrow.down.circle").pondFont(14).foregroundStyle(Color.chirp.moon).accessibilityHidden(true)
             }
             Text(notice.text)
-                .font(.callout)
+                .pondFont(.callout)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -726,7 +793,7 @@ private struct NotesStatusLines: View {
                 ForEach(notes, id: \.self) { note in
                     let success = note == model.reorganizeNote && model.reorganizeNoteIsSuccess
                     Label(note, systemImage: success ? "checkmark.circle" : note == model.micNote ? "mic.slash" : "arrow.clockwise")
-                        .font(.caption)
+                        .pondFont(.caption)
                         .foregroundStyle(success ? AnyShapeStyle(Color.chirp.lily) : AnyShapeStyle(Color.chirp.moon))
                 }
             }
@@ -748,6 +815,7 @@ private struct NotesStatusLines: View {
 private struct HearingStrip: View {
     let parts: [HearingPart]
     let text: String
+    let paused: Bool
     @Environment(\.colorScheme) private var scheme
 
     /// The words, with each speaker's name in their colour where the speaker changes (labels on).
@@ -764,15 +832,15 @@ private struct HearingStrip: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "waveform")
-                .font(.system(size: 11, weight: .semibold))
+            Image(systemName: paused ? "pause.circle" : "waveform")
+                .pondFont(12, weight: .semibold)
                 .foregroundStyle(Color.chirp.koi)
                 .accessibilityHidden(true)
-            Text("Hearing")
-                .font(.caption.weight(.semibold))
+            Text(paused ? "Last heard" : "Hearing")
+                .pondFont(.caption, weight: .semibold)
                 .foregroundStyle(NotesInk.secondary)
             line
-                .font(.system(size: 13))
+                .pondFont(13)
                 .foregroundStyle(NotesInk.secondary)
                 .lineLimit(2)
                 .truncationMode(.head)
@@ -785,8 +853,11 @@ private struct HearingStrip: View {
         // The pale koi container wash in light; in dark a light koi wash (the dark container reads muddy this wide).
         .background(scheme == .dark ? Color.chirp.koi.opacity(0.1) : Color.chirp.koiContainer.opacity(0.35))
         .overlay(alignment: .top) { Divider().opacity(0.6) }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Hearing: \(text)")
+        // Partials remain available on demand, without a changing sentence in the live region label.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(paused ? "Last heard before pausing" : "Live transcription")
+        .accessibilityValue(text)
+        .accessibilityAddTraits(.updatesFrequently)
     }
 }
 
@@ -805,7 +876,7 @@ private struct NotesMetaBar: View {
                 if let host = model.structuringHost { StructuringChip(model: model, host: host) }
                 if let keep {
                     Label(keep, systemImage: model.keepSaving.isSaving ? "arrow.triangle.2.circlepath" : "exclamationmark.triangle")
-                        .font(.caption)
+                        .pondFont(.caption)
                         .foregroundStyle(model.keepSaving.isSaving ? AnyShapeStyle(NotesInk.secondary) : AnyShapeStyle(Color.chirp.moon))
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -813,7 +884,7 @@ private struct NotesMetaBar: View {
                 if let status = model.speakerStatus {
                     HStack(spacing: 4) {
                         Text(status)
-                            .font(.caption)
+                            .pondFont(.caption)
                             .foregroundStyle(NotesInk.secondary)
                             .lineLimit(1)
                     }
@@ -821,7 +892,7 @@ private struct NotesMetaBar: View {
                 Spacer(minLength: 0)
                 if model.debugRetention {
                     Text(MenuContent.debugRetention)
-                        .font(.caption.weight(.bold))
+                        .pondFont(.caption, weight: .bold)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
@@ -845,7 +916,7 @@ private struct LagChip: View {
     var body: some View {
         Button { model.showsBacklog.toggle() } label: {
             Label(text, systemImage: "hourglass")
-                .font(.caption.weight(.medium).monospacedDigit())
+                .pondFont(.caption, weight: .medium)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2)
                 .background(Capsule().fill(Color.chirp.moonFill.opacity(0.2)))
@@ -858,7 +929,7 @@ private struct LagChip: View {
         .popover(isPresented: $model.showsBacklog, arrowEdge: .top) {
             ScrollView {
                 Text(model.hearingText)
-                    .font(.system(size: 13))
+                    .pondFont(13)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
@@ -877,7 +948,7 @@ struct StructuringChip: View {
     var body: some View {
         Label(NotesStatus.structuringChip(host), systemImage: "arrow.up.forward.circle")
             .labelStyle(.titleAndIcon)
-            .font(.caption.weight(.medium))
+            .pondFont(.caption, weight: .medium)
             .foregroundStyle(Color.chirp.moon)
             .lineLimit(1)
             .fixedSize()
@@ -898,14 +969,14 @@ private struct EditedChip: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "mic.badge.plus").font(.caption).foregroundStyle(Color.chirp.moon)
-            Text(NotesStatus.edited).font(.caption.weight(.medium))
-            Text("·").font(.caption).foregroundStyle(NotesInk.secondary)
+            Image(systemName: "mic.badge.plus").pondFont(.caption).foregroundStyle(Color.chirp.moon)
+            Text(NotesStatus.edited).pondFont(.caption, weight: .medium)
+            Text("·").pondFont(.caption).foregroundStyle(NotesInk.secondary)
             Button {
                 model.undoEdit()
                 model.onVoiceEditDismiss()
             } label: {
-                Text("Undo").font(.caption.weight(.semibold))
+                Text("Undo").pondFont(.caption, weight: .semibold)
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.chirp.koi)
@@ -925,25 +996,25 @@ private struct UndoChip: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "sparkles").font(.caption).foregroundStyle(Color.chirp.moon)
-            Text(NotesStatus.organized).font(.caption.weight(.medium))
-            Text("·").font(.caption).foregroundStyle(NotesInk.secondary)
+            Image(systemName: "sparkles").pondFont(.caption).foregroundStyle(Color.chirp.moon)
+            Text(NotesStatus.organized).pondFont(.caption, weight: .medium)
+            Text("·").pondFont(.caption).foregroundStyle(NotesInk.secondary)
             if model.snapshots.latest != nil {
                 Button {
                     model.review()
                 } label: {
-                    Text("Show changes").font(.caption.weight(.semibold))
+                    Text("Show changes").pondFont(.caption, weight: .semibold)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.chirp.koi)
                 .accessibilityLabel("Show what organize changed")
-                Text("·").font(.caption).foregroundStyle(NotesInk.secondary)
+                Text("·").pondFont(.caption).foregroundStyle(NotesInk.secondary)
             }
             Button {
                 model.undoReorganize()
                 model.dismissUndoChip()
             } label: {
-                Text("Undo").font(.caption.weight(.semibold))
+                Text("Undo").pondFont(.caption, weight: .semibold)
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.chirp.koi)
@@ -960,7 +1031,7 @@ private struct UndoChip: View {
 private struct UpdatingBadge: View {
     var body: some View {
         Label("Updating", systemImage: "sparkles")
-            .font(.caption.weight(.medium))
+            .pondFont(.caption, weight: .medium)
             .foregroundStyle(Color.chirp.moon)
             .modifier(ChipStyle())
     }
@@ -982,9 +1053,85 @@ private struct ChipStyle: ViewModifier {
 struct NotesTipView: View {
     var body: some View {
         Label(NotesStatus.tip, systemImage: "sparkles")
-            .font(.callout)
+            .pondFont(.callout)
             .fixedSize(horizontal: false, vertical: true)
             .padding(14)
             .frame(width: 280, alignment: .leading)
+    }
+}
+
+
+/// View ▸ Read Formatted Note: the note without Markdown syntax (headings, bullets, emphasis), its tasks as standard
+/// checkboxes that toggle through the editor's own edit and Undo path. The editable NSTextView keeps its native text,
+/// offsets and selection; this sheet is a second, read-mostly presentation with its own accessibility tree.
+struct NotesFormattedReader: View {
+    let model: NotesModel
+    let done: () -> Void
+
+    enum Line: Equatable {
+        case heading(String)
+        case bullet(String, indent: Int)
+        /// `toggle` is a UTF-16 offset inside the `[ ]` box, as the editor's task toggle expects.
+        case task(String, checked: Bool, indent: Int, toggle: Int)
+        case text(String)
+    }
+
+    static func lines(_ markdown: String) -> [Line] {
+        var offset = 0
+        return markdown.components(separatedBy: "\n").compactMap { line in
+            defer { offset += line.utf16.count + 1 }
+            if let prefix = NotesMarkdown.listPrefix(Substring(line)) {
+                let rest = String(line.dropFirst(prefix.length))
+                if let checked = prefix.box {
+                    return .task(rest, checked: checked, indent: prefix.indent, toggle: offset + prefix.spaces + 3)
+                }
+                return .bullet(rest, indent: prefix.indent)
+            }
+            if let range = line.range(of: #"^#{1,6}\s+"#, options: .regularExpression) {
+                return .heading(String(line[range.upperBound...]))
+            }
+            return line.trimmingCharacters(in: .whitespaces).isEmpty ? nil : .text(line)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(model.displayTitle).pondFont(.title, weight: .semibold, design: .serif).accessibilityAddTraits(.isHeader)
+                    ForEach(Array(Self.lines(model.document.text).enumerated()), id: \.offset) { _, line in
+                        switch line {
+                        case .heading(let text):
+                            Text(.init(text)).pondFont(.section, weight: .semibold).padding(.top, 6).accessibilityAddTraits(.isHeader)
+                        case .bullet(let text, let indent):
+                            Label { Text(.init(text)) } icon: { Text("•").foregroundStyle(NotesInk.secondary) }
+                                .pondFont(.body).padding(.leading, CGFloat(indent) * 20)
+                        case .task(let text, let checked, let indent, let toggle):
+                            Toggle(isOn: Binding(get: { checked }, set: { _ in _ = model.toggleAccessibleTask(toggle) })) {
+                                Text(.init(text))
+                            }
+                            .toggleStyle(.checkbox)
+                            .pondFont(.body)
+                            .padding(.leading, CGFloat(indent) * 20)
+                        case .text(let text):
+                            Text(.init(text)).pondFont(.body)
+                        }
+                    }
+                }
+                .textSelection(.enabled)
+                .foregroundStyle(NotesInk.primary)
+                .padding(28)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Divider()
+            HStack {
+                Text("Tasks you tick here change the note; ⌘Z in the note undoes them.").pondFont(.meta).foregroundStyle(NotesInk.secondary)
+                Spacer()
+                Button("Done", action: done).keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(minWidth: 520, idealWidth: 640, minHeight: 360, idealHeight: 520)
+        .background(Color.chirp.surface)
     }
 }

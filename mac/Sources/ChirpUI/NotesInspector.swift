@@ -10,10 +10,10 @@ struct NotesInspector: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Text("Transcript").font(.headline).foregroundStyle(NotesInk.primary).accessibilityAddTraits(.isHeader)
+                Text("Transcript").pondFont(.section).foregroundStyle(NotesInk.primary).accessibilityAddTraits(.isHeader)
                 if !model.document.segments.isEmpty {
                     Text(NotesLibraryText.duration(model.elapsed) ?? "")
-                        .font(ChirpType.meta)
+                        .pondFont(.meta)
                         .foregroundStyle(NotesInk.secondary)
                 }
                 Spacer()
@@ -50,7 +50,7 @@ struct NotesInspector: View {
             .padding(.bottom, model.document.transcribedWith == nil ? 10 : 2)
             if let engine = model.document.transcribedWith {
                 Text(NotesRetranscribeText.transcribedWith(engine))
-                    .font(.caption)
+                    .pondFont(.caption)
                     .foregroundStyle(NotesInk.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
@@ -100,7 +100,7 @@ private struct TranscriptList: View {
                     LazyVStack(alignment: .leading, spacing: 4) {
                         if model.document.segments.isEmpty && model.document.livePartial.isEmpty {
                             Text(model.state.isLive ? "Segments appear here as you talk." : "No transcript — this note was typed.")
-                                .font(.callout)
+                                .pondFont(.callout)
                                 .foregroundStyle(NotesInk.tertiary)
                                 .padding(.vertical, 8)
                         }
@@ -111,7 +111,7 @@ private struct TranscriptList: View {
                         if !model.document.livePartial.isEmpty {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
                                 Text(model.document.livePartial)
-                                    .font(.system(size: 13))
+                                    .pondFont(13)
                                     .foregroundStyle(NotesInk.tertiary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -153,7 +153,7 @@ private struct ContinuedDivider: View {
         HStack(spacing: 8) {
             Rectangle().fill(NotesInk.tertiary.opacity(0.5)).frame(height: 1)
             Text(NotesLibraryText.continued(date))
-                .font(.system(size: 11, weight: .medium))
+                .pondFont(12, weight: .medium)
                 .foregroundStyle(NotesInk.secondary)
                 .fixedSize()
             Rectangle().fill(NotesInk.tertiary.opacity(0.5)).frame(height: 1)
@@ -169,6 +169,7 @@ private struct TranscriptRowView: View {
     let library: NotesLibraryModel
     private var player: NotesPlayer { library.player }
     let row: TranscriptRow
+    @Environment(\.chirpTextScale) private var textScale
     @Environment(\.colorScheme) private var scheme
 
     /// This paragraph's segments that have kept audio, in order.
@@ -191,7 +192,7 @@ private struct TranscriptRowView: View {
                         player.toggle(note: model.document.id, paragraph: p.id, segments: audio)
                     } label: {
                         Image(systemName: playing ? "stop.fill" : "play.fill")
-                            .font(.system(size: 8, weight: .bold))
+                            .pondFont(8, weight: .bold)
                             .foregroundStyle(playing ? Color.chirp.onKoi : Color.chirp.koi)
                             .frame(width: 18, height: 18)
                             .background(Circle().fill(playing ? Color.chirp.koi : Color.chirp.koiContainer.opacity(0.8)))
@@ -201,7 +202,7 @@ private struct TranscriptRowView: View {
                     .accessibilityLabel(playing ? "Stop playback" : "Play from \(NotesDocument.timestamp(row.offset))")
                 }
                 Text(NotesStatus.clock(row.offset))
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .pondFont(12, weight: .medium, digits: true)
                     .foregroundStyle(playing ? Color.chirp.koi : NotesInk.secondary)
                     .help(NotesDocument.timestamp(row.offset))
                 if let chip = row.chip, let person = p.person, p.failure == nil {
@@ -219,31 +220,31 @@ private struct TranscriptRowView: View {
                     if model.voices.recognised.contains(person), let name = model.voices.linked[person] {
                         Button("Not \(name)") { model.onSpeakerEdit(.declineVoice(person)) }
                             .buttonStyle(.plain)
-                            .font(.caption)
+                            .pondFont(.caption)
                             .foregroundStyle(.secondary)
                             .help("Remove this recognised name for this note")
                     }
 
                 }
                 if playing {
-                    Text("Playing").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Color.chirp.koi)
+                    Text("Playing").pondFont(12, weight: .semibold).foregroundStyle(Color.chirp.koi)
                 }
                 Spacer(minLength: 0)
             }
             if let failure = p.failure {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("⚠︎ audio not transcribed (\(failure))")
-                        .font(.system(size: 13))
+                        .pondFont(13)
                         .foregroundStyle(Color.chirp.moon)
                     if library.canRetranscribe(model), model.keptAudio[p.parts[0].segment] != nil {
                         Button(NotesRetranscribeText.gapAgain) { library.onRetranscribe(model.document.id, p.parts[0].segment) }
                             .buttonStyle(.link)
-                            .font(.system(size: 12, weight: .medium))
+                            .pondFont(12, weight: .medium)
                     }
                 }
             } else {
                 paragraphText(p, hovered: model.hoveredParagraph == p.id)
-                    .font(.system(size: 13))
+                    .pondFont(13)
                     .foregroundStyle(NotesInk.primary)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -284,13 +285,13 @@ private struct TranscriptRowView: View {
             var body = Text((i == 0 ? "" : " ") + part.text(model.showRaw))
             if part.segment == playingSegment { body = body.fontWeight(.medium) }
             guard hovered, i > 0 else { return text + body }
-            return text + Text(" [\(NotesDocument.timestamp(part.offset))]").font(.caption2.monospacedDigit()).foregroundColor(NotesInk.secondary) + body
+            return text + Text(" [\(NotesDocument.timestamp(part.offset))]").font(.system(size: 12 * textScale).monospacedDigit()).foregroundColor(NotesInk.secondary) + body
         }
     }
 
     private var keptOriginal: some View {
         Text("kept original")
-            .font(.caption2.weight(.medium))
+            .pondFont(.caption, weight: .medium)
             .foregroundStyle(NotesInk.secondary)
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
@@ -325,7 +326,7 @@ struct SpeakerChip: View {
             Text(name).lineLimit(1)
             if recognised { Text("✓").accessibilityHidden(true) }
         }
-        .font(.caption.weight(.semibold))
+        .pondFont(.caption, weight: .semibold)
         .foregroundStyle(hue)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)

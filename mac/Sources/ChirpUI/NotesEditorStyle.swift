@@ -53,7 +53,7 @@ enum NotesEditorStyle {
 
     /// Restyles the paragraphs `range` touches (the whole text when nil). With `hide`, syntax outside `raw` (the caret's
     /// paragraphs; nil when the editor is not focused) is hidden.
-    static func restyle(_ storage: NSTextStorage, range: NSRange? = nil, hide: Bool = false, raw: NSRange? = nil) {
+    static func restyle(_ storage: NSTextStorage, range: NSRange? = nil, hide: Bool = false, raw: NSRange? = nil, scale: CGFloat = 1) {
         let ns = storage.string as NSString
         let target = range.map { ns.paragraphRange(for: NSRange(location: min($0.location, ns.length), length: max(0, min($0.length, ns.length - min($0.location, ns.length))))) }
             ?? NSRange(location: 0, length: ns.length)
@@ -71,6 +71,25 @@ enum NotesEditorStyle {
         for run in runs { apply(run, to: storage, ns: ns) }
         if hide {
             for run in runs where !isRaw(run.range, raw: raw, ns: ns) { conceal(run, in: storage, ns: ns) }
+        }
+        // Restyling first resets the affected paragraphs to base attributes; scaling therefore never compounds.
+        // Only attributes change. Text, UTF-16 offsets and the undo stack remain native.
+        if scale != 1 {
+            storage.enumerateAttributes(in: target) { attributes, range, _ in
+                if let font = attributes[.font] as? NSFont, font.pointSize > 0.02 {
+                    storage.addAttribute(.font, value: NSFontManager.shared.convert(font, toSize: font.pointSize * scale), range: range)
+                }
+                if let original = attributes[.paragraphStyle] as? NSParagraphStyle,
+                   let paragraph = original.mutableCopy() as? NSMutableParagraphStyle {
+                    paragraph.lineSpacing *= scale
+                    paragraph.paragraphSpacing *= scale
+                    paragraph.paragraphSpacingBefore *= scale
+                    paragraph.headIndent *= scale
+                    paragraph.firstLineHeadIndent *= scale
+                    storage.addAttribute(.paragraphStyle, value: paragraph, range: range)
+                }
+                if let kern = attributes[.kern] as? CGFloat { storage.addAttribute(.kern, value: kern * scale, range: range) }
+            }
         }
         storage.endEditing()
     }
@@ -145,7 +164,7 @@ enum NotesEditorStyle {
                 storage.addAttribute(.font, value: font(f, adding: trait), range: sub)
             }
         case .bulletMarker(let indent):
-            storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: r)
+            storage.addAttribute(.foregroundColor, value: NotesInk.muted, range: r)
             let line = ns.substring(with: ns.lineRange(for: r))
             let spaces = line.prefix { $0 == " " }.count
             // The leading spaces are kerned to exactly `indent` steps, so nesting reads the same however it was typed.
@@ -161,9 +180,9 @@ enum NotesEditorStyle {
                 + (task ? width("[ ] ", box) : 0)
             storage.addAttribute(.paragraphStyle, value: p, range: ns.paragraphRange(for: r))
         case .taskBox:
-            storage.addAttributes([.font: box, .foregroundColor: NSColor.secondaryLabelColor], range: r)
+            storage.addAttributes([.font: box, .foregroundColor: NotesInk.muted], range: r)
         case .checkedTaskText:
-            storage.addAttributes([.foregroundColor: NSColor.secondaryLabelColor,
+            storage.addAttributes([.foregroundColor: NotesInk.muted,
                                    .strikethroughStyle: NSUnderlineStyle.single.rawValue,
                                    .strikethroughColor: NSColor.tertiaryLabelColor], range: r)
         case .decisionLabel:
@@ -173,7 +192,7 @@ enum NotesEditorStyle {
             storage.addAttributes([.foregroundColor: NotesEditorDecorations.moon,
                                    .font: NSFont.systemFont(ofSize: bodySize, weight: .semibold)], range: r)
         case .fallbackHeader:
-            storage.addAttributes([.foregroundColor: NSColor.secondaryLabelColor, .font: font(body, adding: .italicFontMask)], range: r)
+            storage.addAttributes([.foregroundColor: NotesInk.muted, .font: font(body, adding: .italicFontMask)], range: r)
         }
     }
 }
