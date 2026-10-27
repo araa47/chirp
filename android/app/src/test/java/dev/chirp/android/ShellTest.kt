@@ -113,6 +113,8 @@ class ShellBackTest {
         compose.runOnIdle { activity.onBackPressedDispatcher.onBackPressed() }
         assertTrue("back from the pair page returns to the shell", activity.state.shellOpen); assertFalse(activity.isFinishing)
         compose.onNode(hasText("History") and isSelectable()).performClick()
+        // History reads its entries off the main thread, so the empty state appears a beat after the tab opens.
+        compose.waitUntil(5000) { compose.onAllNodesWithText("No dictations yet").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("No dictations yet").assertExists()
         compose.runOnIdle { activity.onBackPressedDispatcher.onBackPressed() }
         assertEquals(ShellTab.Notes, activity.state.tab); assertFalse(activity.isFinishing)
