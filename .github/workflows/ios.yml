@@ -1,11 +1,14 @@
 name: ios
 
 # macOS runner minutes cost 10x Linux: run only when `ios/**`, the mac package sources the iOS app links
-# (ChirpCore, ChirpSpeakers and their pins) or this file change.
+# (ChirpCore, ChirpSpeakers and their pins) or this file change, not for READMEs. THIRD-PARTY-NOTICES.md stays in:
+# ios/scripts/check-project.py reads it.
 on:
   pull_request:
     paths: &paths
       - "ios/**"
+      - "!ios/README.md"
+      - "!ios/Shared/README.md"
       - "mac/Package.swift"
       - "mac/Package.resolved"
       - "mac/Sources/ChirpCore/**"

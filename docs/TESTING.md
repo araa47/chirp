@@ -51,7 +51,7 @@ key presses and real apps are the operator's Windows checklist in [#214](https:/
 
 ### CI
 
-GitHub Actions (`.github/workflows/`) runs the automated checks on every pull request and on pushes to `main`. Each workflow is path-filtered, so a PR only runs the components it touches, and a newer push cancels the superseded run. No secrets, tailnet access or model downloads are involved.
+GitHub Actions (`.github/workflows/`) runs the automated checks on every pull request and on pushes to `main`. Each workflow is path-filtered, so a PR only runs the components it touches, and superseded or finished-with runs are cancelled (see [Stale runs](#stale-runs)). No secrets, tailnet access or model downloads are involved.
 
 | Workflow | Runner | Runs | Notes |
 |---|---|---|---|
@@ -61,10 +61,22 @@ GitHub Actions (`.github/workflows/`) runs the automated checks on every pull re
 | `android.yml` | ubuntu, JDK 21, Android SDK 37.2 | `./gradlew lint testDebugUnitTest assembleDebug assembleRelease` | The release APK is unsigned (no keystore secret). Lint and test reports upload on failure. |
 | `mac.yml` | macos | `mac/scripts/ci-test.sh` (wraps `test.sh`) | Only for `mac/**` changes (macOS minutes are expensive). Can also be started by hand (`workflow_dispatch`). |
 | `ios.yml` | macos, newest installed Xcode | `ios/scripts/ci-test.sh`: `check-sources.sh`, `Shared/scripts/test.sh`, the keyboard policy package tests, then `ios/scripts/simulator.sh test` (build and unit tests of the app with its keyboard and widgets) on one iPhone simulator | Only for `ios/**`, the `mac` package sources the app links (`ChirpCore`, `ChirpSpeakers`, `Package.*`) and the workflow file. Ad-hoc simulator signing, no team or secrets. Can also be started by hand. |
+| `pr-closed-cancel.yml` | ubuntu | `gh api` calls only | When a PR is merged or closed, cancels that PR's queued and running runs of every workflow above. No checkout, no secrets, token limited to `actions: write`. |
 
 The hosted runners only have Xcode 26 (Swift 6.2/6.3). On them, several stream, recorder and Notes suites abort the shared test process (`freed pointer was not the last allocation`) although every test passes alone and on Swift 6.4, so `ci-test.sh` runs those one test per process, together with the Live Notes soak (`NotesSoakTests`; `test.sh` with no arguments also runs it after the rest, so its 2-minute limit covers the soak alone). It skips `GeneratedSoundTests` (needs `swift make-sounds.swift`) and `SnapshotTests` (the runner's fonts render PNGs over the committed-size cap). Both run in `mac/scripts/test.sh` on the Mac.
 
 iOS CI runs the portable checks and the app's unit tests only. The UI schemes and the live-server end to end (`ios/scripts/simulator-e2e.sh`) stay on the Mac: they need `say`, ffmpeg, the cached model and a real keyboard setup, which the runners do not have, and headless simulator UI runs are not reliable enough to gate a PR. Run `ios/scripts/simulator.sh ui` or `simulator-e2e.sh` before merging UI changes.
+
+#### Stale runs
+
+Runners are shared and macOS minutes cost 10x Linux, so a run nobody needs any more should not keep one busy:
+
+- **Newer push to the same PR:** every workflow has `concurrency: group: <workflow>-<PR number or ref>`, `cancel-in-progress: true`. The group holds one workflow of one PR (or of one ref), so a PR's push cancels only its own older run, never another PR's, never `main`'s, and never another workflow's.
+- **Newer push to `main`:** same group, keyed by `refs/heads/main`. The superseded run is cancelled; the newer commit contains the older one, so its run covers it. A commit in the middle of a burst of pushes therefore has no CI result of its own.
+- **Merged or closed PR:** `concurrency` cannot see a PR closing, so `pr-closed-cancel.yml` (`pull_request: types: [closed]`) lists the PR's unfinished `pull_request` runs and cancels them. It skips fork PRs (their token is read-only) and does nothing if the PR was reopened in the meantime. The push to `main` after a merge runs the same checks anyway.
+- **Pages:** `pages.yml` sets concurrency per job. Builds cancel like the others; the deploy job is alone in the `pages` group with `cancel-in-progress: false`, so a deploy that has started always finishes and the newest queued one runs after it.
+- **Docs-only changes:** `mac.yml` and `ios.yml` ignore the READMEs (and `mac/docs`). Markdown that a test or script reads (`NOTICES.md`, `THIRD-PARTY-NOTICES.md`) still triggers them.
+- **Drafts** run CI (the workflow is to gate on hosted CI before marking a PR ready), so a draft that gets pushes costs runs too; batch pushes, or use a local path from the sections above.
 
 `scripts/e2e-local.sh` and the operator steps below need a real Mac, `say` and (for the app) permissions, so they stay local.
 
