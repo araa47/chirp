@@ -93,7 +93,7 @@ extension LiveNotesController {
     /// The health of a current Mac server with clean-up on this Mac and every notes endpoint.
     static let syntheticHealth = Health(engine: "parakeet-mlx:tdt-0.6b-v3", ready: true, correction: "available", correctionLeavesMachine: false,
                                         notesStructure: true, notesCorrection: true, notesReorganize: true, notesContext: true,
-                                        notesSpeakers: true, speakersModel: SpeakersModel(state: .ready, sizeBytes: 26_530_309),
+                                        notesEdit: true, notesSpeakers: true, speakersModel: SpeakersModel(state: .ready, sizeBytes: 26_530_309),
                                         speechModel: "parakeet-v3", notesRetranscribe: true)
 
     /// UI-test controller: synthetic sockets (ready and a partial on start, a final on stop), a structuring stand-in that
@@ -118,11 +118,14 @@ extension LiveNotesController {
                 // Re-transcribe sheet states: an older server, and one that keeps debug recordings.
                 if args.contains("--chirp-retranscribe-old-server") { health.notesRetranscribe = nil }
                 if args.contains("--chirp-retranscribe-debug") { health.debugRetention = true }
+                // An older server without Edit by voice, so the Command button is not offered.
+                if args.contains("--chirp-no-notes-edit") { health.notesEdit = nil }
                 return health
             },
             makeStream: { _, options, _ in StreamSession(transport: SyntheticTransport(automatic: true, voiceMatches: { withVoices ? voices.matches : [] }), options: options) },
             structure: { _, _, request, _ in syntheticStructure(request) },
             reorganize: { _, _, request, _ in syntheticReorganize(request) },
+            editNotes: { _, _, request, _ in syntheticEdit(request) },
             fetchVoices: { _, _ in voices.value },
             voiceAction: { _, _, action in voices.perform(action) },
             audio: SyntheticNotesAudio(), requestPermission: { true }, activity: .none,
@@ -140,6 +143,11 @@ extension LiveNotesController {
         let lines = request.notes.components(separatedBy: "\n").filter { !$0.isEmpty }
         let organized = (lines.filter { !$0.hasPrefix("- ") } + lines.filter { $0.hasPrefix("- ") }.sorted()).joined(separator: "\n")
         return NotesReorganizeResponse(markdown: organized, reorganized: true, changed: organized != request.notes)
+    }
+
+    /// Edit by voice: the instruction becomes one bullet at the end, so the edit is visible and Undo can put it back.
+    nonisolated static func syntheticEdit(_ request: NotesEditRequest) -> NotesEditResponse {
+        NotesEditResponse(markdown: request.notes + "\n\n- Edited by voice: “\(request.instruction)”", edited: true, changed: true)
     }
     /// `--chirp-speakers-gallery`: the first note's transcript with two people (one renamed), as the server's labels
     /// would leave it, and notes that name "Person 1", so the rename sheet has something to offer.

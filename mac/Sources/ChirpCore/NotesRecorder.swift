@@ -1031,6 +1031,20 @@ public final class NotesRecorder {
     /// A voice edit is waiting for the slot or running.
     public var isEditing: Bool { pendingEdit != nil }
 
+    /// The notes right before the last applied voice edit, and the version it left (undo while nothing changed it since).
+    private var editUndo: (before: String, version: Int)?
+
+    /// The "Edited · Undo" chip can still take the last voice edit back.
+    public var canUndoEdit: Bool { editUndo?.version == document.version }
+
+    /// Restores the text from before the last voice edit, as the user's own edit, while nothing else changed it since.
+    public func undoEdit() {
+        guard let undo = editUndo, undo.version == document.version else { return }
+        editUndo = nil
+        guard let change = NotesDocument.diff(document.text, undo.before, kind: .restore) else { return }
+        restoreText(change.range, change.replacement)
+    }
+
     private func failEdit(_ outcome: NotesEditOutcome) {
         guard let e = pendingEdit else { return }
         pendingEdit = nil
@@ -1094,12 +1108,17 @@ public final class NotesRecorder {
             outcome = .unchanged
         } else if !document.canApplyEdit(request) || editorComposing {
             outcome = .conflict
-        } else if let change = document.applyEdit(response, for: request) {
-            dropHeld()
-            publish(change)
-            outcome = .applied
         } else {
-            outcome = .unchanged
+            // The text as it was, for the "Edited · Undo" chip: captured before the edit applies.
+            let before = document.text
+            if let change = document.applyEdit(response, for: request) {
+                dropHeld()
+                publish(change)
+                editUndo = (before, document.version)
+                outcome = .applied
+            } else {
+                outcome = .unchanged
+            }
         }
         failEdit(outcome)
     }

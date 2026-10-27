@@ -507,6 +507,54 @@ final class ChirpNotesUITests: XCTestCase {
         XCTAssertTrue(Self.waitFor(Self.element("chirp.notes.status", in: app), "label == 'Stopped'", timeout: 20))
     }
 
+    /// Edit by voice (A2-4): hold the Command button, say the change, let go: the edit applies with Edited · Undo, and
+    /// Undo puts the notes back. A quick tap latches it (Tap to send, with Cancel); an older server has no button.
+    @MainActor func testEditByVoiceHoldLatchAndUndo() {
+        func openLantern(_ app: XCUIApplication) {
+            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'chirp.notes.row.' AND label CONTAINS 'Lantern kickoff'")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10)); row.tap()
+        }
+        let app = launch(["--chirp-notes-gallery"])
+        openLantern(app)
+        let command = app.buttons["chirp.notes.voiceEdit.button"]
+        XCTAssertTrue(command.waitForExistence(timeout: 10), "the paired computer edits notes")
+        XCTAssertEqual(command.label, "Edit notes by voice. Hold, say the change, let go.")
+        let edited = Self.element("chirp.notes.preview", in: app).staticTexts.matching(NSPredicate(format: "label CONTAINS 'Edited by voice'")).firstMatch
+        XCTAssertFalse(edited.exists)
+
+        // Hold, say it, let go: the synthetic computer hears "Synthetic words." and adds it as a bullet.
+        command.press(forDuration: 1.5)
+        let undo = app.buttons["chirp.notes.voiceEdit.undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10), "Edited · Undo after the edit applied")
+        XCTAssertTrue(edited.waitForExistence(timeout: 5))
+        screenshot("notes-voice-edited", app)
+        undo.tap()
+        XCTAssertTrue(Self.waitFor(edited, "exists == false", timeout: 5), "Undo puts the notes back")
+        XCTAssertFalse(undo.exists)
+
+        // A quick tap latches it: what it hears shows with Cancel, and the next tap sends.
+        command.tap()
+        let cancel = app.buttons["chirp.notes.voiceEdit.cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertTrue(Self.waitFor(command, "label == 'Send the spoken edit'", timeout: 5))
+        XCTAssertTrue(Self.waitFor(Self.element("chirp.notes.voiceEdit.heard", in: app), "label CONTAINS 'synthetic words'", timeout: 5))
+        screenshot("notes-voice-edit-listening", app)
+        cancel.tap()
+        XCTAssertTrue(Self.waitFor(cancel, "exists == false", timeout: 5))
+        XCTAssertFalse(edited.exists, "a cancelled command edits nothing")
+        command.tap()
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        command.tap()
+        XCTAssertTrue(undo.waitForExistence(timeout: 10), "the second tap sends it")
+        XCTAssertTrue(edited.exists)
+        app.terminate()
+
+        let older = launch(["--chirp-notes-gallery", "--chirp-no-notes-edit"])
+        openLantern(older)
+        XCTAssertTrue(older.buttons["chirp.notes.more"].waitForExistence(timeout: 10))
+        XCTAssertFalse(older.buttons["chirp.notes.voiceEdit.button"].exists, "an older server has no Edit by voice")
+    }
+
     /// Labels are on by default: no switch to flip and no consent (the synthetic Mac has the model), the chips follow, and
     /// Turn off in Settings is the one explicit choice.
     @MainActor func testLabelSpeakersAreOnByDefaultAndSettingsTurnsThemOff() {

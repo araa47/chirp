@@ -33,6 +33,8 @@ struct NoteDetailView: View {
     @State private var namingSpeakers = false
     @State private var transcriptNamingSpeakers = false
     @State private var renamingSpeaker: SpeakerSheetItem?
+    /// The Command button's press, while it is held (hold-to-edit; nil between presses).
+    @State private var commandPressed: Date?
     @StateObject private var player = NotesSegmentPlayer()
 
     var body: some View {
@@ -110,6 +112,7 @@ struct NoteDetailView: View {
                         RetranscribeToastView(notes: notes, toast: toast) { if !notes.undoOrganize() { confirmUndo = true } }
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                    voiceEditLine
                     if !notes.isRetranscribing { dock }
                 }.padding(.horizontal, 16).padding(.vertical, 12).background(Color.chirp.background)
                     .animation(.default, value: notes.visibleRetranscribeToast)
@@ -212,7 +215,16 @@ struct NoteDetailView: View {
             .modifier(NotesDockGlass())
     }
 
+    /// Edit by voice (A2-4) while the note has something to edit and the server runs the instructions: beside Record,
+    /// and beside Pause/Stop while it records (the recorder diverts its capture for the command).
+    private var showsCommandButton: Bool {
+        notes.voiceEditAvailable && !notes.isRetranscribing
+            && (notes.recordingID == nil || notes.recordingID == notes.document.id)
+            && (notes.state.isActive || !notes.document.text.isEmpty)
+    }
+
     @ViewBuilder private var dockButtons: some View {
+        if showsCommandButton { commandButton }
         if notes.state.isLive {
             HStack(spacing: 8) {
                 Ripple(level: notes.state.isCapturing ? 0.3 : 0, reduceMotion: notes.isPaused ? true : nil).frame(width: 32, height: 32)
@@ -237,6 +249,69 @@ struct NoteDetailView: View {
                 .disabled(!notes.paired || notes.starting || session.armed || notes.isRetranscribing)
                 .keyboardShortcut("r", modifiers: [.command, .shift]).accessibilityIdentifier("chirp.notes.record")
         }
+    }
+
+    /// Hold it and say what to change, let go to send (A2-4, as on Android). A quick tap latches it — tap again to
+    /// send — and ⇧⌘E toggles it, as on the Mac. What is said goes to the edit and never into the transcript.
+    /// Not a `Button`: its tap action would toggle the command a second time after the press gesture already did, so
+    /// the press drives it and VoiceOver's double tap (the accessibility action) toggles it, like TalkBack on Android.
+    private var commandButton: some View {
+        let listening = notes.voiceEditListening
+        let enabled = listening || notes.canStartVoiceEdit
+        let title = listening ? (commandPressed != nil ? "Release to send" : "Tap to send") : "Hold to edit"
+        let tint = listening ? Color.chirp.record : Color.chirp.moon
+        return Label(title, systemImage: listening ? "mic.fill" : "sparkles").font(.headline).lineLimit(1)
+            .padding(.horizontal, 16).frame(minHeight: 44)
+            .foregroundStyle(tint).background(tint.opacity(0.15), in: Capsule())
+            .contentShape(Capsule()).opacity(enabled ? 1 : 0.4)
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in if commandPressed == nil { commandPressed = Date(); notes.commandPress() } }
+                .onEnded { _ in
+                    if let since = commandPressed { notes.commandRelease(held: Date().timeIntervalSince(since)) }
+                    commandPressed = nil
+                })
+            .background {
+                // ⇧⌘E with a hardware keyboard; shortcuts need a Button, so it sits behind the control, out of sight.
+                Button("Edit by voice", action: notes.toggleVoiceEdit).keyboardShortcut("e", modifiers: [.command, .shift])
+                    .opacity(0).accessibilityHidden(true)
+            }
+            .disabled(!enabled)
+            .accessibilityElement(children: .ignore).accessibilityAddTraits(.isButton)
+            .accessibilityLabel(listening ? "Send the spoken edit" : "Edit notes by voice. Hold, say the change, let go.")
+            .accessibilityAction { notes.toggleVoiceEdit() }
+            .accessibilityShowsLargeContentViewer()
+            .accessibilityIdentifier("chirp.notes.voiceEdit.button")
+    }
+
+    /// Edit by voice's line above the dock: what it heard with Cancel while it listens, "Editing notes…" while it
+    /// runs, "Edited · Undo" after it applied (20 s), or the note for one that did not (12 s).
+    @ViewBuilder private var voiceEditLine: some View {
+        if notes.voiceEditListening {
+            HStack(spacing: 12) {
+                Text(notes.voiceEditStatusText ?? NotesVoiceEditText.listening).font(.footnote)
+                    .foregroundStyle(Color.chirp.inkMuted).lineLimit(2)
+                    .accessibilityIdentifier("chirp.notes.voiceEdit.heard")
+                Spacer(minLength: 0)
+                Button("Cancel", action: notes.cancelVoiceEdit).font(.footnote)
+                    .keyboardShortcut(.cancelAction).accessibilityIdentifier("chirp.notes.voiceEdit.cancel")
+            }
+        } else if case .editing = notes.voiceEdit {
+            Text(NotesVoiceEditText.running).font(.footnote).foregroundStyle(Color.chirp.inkMuted)
+                .accessibilityIdentifier("chirp.notes.voiceEdit.running")
+        } else if notes.showsEditedChip {
+            EditedChip(notes: notes)
+        } else if let note = notes.voiceEditNote {
+            Text(note).font(.footnote).foregroundStyle(Color.chirp.inkMuted)
+                .accessibilityIdentifier("chirp.notes.voiceEdit.note")
+                .task(id: notes.voiceEdit) { await autoDismissVoiceEdit(12) }
+        }
+    }
+
+    /// The chip and the note under it go away by themselves, unless a newer state replaced them first.
+    private func autoDismissVoiceEdit(_ seconds: Double) async {
+        let status = notes.voiceEdit
+        try? await Task.sleep(for: .seconds(seconds))
+        if !Task.isCancelled, notes.voiceEdit == status { notes.dismissVoiceEdit() }
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
@@ -529,6 +604,51 @@ struct NotesSettingsSheet: View {
     var body: some View {
         NavigationStack {
             NotesSettingsView(notes: notes).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+}
+
+/// "Edited · Undo" for 20 s after a voice edit applied (or until the next edit, Undo or a click), as on the Mac and
+/// Android.
+private struct EditedChip: View {
+    @ObservedObject var notes: LiveNotesController
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label(NotesVoiceEditText.edited, systemImage: "mic.badge.plus").font(.footnote.weight(.medium)).foregroundStyle(Color.chirp.moon)
+            Text("·").font(.footnote).foregroundStyle(Color.chirp.inkMuted)
+            Button("Undo") { notes.undoVoiceEdit() }.font(.footnote.weight(.semibold))
+                .accessibilityLabel("Undo the spoken edit")
+                .accessibilityIdentifier("chirp.notes.voiceEdit.undo")
+        }.padding(.horizontal, 12).padding(.vertical, 8).background(Color.chirp.surfaceRaised, in: Capsule())
+        .onTapGesture(perform: notes.dismissVoiceEdit)
+        .accessibilityElement(children: .contain).accessibilityIdentifier("chirp.notes.voiceEdit.chip")
+        .task(id: notes.voiceEdit) {
+            try? await Task.sleep(for: .seconds(20))
+            if !Task.isCancelled { notes.dismissVoiceEdit() }
+        }
+    }
+}
+
+/// The words of a voice edit (#97) on the phone, the same as the Mac's and Android's.
+enum NotesVoiceEditText {
+    static let listening = "Say the edit…"
+    static let running = "Editing notes…"
+    static let edited = "Edited"
+
+    /// The note under the chip for an edit that did not apply; nil for one that did.
+    static func note(_ outcome: NotesEditOutcome) -> String? {
+        switch outcome {
+        case .applied: nil
+        case .unchanged: "The edit changed nothing"
+        case .refused("adds_content"): "Can’t add new content by voice — ask to remove, move, tidy or reword"
+        case .refused("not_an_edit"): "That didn’t sound like an edit to the notes"
+        case .refused: "Couldn’t tell what to change — try naming the section"
+        case .conflict: "Notes changed while editing — try again"
+        case .nothing("not_heard"): "Didn’t catch an edit — try again"
+        case .nothing("too_long"): "Too much to edit at once — select a section first"
+        case .nothing: "Nothing to edit yet"
+        case .failed(let code): "Couldn’t edit notes (\(code))"
         }
     }
 }
