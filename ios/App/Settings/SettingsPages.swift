@@ -288,6 +288,7 @@ struct ShortcutsPage: View {
         ("New note", "⌘N"),
         ("Record / Stop note", "⇧⌘R"),
         ("Pause / Resume note", "⇧⌘P"),
+        ("Edit by voice", "⇧⌘E"),
         ("Search notes", "⌘F"),
         ("Show or hide transcript", "⌥⌘T"),
     ]

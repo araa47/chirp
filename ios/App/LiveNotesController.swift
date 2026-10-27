@@ -38,6 +38,10 @@ final class LiveNotesController: ObservableObject {
         var reorganize: @Sendable (ServerConfig, URLSession, NotesReorganizeRequest, TimeInterval) async throws -> NotesReorganizeResponse = {
             try await $0.reorganizeNotes($2, session: $1, timeout: $3)
         }
+        /// `POST /v1/notes/edit` (#97): one spoken instruction applied to the notes on the paired server.
+        var editNotes: @Sendable (ServerConfig, URLSession, NotesEditRequest, TimeInterval) async throws -> NotesEditResponse = {
+            try await $0.editNotes($2, session: $1, timeout: $3)
+        }
         /// `POST /v1/speakers/model`: the Mac fetches (or drops) its speaker model. Labels are on by default, so the phone asks
         /// for the one pinned download itself while they are on; Turn off stops asking.
         var speakersModel: @Sendable (ServerConfig, URLSession, SpeakersModelAction) async throws -> SpeakersModel = {
@@ -99,6 +103,9 @@ final class LiveNotesController: ObservableObject {
     @Published private(set) var starting = false
     /// The request for the Mac's speaker model could not reach it (the status line offers Retry).
     @Published private(set) var speakerRequestFailed = false
+    /// Edit by voice (#97): the selected note's command mode — what it heard while listening, and how the last one ended
+    /// (the "Edited · Undo" chip or the note under it). ChirpCore's `NotesVoiceEdit` owns the flow.
+    @Published private(set) var voiceEdit: NotesVoiceEditStatus = .idle
     /// Re-transcribe from kept audio (#287, LiveNotesRetranscribe.swift): the consent sheet on offer, the run (one at a
     /// time), the finish toast and "Replace your edits?" for a rebuild that would overwrite typing.
     @Published var retranscribeOffer: NotesRetranscribeOffer?
@@ -114,12 +121,17 @@ final class LiveNotesController: ObservableObject {
     /// Each open document owns its recorder and journal. In-flight AI work always updates its original document.
     private final class NoteSession {
         let recorder: NotesRecorder
+        /// Edit by voice (#97): this note's command mode, on its own socket (never the transcript).
+        let voiceEdit: NotesVoiceEdit
         var journal: NotesJournal?
         var snaps = NotesSnapshots()
         var textBefore = ""
         var lastState: NotesRecorderState = .idle
         var voices = NoteVoiceState()
-        init(_ recorder: NotesRecorder) { self.recorder = recorder }
+        init(_ recorder: NotesRecorder, voiceEdit: NotesVoiceEdit) {
+            self.recorder = recorder
+            self.voiceEdit = voiceEdit
+        }
     }
     private var sessions: [UUID: NoteSession] = [:]
     private var selected: NoteSession!
@@ -159,7 +171,7 @@ final class LiveNotesController: ObservableObject {
 
     private func makeSession(record: NotesJournalRecord? = nil) -> NoteSession {
         let box = serverBox
-        let http = deps.http, reorganize = deps.reorganize, makeStream = deps.makeStream
+        let http = deps.http, reorganize = deps.reorganize, editNotes = deps.editNotes, makeStream = deps.makeStream
         let recorder = NotesRecorder(
             makeSession: { options in makeStream(box.config ?? ServerConfig(baseURL: URL(string: "https://unpaired.invalid")!), options, http) },
             structure: structureCall(),
@@ -167,12 +179,29 @@ final class LiveNotesController: ObservableObject {
                 guard let config = box.config else { throw NotesStructureError.unsupported(404) }
                 return try await reorganize(config, http, request, await self?.health?.operationTimeout(.notesReorganize, fallback: 50) ?? 50)
             },
+            edit: { [weak self] request in
+                guard let config = box.config else { throw NotesStructureError.unsupported(404) }
+                return try await editNotes(config, http, request, await self?.health?.operationTimeout(.notesEdit, fallback: 50) ?? 50)
+            },
             now: deps.now, sleep: deps.sleep, options: StartOptions(client: "ios", wordTimings: true), structuring: false,
             autoReorganize: preferences.autoReorganize, keptAudio: deps.keptAudio)
         if let record { recorder.restore(record.document, elapsed: record.elapsed) }
-        let context = NoteSession(recorder)
+        // Edit by voice: its own socket, raw speech (the recorder's options minus clean-up), applied as one undo step.
+        let voiceEdit = NotesVoiceEdit(recorder: recorder,
+            makeSession: { options in makeStream(box.config ?? ServerConfig(baseURL: URL(string: "https://unpaired.invalid")!), options, http) },
+            now: deps.now, sleep: deps.sleep)
+        let context = NoteSession(recorder, voiceEdit: voiceEdit)
         context.textBefore = recorder.document.text
         context.journal = makeJournal()
+        voiceEdit.onChange = { [weak self, weak context] in
+            guard let context else { return }
+            self?.sync(context)
+        }
+        voiceEdit.openMicrophone = { [weak self, weak context] session in
+            guard let self, let context, context === self.selected else { return false }
+            return self.openCommandMicrophone(session)
+        }
+        voiceEdit.closeMicrophone = { [weak self] in self?.deps.audio.stop() }
         recorder.onChange = { [weak self, weak context] in
             guard let context else { return }
             self?.sync(context)
@@ -242,7 +271,10 @@ final class LiveNotesController: ObservableObject {
     }
 
     func shutdown() {
-        for context in sessions.values { context.recorder.onChange = nil; context.recorder.onServerSpeakers = nil; context.recorder.cancel() }
+        for context in sessions.values {
+            context.voiceEdit.cancel()
+            context.recorder.onChange = nil; context.recorder.onServerSpeakers = nil; context.recorder.cancel()
+        }
         deps.audio.stop()
         speakerPoll?.cancel(); speakerPoll = nil
         speakerRequest?.cancel(); speakerRequest = nil
@@ -278,6 +310,8 @@ final class LiveNotesController: ObservableObject {
         let generation = openGeneration
         await ready()
         guard generation == openGeneration, id != recorder.document.id else { return }
+        // A listening command belongs to the note it started in; switching drops it (its microphone closes).
+        if selected.voiceEdit.status.isListening { selected.voiceEdit.cancel() }
         journal?.flush()
         if let existing = sessions[id] { selected = existing }
         else if let library {
@@ -358,6 +392,7 @@ final class LiveNotesController: ObservableObject {
         var deleted: [UUID] = []
         for id in ids where id != recordingID {
             cancelRetranscribe(note: id)
+            sessions[id]?.voiceEdit.cancel()
             do {
                 // Flush and retire this editor before moving its durable record to Recently Deleted.
                 sessions[id]?.journal?.flush()
@@ -425,6 +460,7 @@ final class LiveNotesController: ObservableObject {
     func record() async {
         await ready()
         guard !starting, !recorder.state.isActive else { return }
+        guard !selected.voiceEdit.status.isListening else { notice = "Finish the spoken edit first."; return }
         guard recordingID == nil else { notice = "Stop current and continue here."; return }
         guard let config = deps.server() else { notice = "Pair your computer first."; return }
         guard !deps.otherCaptureActive() else { notice = "End the keyboard session to record notes."; return }
@@ -503,6 +539,23 @@ final class LiveNotesController: ObservableObject {
         } catch { return false }
     }
 
+    /// A command's own microphone while its note is not recording: the frames go straight to the command's socket. As
+    /// with recording, a keyboard session and a command never hold the microphone together.
+    private func openCommandMicrophone(_ session: StreamSession) -> Bool {
+        guard !deps.audio.isRunning else { return false }
+        do {
+            try deps.audio.start(frame: { session.sendAudio($0) },
+                                 event: { [weak self] event in Task { @MainActor in self?.commandAudioEvent(event) } })
+            return true
+        } catch { return false }
+    }
+
+    /// The command's microphone went away (a call, another app): the command is dropped, as a recording would pause.
+    private func commandAudioEvent(_ event: NotesAudioEvent) {
+        guard selected.voiceEdit.status.isListening, event != .resumable else { return }
+        selected.voiceEdit.cancel()
+    }
+
     private func audioEvent(_ event: NotesAudioEvent) async {
         switch event {
         case .interrupted:
@@ -521,6 +574,7 @@ final class LiveNotesController: ObservableObject {
     /// A blank note is never retained unless the user types, renames it, or starts recording.
     func newNotes() {
         openGeneration += 1
+        if selected.voiceEdit.status.isListening { selected.voiceEdit.cancel() }
         journal?.flush()
         selected = makeSession()
         notice = ""
@@ -541,6 +595,7 @@ final class LiveNotesController: ObservableObject {
         if let change = NotesEditRebase.change(shown: document.text, edited: text, current: recorder.document.text) {
             recorder.userEdit(change.range, change.replacement)
         }
+        selected.voiceEdit.dismiss()
         publish()
     }
 
@@ -548,6 +603,87 @@ final class LiveNotesController: ObservableObject {
     func setEditing(_ editing: Bool) { recorder.setEditorFocus(inTail: editing, composing: false) }
 
     func organize() { recorder.reorganizeNow() }
+
+    // MARK: Edit by voice
+
+    /// The paired server runs spoken edit instructions (health), so the note offers Edit by voice (A2-4).
+    var voiceEditAvailable: Bool { recorder.canEdit }
+    /// The button can start a command now (one is not already running).
+    var canStartVoiceEdit: Bool { selected.voiceEdit.canStart }
+    /// A command is listening for its instruction (the button sends it).
+    var voiceEditListening: Bool { selected.voiceEdit.status.isListening }
+
+    /// What the line under the button shows while a command listens or runs; nil otherwise.
+    var voiceEditStatusText: String? {
+        switch voiceEdit {
+        case .listening(let heard): heard.isEmpty ? NotesVoiceEditText.listening : "“\(heard)”"
+        case .editing: NotesVoiceEditText.running
+        default: nil
+        }
+    }
+
+    /// "Edited · Undo" after a voice edit applied, until the next edit, Undo or 20 s.
+    var showsEditedChip: Bool {
+        if case .done(.applied, _) = voiceEdit { return recorder.canUndoEdit }
+        return false
+    }
+
+    /// The note under the chip for an edit that did not apply; nil for one that did.
+    var voiceEditNote: String? {
+        if case .done(let outcome, _) = voiceEdit { return NotesVoiceEditText.note(outcome) }
+        return nil
+    }
+
+    /// ⇧⌘E and the button's accessibility action: start a command, or end the one listening.
+    func toggleVoiceEdit() {
+        if voiceEditListening { finishVoiceEdit() } else { Task { await startVoiceEdit() } }
+    }
+
+    /// Hold-to-edit begins: paired, the server edits, no keyboard session and the microphone is permitted — then the
+    /// command's own socket listens (a recording diverts its capture; otherwise the microphone opens just for it).
+    /// Pairing comes first: an unpaired phone has no server health, so ⇧⌘E would otherwise do nothing silently.
+    func startVoiceEdit() async {
+        await ready()
+        guard let config = deps.server() else { notice = "Pair your computer first."; return }
+        guard selected.voiceEdit.canStart else { return }
+        guard !deps.otherCaptureActive() else { notice = "End the keyboard session to edit by voice."; return }
+        guard await deps.requestPermission() else { notice = SessionFailure.permission.localizedDescription; return }
+        serverBox.config = config
+        selected.voiceEdit.start()
+    }
+
+    /// The held button or a second tap ends listening: the instruction's final arrives and the edit runs.
+    func finishVoiceEdit() { Task { await selected.voiceEdit.finish() } }
+    /// Esc or Cancel: the command is dropped and its words go nowhere.
+    func cancelVoiceEdit() { selected.voiceEdit.cancel() }
+    /// The chip (after Undo) or its timeout.
+    func dismissVoiceEdit() { selected.voiceEdit.dismiss() }
+
+    /// The chip's Undo: the last voice edit goes back while nothing else changed the notes since.
+    func undoVoiceEdit() {
+        recorder.undoEdit()
+        selected.voiceEdit.dismiss()
+    }
+
+    /// A press shorter than this latches the command (tap to start, tap again to send); a longer hold ends it on release.
+    static let commandHold: TimeInterval = 0.45
+    /// The press that started (or latched) the current command, until its release.
+    private(set) var commandDown = false
+
+    /// The Command button went down: start a command, or send a latched one.
+    func commandPress() {
+        if voiceEditListening { finishVoiceEdit(); commandDown = false; return }
+        notice = ""
+        commandDown = true
+        Task { await startVoiceEdit() }
+    }
+
+    /// The button came up after `held`: a hold sends the command, a tap leaves it listening until the next press.
+    func commandRelease(held: TimeInterval) {
+        let ours = commandDown
+        commandDown = false
+        if ours, held >= Self.commandHold { finishVoiceEdit() }
+    }
 
     var canUndoOrganize: Bool { snaps.latest != nil && recorder.state != .stopping }
 
@@ -962,6 +1098,7 @@ final class LiveNotesController: ObservableObject {
         pauseReason = recorder.pauseReason
         debugRetention = recorder.debugRetention || health?.debugRetention == true
         snapshots = snaps
+        voiceEdit = selected.voiceEdit.status
     }
 
     private func setTicking(_ on: Bool) {

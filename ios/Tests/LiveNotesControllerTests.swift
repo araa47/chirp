@@ -20,6 +20,8 @@ struct LiveNotesControllerTests {
         var transports: [SyntheticTransport] = []
         let speakerCalls = SpeakerCalls()
         var speakerRequests: [SpeakersModelAction] { speakerCalls.actions }
+        /// Every spoken-edit instruction the server was asked to apply, oldest first.
+        let editCalls = EditCalls()
         var starts: [String] {
             transports.flatMap { $0.sent }.compactMap { if case .string(let text) = $0, text.contains(#""type":"start""#) { text } else { nil } }
         }
@@ -33,6 +35,13 @@ struct LiveNotesControllerTests {
         /// Makes the Mac unreachable for the next requests (they are still recorded).
         var fail: Bool { get { lock.withLock { failing } } set { lock.withLock { failing = newValue } } }
         func add(_ action: SpeakersModelAction) { lock.withLock { list.append(action) } }
+    }
+    /// The spoken-edit requests the controller made (same locking reason as `SpeakerCalls`).
+    final class EditCalls: @unchecked Sendable {
+        private let lock = NSLock()
+        private var list: [NotesEditRequest] = []
+        var requests: [NotesEditRequest] { lock.withLock { list } }
+        func add(_ request: NotesEditRequest) { lock.withLock { list.append(request) } }
     }
     @MainActor struct Fixture {
         let notes: LiveNotesController
@@ -50,6 +59,7 @@ struct LiveNotesControllerTests {
     func fixture(root: URL? = nil, paired: Bool = true, voiceLibrary: TestVoiceLibrary? = nil, voiceMatches: [ServerVoiceMatch] = [], secrets: MemorySecretStore = MemorySecretStore(), health: Health = LiveNotesController.syntheticHealth,
                  reorganize: @escaping @Sendable (NotesReorganizeRequest) async throws -> NotesReorganizeResponse = { LiveNotesController.syntheticReorganize($0) },
                  structure: @escaping @Sendable (NotesStructureRequest) async throws -> NotesStructureResponse = { LiveNotesController.syntheticStructure($0) },
+                 edit: @escaping @Sendable (NotesEditRequest) async throws -> NotesEditResponse = { LiveNotesController.syntheticEdit($0) },
                  retranscribe: (() -> SyntheticTransport)? = nil) throws -> Fixture {
         let root = root ?? FileManager.default.temporaryDirectory.appendingPathComponent("chirp-notes-unit-" + UUID().uuidString)
         let store = try NotesStore(root: root, secrets: secrets)
@@ -67,6 +77,10 @@ struct LiveNotesControllerTests {
             },
             structure: { _, _, request, _ in try await structure(request) },
             reorganize: { _, _, request, _ in try await reorganize(request) },
+            editNotes: { [calls = values.editCalls] _, _, request, _ in
+                calls.add(request)
+                return try await edit(request)
+            },
             speakersModel: { [calls = values.speakerCalls] _, _, action in
                 calls.add(action)
                 if calls.fail { throw URLError(.cannotConnectToHost) }
@@ -428,9 +442,9 @@ struct LiveNotesControllerTests {
 
     @Test func notesShortcutTableMatchesCurrentBindings() {
         #expect(ShortcutsPage.notesShortcuts.map(\.title) == [
-            "New note", "Record / Stop note", "Pause / Resume note", "Search notes", "Show or hide transcript",
+            "New note", "Record / Stop note", "Pause / Resume note", "Edit by voice", "Search notes", "Show or hide transcript",
         ])
-        #expect(ShortcutsPage.notesShortcuts.map(\.keys) == ["⌘N", "⇧⌘R", "⇧⌘P", "⌘F", "⌥⌘T"])
+        #expect(ShortcutsPage.notesShortcuts.map(\.keys) == ["⌘N", "⇧⌘R", "⇧⌘P", "⇧⌘E", "⌘F", "⌥⌘T"])
     }
 
     @Test func notesIntentActionsActOnlyOnALiveSession() async throws {
@@ -601,5 +615,171 @@ struct LiveNotesControllerTests {
         // A turn that is not there changes nothing.
         f.notes.reassignTurn(segment: index, turn: 9, to: 1)
         #expect(f.notes.document.segments[index].turns == turns)
+    }
+}
+
+/// Edit by voice (A2-4): the Command button's flow, on ChirpCore's `NotesVoiceEdit`.
+extension LiveNotesControllerTests {
+    /// Hold to edit: the command opens its own socket and the microphone (never the recorder's), what it heard shows,
+    /// sending applies the instruction as one edit, and the chip's Undo puts the notes back.
+    @Test func editByVoiceAppliesTheInstructionAndUndoPutsItBack() async throws {
+        let f = try fixture(); defer { f.clean() }
+        await f.notes.refreshHealth()
+        f.notes.edit("One\n\n- [ ] Buy figs")
+        await f.notes.settleJournal()
+        #expect(f.notes.voiceEditAvailable)
+
+        await f.notes.startVoiceEdit()
+        try await eventually("listening") { f.notes.voiceEditListening }
+        // The microphone opens once the command's own socket is open, a moment after "listening" shows.
+        try await eventually("the command opens the microphone itself") { f.audio.isRunning && f.audio.starts == 1 }
+        try await eventually("heard") { f.notes.voiceEditStatusText == "“synthetic words”" }
+
+        f.notes.finishVoiceEdit()
+        try await eventually("applied") { f.notes.showsEditedChip }
+        #expect(!f.audio.isRunning)
+        #expect(f.values.editCalls.requests.map(\.instruction) == ["Synthetic words."])
+        #expect(f.notes.document.text.contains("Edited by voice: “Synthetic words.”"))
+
+        f.notes.undoVoiceEdit()
+        #expect(!f.notes.showsEditedChip)
+        #expect(f.notes.document.text == "One\n\n- [ ] Buy figs", "Undo restores the notes before the edit")
+        // Typing after the edit would have made Undo unavailable too (the version moved on).
+        f.notes.edit("One\n\n- [ ] Buy figs\n\nTyped")
+        #expect(!f.notes.showsEditedChip)
+    }
+
+    /// A quick tap latches the command (tap again to send); a hold sends it on release (as on Android).
+    @Test func editByVoiceHoldsAndLatches() async throws {
+        let f = try fixture(); defer { f.clean() }
+        await f.notes.refreshHealth()
+        f.notes.edit("Shopping list")
+        await f.notes.settleJournal()
+
+        f.notes.commandPress()
+        try await eventually("listening") { f.notes.voiceEditListening }
+        f.notes.commandRelease(held: 0.1)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(f.notes.voiceEditListening, "a tap leaves the command latched")
+
+        f.notes.commandPress()
+        #expect(!f.notes.commandDown, "the second press sends a latched command")
+        try await eventually("applied") { f.notes.showsEditedChip }
+
+        f.notes.undoVoiceEdit()
+        f.notes.commandPress()
+        try await eventually("listening again") { f.notes.voiceEditListening }
+        f.notes.commandRelease(held: 0.6)
+        try await eventually("applied again") { f.notes.showsEditedChip }
+        #expect(f.values.editCalls.requests.count == 2)
+    }
+
+    /// While the note records, the command borrows the capture on its own socket — the microphone stays the
+    /// recording's, and the recording continues on a fresh socket once the command ends.
+    @Test func editByVoiceDivertsARecordingInsteadOfEnteringIt() async throws {
+        let f = try fixture(); defer { f.clean() }
+        await f.notes.refreshHealth()
+        // Something to edit, as in the Mac's routing test: the notes start empty, and the first segment's final only
+        // arrives when the command cuts it.
+        f.notes.edit("Plan\n\n- keep the vendor")
+        await f.notes.record()
+        try await eventually("recording") { f.notes.state == .recording }
+        let sockets = f.values.transports.count
+
+        await f.notes.startVoiceEdit()
+        try await eventually("listening") { f.notes.voiceEditListening }
+        #expect(f.values.transports.count == sockets + 1, "the command has its own socket")
+        // "Listening" shows at once; the recorder hands its capture over once the command's socket is open. Sending
+        // before that would leave the recording on its own socket (a real hold is far longer than this hop).
+        let command = f.values.transports[sockets]
+        try await eventually("the recording's capture reaches the command's socket") {
+            command.sent.contains { if case .data = $0 { true } else { false } }
+        }
+        #expect(f.audio.starts == 1, "no second microphone: the recorder's capture is diverted")
+
+        f.notes.finishVoiceEdit()
+        try await eventually("applied") { f.notes.showsEditedChip }
+        #expect(f.notes.state == .recording, "the note records on through the command")
+        #expect(f.notes.document.text.contains("- keep the vendor") && f.notes.document.text.contains("Edited by voice: “Synthetic words.”"))
+        try await eventually("a fresh notes socket") { f.values.transports.count == sockets + 2 }
+
+        await f.notes.stop()
+        try await eventually("stopped") { f.notes.state == .stopped }
+        #expect(f.notes.document.segments.count == 2, "the command's words made no segment")
+        #expect(f.values.editCalls.requests.map(\.instruction) == ["Synthetic words."])
+    }
+
+    /// What the note shows when the edit does not apply (the server refused to add content, the call failed), and
+    /// Cancel drops a listening command without editing anything.
+    @Test func editByVoiceOutcomesAndCancel() async throws {
+        let f = try fixture(edit: { _ in NotesEditResponse(markdown: nil, edited: false, changed: false, error: "refused", reason: "adds_content") }); defer { f.clean() }
+        await f.notes.refreshHealth()
+        f.notes.edit("One")
+        await f.notes.settleJournal()
+
+        await f.notes.startVoiceEdit()
+        try await eventually("listening") { f.notes.voiceEditListening }
+        f.notes.finishVoiceEdit()
+        try await eventually("refused") { f.notes.voiceEditNote == "Can’t add new content by voice — ask to remove, move, tidy or reword" }
+        #expect(f.notes.document.text == "One" && !f.notes.showsEditedChip)
+        f.notes.dismissVoiceEdit()
+        #expect(f.notes.voiceEditNote == nil)
+
+        // The call fails: the notes stay and the note says so.
+        let e = try fixture(edit: { _ in throw URLError(.timedOut) }); defer { e.clean() }
+        await e.notes.refreshHealth()
+        e.notes.edit("One")
+        await e.notes.settleJournal()
+        await e.notes.startVoiceEdit()
+        try await eventually("listening") { e.notes.voiceEditListening }
+        e.notes.finishVoiceEdit()
+        try await eventually("failed") { e.notes.voiceEditNote?.hasPrefix("Couldn’t edit notes") == true }
+        #expect(e.notes.document.text == "One" && !e.notes.showsEditedChip && !e.audio.isRunning)
+
+        // Cancel: the command is dropped, its words go nowhere and nothing is sent.
+        let g = try fixture(); defer { g.clean() }
+        await g.notes.refreshHealth()
+        g.notes.edit("Two")
+        await g.notes.settleJournal()
+        await g.notes.startVoiceEdit()
+        try await eventually("listening") { g.notes.voiceEditListening }
+        try await eventually("the microphone opened") { g.audio.isRunning }
+        g.notes.cancelVoiceEdit()
+        try await eventually("dropped") { !g.notes.voiceEditListening && !g.audio.isRunning }
+        #expect(g.notes.voiceEditNote == nil, "a cancelled command leaves no note")
+        #expect(g.values.editCalls.requests.isEmpty && g.notes.document.text == "Two")
+    }
+
+    /// The command needs the pairing, the server's endpoint and the microphone to itself: a keyboard session or an
+    /// unpaired computer leaves a notice instead, and Record waits for a listening command.
+    @Test func editByVoiceNeedsPairingAndTheMicrophone() async throws {
+        let f = try fixture(); defer { f.clean() }
+        f.values.otherCapture = true
+        await f.notes.refreshHealth()
+        f.notes.edit("One")
+        await f.notes.settleJournal()
+        await f.notes.startVoiceEdit()
+        #expect(!f.notes.voiceEditListening && f.notes.notice.contains("keyboard session"))
+        f.values.otherCapture = false
+
+        await f.notes.startVoiceEdit()
+        try await eventually("listening") { f.notes.voiceEditListening }
+        await f.notes.record()
+        #expect(f.notes.notice == "Finish the spoken edit first." && f.notes.state == .idle)
+        f.notes.cancelVoiceEdit()
+
+        let g = try fixture(paired: false); defer { g.clean() }
+        g.notes.edit("One")
+        await g.notes.settleJournal()
+        await g.notes.startVoiceEdit()
+        #expect(g.notes.notice == "Pair your computer first.")
+
+        // An older server without the endpoint does not offer the button at all.
+        var older = LiveNotesController.syntheticHealth; older.notesEdit = nil
+        let h = try fixture(health: older); defer { h.clean() }
+        await h.notes.refreshHealth()
+        h.notes.edit("One")
+        await h.notes.settleJournal()
+        #expect(!h.notes.voiceEditAvailable)
     }
 }

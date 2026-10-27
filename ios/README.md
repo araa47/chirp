@@ -377,6 +377,18 @@ shows a list and detail, with a trailing transcript inspector.
   restores the previous version, asking before replacing intervening edits.
   Automatic organizing is a separate Notes setting. AI responses stay attached
   to the note that requested them, even while another note is open.
+- **Edit by voice** (when the computer has `POST /v1/notes/edit`; otherwise the
+  button is hidden). In the note's dock, **Hold to edit**: hold it, say what to
+  change ("remove the bit about pricing", "change Friday to Thursday"), let go.
+  A quick tap latches it instead (**Tap to send**, with **Cancel**), and
+  VoiceOver's double tap does the same; ⇧⌘E toggles it with a keyboard. What you
+  say goes to its own socket as raw speech and never into the transcript: while
+  the note records, capture moves to the command once its socket is open and
+  back to a fresh notes socket after it; otherwise the command opens the
+  microphone just for itself. It ends by itself after 20 seconds. The edit
+  applies only if the notes did not change meanwhile, as one change with
+  **Edited · Undo** for 20 seconds; refusals and failures say why, as on the Mac
+  and Android. The words and the notes are never logged.
 - **Transcript** opens a sheet on iPhone or an inspector on iPad. It shows
   timestamps, **Show raw**, capture boundaries, and per-segment replay when
   audio was kept.
@@ -466,7 +478,7 @@ Notes library screenshots (synthetic text only):
 ![iPad transcript inspector, light](../docs/screenshots/ios/ipad-notes-transcript-audio-light.png)
 
 Hardware keyboard: ⌘N new note (typed, no recording), ⌘F search, ⌥⌘T
-transcript, ⌘⇧R record/stop, ⌘⇧P pause/resume. Shortcuts retain Start, Pause/resume and Stop
+transcript, ⌘⇧R record/stop, ⌘⇧P pause/resume, ⌘⇧E edit by voice. Shortcuts retain Start, Pause/resume and Stop
 Chirp Live Notes.
 
 ## Dictate from any app (keyboard)
