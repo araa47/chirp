@@ -48,7 +48,7 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
 
     var inputFormat: AVAudioFormat? {
         applyPickedDevice()
-        inputName = pinned.flatMap(InputDevice.name) ?? InputDevice.systemDefault()?.input.name
+        refreshInputName()
         let format = engine.inputNode.inputFormat(forBus: 0)
         return format.sampleRate > 0 && format.channelCount > 0 ? format : nil
     }
@@ -66,7 +66,7 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
     /// Pins the input unit to the picked device. Going back to the default needs a fresh engine, because a unit
     /// bound to a device no longer follows the system default.
     private func applyPickedDevice() {
-        let wanted = fallbackStep == 2 ? InputDevice.builtIn()?.id : fallbackStep == 1 ? nil : pickedDevice()
+        let wanted = wantedDevice()
         guard wanted != pinned else { return }
         if let wanted {
             do { try engine.inputNode.auAudioUnit.setDeviceID(wanted) } catch {
@@ -80,13 +80,27 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
         pinned = wanted
     }
 
+    /// The device the input unit should be pinned to now: the picked one while it is connected, else the fallback
+    /// step's (nil follows the system default).
+    private func wantedDevice() -> AudioObjectID? {
+        fallbackStep == 2 ? InputDevice.builtIn()?.id : fallbackStep == 1 ? nil : pickedDevice()
+    }
+
+    private func refreshInputName() {
+        inputName = pinned.flatMap(InputDevice.name) ?? InputDevice.systemDefault()?.input.name
+    }
+
     func resumeAfterConfigurationChange() -> Bool {
-        if engine.isRunning { return true }
-        guard let tapFormat else { return false }
-        let hardware = engine.inputNode.inputFormat(forBus: 0)
-        guard hardware.sampleRate == tapFormat.sampleRate,
-              hardware.channelCount == tapFormat.channelCount else { return false }
-        do { try engine.start(); return true } catch { return false }
+        if !engine.isRunning {
+            let hardware = engine.inputNode.inputFormat(forBus: 0)
+            guard AudioCapture.canResume(on: pinned, wanted: wantedDevice(), tap: tapFormat, input: hardware) else {
+                return false
+            }
+            do { try engine.start() } catch { return false }
+        }
+        // The unpinned unit follows the system default, which may be another input now.
+        refreshInputName()
+        return true
     }
 
     func installTap(_ block: @escaping @Sendable (AVAudioPCMBuffer) -> Void) {
