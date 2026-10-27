@@ -156,6 +156,54 @@ private func samples(_ seconds: TimeInterval) -> Int { Int((seconds * PCMConvert
         #expect(sent.data == (try heard([0.1])))
         mic.close()
     }
+
+    /// Delivers `seconds` of input as the hardware does: in `chunk`-long buffers, each one as it fills.
+    private func live(_ engine: FakeEngine, _ clock: TestClock, seconds: Double, chunk: Double = 0.04) {
+        for _ in 0..<Int((seconds / chunk).rounded()) {
+            clock.advance(chunk)
+            engine.deliver(seconds: chunk)
+        }
+    }
+
+    @Test func aRouteChangeDuringThePreRollZeroesTheCueNotTheSpeechAfterIt() throws {
+        // Right ⌥ on a Bluetooth headset: the press opens the microphone, the headset switches to its call profile and
+        // the input stops for half a second, then resumes on the same format; the dictation starts and the cue plays.
+        let (mic, engine, clock) = make()
+        let sent = SentAudio()
+        try mic.open()
+        live(engine, clock, seconds: 0.2)
+        engine.resumeSucceeds = true
+        clock.advance(0.5)
+        engine.changeConfiguration()
+        mic.attach { sent.add($0, $1) }
+        mic.excludeCue(at: clock.now(), length: SoundTiming.muteWindow(cueDuration: Self.chirpCue))
+        live(engine, clock, seconds: 0.6)
+        mic.close()
+
+        let pcm = sent.samples
+        let resumed = samples(0.2)
+        #expect(pcm[..<resumed].contains { $0 != 0 })   // the pre-roll is kept
+        // What the microphone heard while the cue played is zeroed (at most one buffer early, inside the margin)…
+        #expect(pcm[resumed..<(resumed + samples(Self.chirpCue))].allSatisfy { $0 == 0 })
+        // …and the speech after the window is not.
+        let window = samples(SoundTiming.muteWindow(cueDuration: Self.chirpCue))
+        let after = pcm[(resumed + window)...]
+        #expect(after.filter { $0 == 0 }.count < after.count / 100)   // only the tone's zero crossings
+        #expect(pcm.count >= samples(0.8))   // zeroed, never dropped
+    }
+
+    @Test func anInputThatStartsLateZeroesNoneOfTheSpeechItHears() throws {
+        // A Bluetooth microphone takes half a second to deliver its first buffer: the cue is over before the
+        // microphone hears anything, so nothing it hears is zeroed.
+        let (mic, engine, clock) = make()
+        let sent = SentAudio()
+        try start(mic, clock: clock, cue: Self.chirpCue, into: sent)
+        clock.advance(0.5)
+        live(engine, clock, seconds: 0.4)
+        mic.close()
+        #expect(!sent.muted.contains(true))
+        #expect(sent.samples[..<samples(0.4)].filter { $0 == 0 }.count < 40)   // only the tone's zero crossings
+    }
 }
 
 /// A socket that is still connecting: every send waits until `connect()`. Records audio and text frames.
