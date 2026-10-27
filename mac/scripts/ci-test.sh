@@ -12,7 +12,7 @@ ISOLATED="NotesBudgetTests NotesLongRecorderTests NotesLayoutTests NotesLongSess
 SKIPPED="GeneratedSoundTests SnapshotTests"
 re() { echo "$*" | tr ' ' '\n' | paste -sd'|' -; }
 # Keep the build quiet, but show compiler errors when it fails.
-swift build --build-tests >/tmp/chirp-build 2>&1 || { tail -100 /tmp/chirp-build; exit 1; }
+swift build --build-tests >/tmp/chirp-build 2>&1 || { grep -A12 'error:' /tmp/chirp-build || tail -100 /tmp/chirp-build; exit 1; }
 swift test list 2>/tmp/chirp-list > /tmp/chirp-tests || { cat /tmp/chirp-list; exit 1; }
 ./scripts/test.sh --skip-build --skip "$(re $ISOLATED $SKIPPED)"
 fail=0
