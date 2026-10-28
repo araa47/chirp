@@ -32,7 +32,7 @@ import okhttp3.OkHttpClient
 internal class NotesModel(
     context: Context,
     private val store: SettingsStore = SettingsStore(context.applicationContext),
-    private val captureFactory: ((ByteArray, Float) -> Unit, (Double) -> Unit, (String?) -> Unit) -> Capture = { frame, level, done -> NotesCapture(frame, level, done, notesInputForBuild(context.applicationContext)) },
+    private val captureFactory: ((ByteArray, Float) -> Unit, (Double) -> Unit, (DictationStatus?) -> Unit) -> Capture = { frame, level, done -> NotesCapture(frame, level, done, notesInputForBuild(context.applicationContext)) },
     private val transportFactory: (OkHttpClient, Pairing, (ServerEvent) -> Unit, () -> Unit) -> ImeTransport = { client, pairing, event, failure ->
         val main = Handler(Looper.getMainLooper())
         StreamTransport(client, pairing, dispatch = { callback -> main.post { callback() } }, event = event, failure = failure,

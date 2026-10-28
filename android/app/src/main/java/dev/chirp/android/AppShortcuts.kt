@@ -4,6 +4,7 @@ import android.content.ContextWrapper
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -11,19 +12,19 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 
 /** One table drives dispatch and Android's Meta+/ helper. Only mounted contexts publish actions. */
-internal enum class AppCommand(val label: String, val key: Int, val modifiers: Int) {
-    NewNote("New note", KeyEvent.KEYCODE_N, KeyEvent.META_CTRL_ON),
-    Search("Search notes / history", KeyEvent.KEYCODE_F, KeyEvent.META_CTRL_ON),
-    Record("Record / Stop note", KeyEvent.KEYCODE_R, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON),
-    Pause("Pause / Resume note", KeyEvent.KEYCODE_P, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON),
-    Edit("Edit / Done", KeyEvent.KEYCODE_E, KeyEvent.META_CTRL_ON),
-    Dictate("Start / Stop dictation", KeyEvent.KEYCODE_ENTER, KeyEvent.META_CTRL_ON),
-    Escape("Cancel / Close", KeyEvent.KEYCODE_ESCAPE, 0),
-    Copy("Copy result", KeyEvent.KEYCODE_C, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON),
-    Raw("Use raw", KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON),
-    Notes("Notes tab", KeyEvent.KEYCODE_1, KeyEvent.META_CTRL_ON),
-    History("History tab", KeyEvent.KEYCODE_2, KeyEvent.META_CTRL_ON),
-    Settings("Settings tab", KeyEvent.KEYCODE_3, KeyEvent.META_CTRL_ON),
+internal enum class AppCommand(@StringRes val label: Int, val key: Int, val modifiers: Int) {
+    NewNote(R.string.shortcut_new_note, KeyEvent.KEYCODE_N, KeyEvent.META_CTRL_ON),
+    Search(R.string.shortcut_search, KeyEvent.KEYCODE_F, KeyEvent.META_CTRL_ON),
+    Record(R.string.shortcut_record, KeyEvent.KEYCODE_R, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON),
+    Pause(R.string.shortcut_pause, KeyEvent.KEYCODE_P, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON),
+    Edit(R.string.shortcut_edit, KeyEvent.KEYCODE_E, KeyEvent.META_CTRL_ON),
+    Dictate(R.string.shortcut_dictate, KeyEvent.KEYCODE_ENTER, KeyEvent.META_CTRL_ON),
+    Escape(R.string.shortcut_escape, KeyEvent.KEYCODE_ESCAPE, 0),
+    Copy(R.string.shortcut_copy, KeyEvent.KEYCODE_C, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON),
+    Raw(R.string.shortcut_raw, KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON),
+    Notes(R.string.shortcut_notes, KeyEvent.KEYCODE_1, KeyEvent.META_CTRL_ON),
+    History(R.string.shortcut_history, KeyEvent.KEYCODE_2, KeyEvent.META_CTRL_ON),
+    Settings(R.string.shortcut_settings, KeyEvent.KEYCODE_3, KeyEvent.META_CTRL_ON),
 }
 
 internal interface AppShortcutHost { val appShortcuts: AppShortcuts }
@@ -45,9 +46,9 @@ class AppShortcuts {
         }
         return false
     }
-    fun provide(groups: MutableList<KeyboardShortcutGroup>) {
+    fun provide(groups: MutableList<KeyboardShortcutGroup>, resources: android.content.res.Resources) {
         val available = contexts.values.flatMap { it().keys }.toSet()
-        val items = AppCommand.entries.filter { it in available }.map { KeyboardShortcutInfo(it.label, it.key, it.modifiers) }
+        val items = AppCommand.entries.filter { it in available }.map { KeyboardShortcutInfo(resources.getString(it.label), it.key, it.modifiers) }
         if (items.isNotEmpty()) groups.add(KeyboardShortcutGroup("Chirp", items))
     }
 }

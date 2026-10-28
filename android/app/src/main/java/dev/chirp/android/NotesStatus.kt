@@ -81,18 +81,26 @@ internal sealed interface RecordingFailure {
         val shown get() = if (kind == null || kind == ConnectionFailure.Kind.OTHER) (if (timedOut) ConnectionFailure.Kind.DOWN else ConnectionFailure.Kind.OTHER) else kind
         /** Probably Tailscale being off: Notes says that instead when the Mac is on the tailnet. */
         val maybeTailscale get() = shown == ConnectionFailure.Kind.OTHER
-        override val english get() = ConnectionFailure.status(kind, timedOut)
-        // The words are ConnectionFailure's own, until its status is typed.
-        override val ui get() = UiText.Raw(english)
+        override val english get() = when (shown) {
+            ConnectionFailure.Kind.DNS -> "Can't find your computer on the tailnet — is it online?"
+            ConnectionFailure.Kind.DOWN -> "Computer may be asleep, or Chirp isn't running"
+            ConnectionFailure.Kind.TLS -> "Couldn't make a secure connection to your computer"
+            ConnectionFailure.Kind.OTHER -> "Computer unreachable — is Tailscale on?"
+        }
+        override val ui: UiText get() = shown
         // TLS has no Tailscale fix; the status text alone explains it.
         override val action get() = DictationAction.NETWORK.takeIf { shown != ConnectionFailure.Kind.TLS }
     }
 
-    /** The microphone ended the recording; [text] is the capture's own, or null when it gave none. */
-    data class Capture(val text: String?) : RecordingFailure {
-        override val english get() = text ?: "The microphone stopped"
-        override val ui get() = if (text == null) UiText.Res(R.string.notes_status_fail_microphone) else UiText.Raw(text)
-        override val action get() = DictationAction.MICROPHONE.takeIf { text != null }
+    /** The microphone ended the recording; [status] is the capture's own reason, or null when it gave none. */
+    data class Capture(val status: DictationStatus?) : RecordingFailure {
+        override val english get() = when (status) {
+            null -> "The microphone stopped"
+            StatusLine.MICROPHONE_BLOCKED -> "Microphone unavailable — check permission in Chirp settings"
+            else -> "Microphone unavailable"
+        }
+        override val ui: UiText get() = status ?: UiText.Res(R.string.notes_status_fail_microphone)
+        override val action get() = DictationAction.MICROPHONE.takeIf { status != null }
     }
 
     /** Segments kept failing, so the recording ended: "Notes stopped: …". */

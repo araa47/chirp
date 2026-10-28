@@ -25,7 +25,9 @@ class NotesStatusTest {
             RecordingFailure.ConnectionClosed to "connection closed",
             RecordingFailure.ConnectionLost to "connection lost",
             RecordingFailure.Capture(null) to "The microphone stopped",
-            RecordingFailure.Capture("Microphone unavailable") to "Microphone unavailable",
+            RecordingFailure.Capture(StatusLine.MICROPHONE_UNAVAILABLE) to "Microphone unavailable",
+            RecordingFailure.Capture(StatusLine.MICROPHONE_BLOCKED) to "Microphone unavailable — check permission in Chirp settings",
+            *ConnectionFailure.Kind.entries.map { RecordingFailure.Connection(it) to it.english() }.toTypedArray(),
             RecordingFailure.Stopped(RecordingFailure.Server.BUSY) to "Notes stopped: Chirp server is busy",
         )) {
             assertEquals(english, failure.ui.notesEnglish())
@@ -33,7 +35,7 @@ class NotesStatusTest {
         }
         assertEquals(DictationAction.PAIR, RecordingFailure.Server.AUTH.action)
         assertNull(RecordingFailure.Server.BUSY.action)
-        assertEquals(DictationAction.MICROPHONE, RecordingFailure.Capture("Microphone unavailable").action)
+        assertEquals(DictationAction.MICROPHONE, RecordingFailure.Capture(StatusLine.MICROPHONE_UNAVAILABLE).action)
         assertNull(RecordingFailure.Capture(null).action)
         assertNull("a stopped recording offers no fix", RecordingFailure.Stopped(RecordingFailure.Server.AUTH).action)
     }
@@ -44,7 +46,7 @@ class NotesStatusTest {
         assertEquals(DictationAction.NETWORK, other.action)
         assertEquals(ConnectionFailure.Kind.DOWN, RecordingFailure.Connection(null, timedOut = true).shown)
         assertEquals(false, RecordingFailure.Connection(null, timedOut = true).maybeTailscale)
-        assertEquals(ConnectionFailure.Kind.DNS.status, RecordingFailure.Connection(ConnectionFailure.Kind.DNS).ui.notesEnglish())
+        assertEquals(ConnectionFailure.Kind.DNS.english(), RecordingFailure.Connection(ConnectionFailure.Kind.DNS).ui.notesEnglish())
         assertEquals(DictationAction.NETWORK, RecordingFailure.Connection(ConnectionFailure.Kind.DNS).action)
         assertNull("TLS has no Tailscale fix", RecordingFailure.Connection(ConnectionFailure.Kind.TLS).action)
     }

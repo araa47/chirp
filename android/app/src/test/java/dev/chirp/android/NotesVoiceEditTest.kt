@@ -305,7 +305,7 @@ class NotesVoiceEditRecorderTest {
         val v = VoiceRig(); val rig = v.rig
         v.recorder.userEdit(0, 0, NOTES)
         v.voice.start()
-        rig.captures.single().done("Microphone unavailable"); rig.idle()
+        rig.captures.single().done(statusOf("Microphone unavailable")); rig.idle()
         assertEquals(VoiceEditStatus.Done(NotesEditOutcome.Failed("microphone")), v.voice.status)
         assertTrue(rig.wires.single().closed)
     }

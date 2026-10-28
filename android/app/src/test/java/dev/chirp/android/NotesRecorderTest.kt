@@ -38,7 +38,7 @@ internal class NotesWire(val event: (ServerEvent) -> Unit, val failure: () -> Un
     fun error(code: String) = event(ServerEvent.Failure(code))
 }
 
-internal class FakeNotesCapture(val frame: (ByteArray, Float) -> Unit, val done: (String?) -> Unit) : Capture {
+internal class FakeNotesCapture(val frame: (ByteArray, Float) -> Unit, val done: (DictationStatus?) -> Unit) : Capture {
     var started = false
     var stopped = false
     override fun start() { started = true }

@@ -56,7 +56,7 @@ internal sealed interface Reorganizing {
  */
 internal class NotesRecorder(
     private val transportFactory: ((ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
-    private val captureFactory: (frame: (ByteArray, Float) -> Unit, level: (Double) -> Unit, done: (String?) -> Unit) -> Capture,
+    private val captureFactory: (frame: (ByteArray, Float) -> Unit, level: (Double) -> Unit, done: (DictationStatus?) -> Unit) -> Capture,
     private val structure: suspend (NotesStructureRequest) -> NotesStructureResponse,
     private val reorganize: suspend (NotesReorganizeRequest) -> NotesReorganizeResponse,
     var options: Options,
@@ -319,7 +319,7 @@ internal class NotesRecorder(
     /** Ends recording with an error (lost microphone…): finishes like Stop and keeps the content. */
     fun fail(failure: RecordingFailure) = finishRecording(failure)
 
-    private fun captureEnded(problem: String?) {
+    private fun captureEnded(problem: DictationStatus?) {
         capture = null
         val message = RecordingFailure.Capture(problem)
         if (state == State.STARTING && resuming) current?.let { abandonResume(it, message) }

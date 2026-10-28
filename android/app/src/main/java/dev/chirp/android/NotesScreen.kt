@@ -201,7 +201,7 @@ internal fun NotesStatusStack(model: NotesModel, act: (DictationAction) -> Unit,
     val action = status.action
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (model.retained) StatusBanner(StatusKind.Error, stringResource(R.string.debug_retention))
-        if (action != null) StatusBanner(StatusKind.Warning, status.text.text(), action = action.label, onAction = { act(action) })
+        if (action != null) StatusBanner(StatusKind.Warning, status.text.text(), action = stringResource(action.label), onAction = { act(action) })
         if (model.recovered != null) StatusBanner(StatusKind.Info, stringResource(R.string.notes_editor_recovered_title), body = stringResource(R.string.notes_editor_recovered_body))
         if (model.speakerModelControl.status != null) SpeakerModelStatus(model.speakerModelControl)
         // Naming is premature while the model is still preparing. Keep the actionable model status instead.

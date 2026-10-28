@@ -65,7 +65,7 @@ internal class EditLearning(private val context: Context, private val store: Lea
         io {
             val activated = store.observe(inserted, edited, said, app)
             if (activated.isNotEmpty()) main.post {
-                if (store.allowed) Toast.makeText(context, "Learned: ${activated.first().correction.title}", Toast.LENGTH_SHORT).show()
+                if (store.allowed) Toast.makeText(context, context.getString(R.string.learned_toast, activated.first().correction.title.resolve(context.resources)), Toast.LENGTH_SHORT).show()
             }
         }
     }).apply { onClosed = { raw = ""; target = null } }

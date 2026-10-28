@@ -35,7 +35,7 @@ internal class NotesVoiceEdit(
     private val recorder: NotesRecorder,
     private val transportFactory: ((ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
     /** Opens the microphone for a command while Notes is not capturing: frames go to the sink; null when it cannot. */
-    private val microphone: (sink: (ByteArray) -> Boolean, ended: (String?) -> Unit) -> Capture?,
+    private val microphone: (sink: (ByteArray) -> Boolean, ended: (DictationStatus?) -> Unit) -> Capture?,
     /** The editor's selection `[start, end)` when the command ends (null or empty: the whole notes). */
     private val selection: () -> Pair<Int, Int>? = { null },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),

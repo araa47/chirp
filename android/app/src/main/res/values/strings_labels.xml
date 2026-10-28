@@ -96,4 +96,24 @@
     <string name="onboarding_about_pairing">About pairing</string>
     <!-- %1$s is the server command, shown in code font. -->
     <string name="onboarding_pairing_steps">On your computer, open Chirp → Settings → Devices → Pair a Phone, or run %1$s on your server.</string>
+    <!-- Android's keyboard shortcuts helper (Meta+/). -->
+    <string name="shortcut_new_note">New note</string>
+    <string name="shortcut_search">Search notes / history</string>
+    <string name="shortcut_record">Record / Stop note</string>
+    <string name="shortcut_pause">Pause / Resume note</string>
+    <string name="shortcut_edit">Edit / Done</string>
+    <string name="shortcut_dictate">Start / Stop dictation</string>
+    <string name="shortcut_escape">Cancel / Close</string>
+    <string name="shortcut_copy">Copy result</string>
+    <string name="shortcut_raw">Use raw</string>
+    <string name="shortcut_notes">Notes tab</string>
+    <string name="shortcut_history">History tab</string>
+    <string name="shortcut_settings">Settings tab</string>
+    <!-- Styles learned from the user's edits. %1$s in learned_toast is one, or a learned word. -->
+    <string name="learned_style_lowercase">Start in lowercase</string>
+    <string name="learned_style_no_period">No period at the end</string>
+    <string name="learned_toast">Learned: %1$s</string>
+    <!-- Installing an app update. -->
+    <string name="update_wrong_archive">Downloaded file is not this app\'s update</string>
+    <string name="update_install_failed">Android couldn\'t start the install</string>
 </resources>

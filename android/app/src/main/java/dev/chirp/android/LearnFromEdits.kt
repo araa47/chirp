@@ -1,16 +1,17 @@
 package dev.chirp.android
 
+import androidx.annotation.StringRes
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
 /** Fixed server style ids; user edits are data, never free-form instructions. */
-enum class LearnedStyle(val wire: String, val title: String) {
-    LOWERCASE("lowercase_start", "Start in lowercase"), NO_PERIOD("no_final_period", "No period at the end")
+enum class LearnedStyle(val wire: String, @StringRes val title: Int) {
+    LOWERCASE("lowercase_start", R.string.learned_style_lowercase), NO_PERIOD("no_final_period", R.string.learned_style_no_period)
 }
 
 internal class LearnedCorrection(val heard: String = "", val term: String = "", val style: LearnedStyle? = null) {
-    val title get() = style?.title ?: term
+    val title: UiText get() = style?.let { UiText.Res(it.title) } ?: UiText.Raw(term)
     fun same(other: LearnedCorrection) = heard == other.heard && term == other.term && style == other.style
     override fun toString() = "LearnedCorrection(<redacted>)"
 }
