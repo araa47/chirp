@@ -53,9 +53,6 @@ def main():
     for source in sorted(wanted):
         rel = source.relative_to(SHOTS).as_posix()
         image = ImageOps.exif_transpose(Image.open(source)).convert("RGB")
-        # The committed iPad landscape captures are stored sideways.
-        if rel.startswith("ios/ipad-") and "sidebar" in rel and image.height > image.width:
-            image = image.transpose(Image.Transpose.ROTATE_90)
         width, height = image.size
         entries = []
         for size in sorted({min(width, x) for x in (320, 640, 960, 1440)}):
