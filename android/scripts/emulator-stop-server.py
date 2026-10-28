@@ -25,6 +25,11 @@ parser.add_argument('--ready-delay', type=float, default=2)
 args = parser.parse_args()
 settings = Settings.read()
 settings.model_dir = args.model_dir
+# The notes flow asks for the model with its first note but only releases it in its last phase, minutes later;
+# a shorter wait would leave the app on a failed download by then.
+GATE_SECONDS = 3600
+
+
 def install_speaker_model():
     # Exercise the authenticated automatic download, without network or the operator's model cache.
     target = speakers_model.path()
@@ -37,7 +42,7 @@ def install_speaker_model():
 
 
 def fetch_speaker_model():
-    deadline = time.monotonic() + 300
+    deadline = time.monotonic() + GATE_SECONDS
     while not args.speaker_model_gate.exists():
         if time.monotonic() >= deadline:
             raise TimeoutError("Speaker fixture was not released")
@@ -48,7 +53,7 @@ def fetch_speaker_model():
 class FixtureSpeakerLabels(SpeakerLabels):
     async def _fetch_model(self):
         # New servers support cancellable fetches; retain that behavior in the offline fixture.
-        deadline = time.monotonic() + 300
+        deadline = time.monotonic() + GATE_SECONDS
         while not args.speaker_model_gate.exists():
             if time.monotonic() >= deadline:
                 raise TimeoutError("Speaker fixture was not released")
