@@ -110,6 +110,64 @@ class StripStatesTest {
         now = 99_000; strip.show("Listening…", "", true, false, false, false); assertEquals("0:00", strip.timer.text.toString())
     }
 
+    @Test fun `spoken times come from plural resources`() {
+        val res = app.resources
+        assertEquals("1 second", elapsedSpoken(res, 1_400))
+        assertEquals("2 minutes", elapsedSpoken(res, 120_000))
+        assertEquals("1 minute 5 seconds", elapsedSpoken(res, 65_000))
+        assertEquals("2 minutes 1 second", elapsedSpoken(res, 121_000))
+        assertEquals("5 min ago" to "5 minutes ago", historyAge(res, 300_000, 0))
+        assertEquals("1 h ago" to "1 hour ago", historyAge(res, 3_600_000, 0))
+        assertEquals("Yesterday" to "Yesterday", historyAge(res, 86_400_000, 0))
+        assertEquals("3 days ago" to "3 days ago", historyAge(res, 3 * 86_400_000L, 0))
+        assertEquals("1 day", HistoryRetention.DAY.label(res))
+        assertEquals("7 days", HistoryRetention.WEEK.label(res))
+    }
+
+    @Test fun `after Stop the timer holds the time the mic was open`() {
+        noMotion()
+        var now = 0L
+        val strip = strip { now }
+        strip.show("Listening…", "", true, false, false, false)
+        now = 5_300; shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
+        strip.show("Finishing…", "", true, true, false, false)
+        assertEquals("0:05", strip.timer.text.toString())
+        now = 9_000; shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3))
+        strip.show("Finishing…", "", true, true, false, false)
+        assertEquals("finishing must not keep counting", "0:05", strip.timer.text.toString())
+        strip.show("Listening…", "", true, false, false, false) // the next segment of a long dictation
+        assertEquals("0:09", strip.timer.text.toString())
+    }
+
+    @Test fun `a strip rebuilt mid-dictation keeps the time and segment`() {
+        noMotion()
+        var now = 0L
+        val before = strip { now }
+        before.show("Listening…", "", true, false, false, false)
+        before.nextSegment()
+        now = 42_700
+        // Rotation or a fold: HeliBoard replaces the input view and Chirp mounts a new strip.
+        val after = strip { now }.apply { continueTimer(before) }
+        after.show("Listening…", "", true, false, false, false)
+        assertEquals("0:42 · #2", after.timer.text.toString())
+        // The next tick lands on the second boundary (300 ms away), not a whole second after the rebuild.
+        now = 43_000; shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(300))
+        assertEquals("0:43 · #2", after.timer.text.toString())
+    }
+
+    @Test fun `the timer resumes ticking when the strip is attached again`() {
+        noMotion()
+        var now = 0L
+        val activity = org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup().get()
+        val strip = KeyboardStrip(ContextThemeWrapper(activity, R.style.Theme_Chirp)) { now }
+        val host = android.widget.FrameLayout(activity).also(activity::setContentView)
+        host.addView(strip)
+        strip.show("Listening…", "", true, false, false, false)
+        host.removeView(strip); host.addView(strip)
+        now = 3_000; shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
+        assertEquals("0:03", strip.timer.text.toString())
+    }
+
     @Test fun `near the limit the timer is a warning chip but the one live region is unchanged`() {
         noMotion()
         val strip = strip()

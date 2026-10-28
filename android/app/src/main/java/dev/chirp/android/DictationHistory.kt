@@ -28,6 +28,7 @@ internal class HistoryEntry(val id: String, val time: Long, val text: String, va
 internal enum class HistoryRetention(val days: Int, val label: String) {
     DAY(1, "1 day"), WEEK(7, "7 days"), MONTH(30, "30 days");
     val millis get() = days * 86_400_000L
+    fun label(resources: android.content.res.Resources): String = resources.getQuantityString(R.plurals.retention_days, days, days)
     companion object { fun of(days: Int) = entries.firstOrNull { it.days == days } ?: WEEK }
 }
 

@@ -9,6 +9,7 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.PersistableBundle
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -29,7 +30,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
@@ -55,7 +58,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal enum class HistoryDay(val label: String) { Today("Today"), Yesterday("Yesterday"), Earlier("Earlier") }
+internal enum class HistoryDay(@StringRes val label: Int) {
+    Today(R.string.history_today), Yesterday(R.string.history_yesterday), Earlier(R.string.history_earlier)
+}
 
 /** Calendar day in [zone], not a 24-hour window: a dictation from 23:50 is Yesterday at 00:10. */
 internal fun historyDay(now: Long, time: Long, zone: ZoneId = ZoneId.systemDefault()): HistoryDay {
@@ -68,8 +73,9 @@ internal fun historyMatches(entry: HistoryEntry, query: String): Boolean =
     query.isBlank() || listOfNotNull(entry.text, entry.raw, entry.app).any { it.contains(query.trim(), ignoreCase = true) }
 
 /** "Gmail · 2 min ago · Polished": app, age and whether clean-up changed it. Never any of the text. */
-internal fun historyMeta(entry: HistoryEntry, now: Long): String =
-    listOfNotNull(entry.app, historyAge(now, entry.time).first, if (entry.partial) "partial" else if (entry.raw != null) "Polished" else null).joinToString(" · ")
+internal fun historyMeta(resources: android.content.res.Resources, entry: HistoryEntry, now: Long): String =
+    listOfNotNull(entry.app, historyAge(resources, now, entry.time).first, resources.getString(R.string.keyboard_history_partial).takeIf { entry.partial }
+        ?: resources.getString(R.string.keyboard_history_polished).takeIf { entry.raw != null }).joinToString(" · ")
 
 /** Dictated text on the clipboard, kept out of clipboard previews and overlays where the system supports it. */
 internal fun copyPrivately(context: Context, label: String, text: String) {
@@ -173,6 +179,10 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
         onPauseOrDispose { }
     }
     val shown = entries.orEmpty().filter { historyMatches(it, query) }
+    val deletedMessage = stringResource(R.string.history_deleted)
+    val undoLabel = stringResource(R.string.history_undo)
+    val addMessages = AddToNoteMessages(stringResource(R.string.history_note_unreadable), stringResource(R.string.history_note_saved_new),
+        stringResource(R.string.history_note_added), stringResource(R.string.history_notes_off), stringResource(R.string.history_note_failed))
     val current = open?.let { id -> entries?.firstOrNull { it.id == id } }
     fun delete(entry: HistoryEntry) {
         if (open == entry.id) choose(null)
@@ -180,7 +190,7 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
         scope.launch {
             withContext(Dispatchers.IO) { history.delete(entry.id) }
             snackbar.currentSnackbarData?.dismiss()
-            if (snackbar.showSnackbar("Dictation deleted", actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+            if (snackbar.showSnackbar(deletedMessage, actionLabel = undoLabel, duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
                 withContext(Dispatchers.IO) { history.restore(entry) }; restores++; reload++
             }
         }
@@ -191,12 +201,12 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
             snackbar.currentSnackbarData?.dismiss()
             val message = when (result) {
                 is AddToNoteResult.Added -> when {
-                    result.unreadableNote -> "Couldn't open that note, saved as a new note"
-                    result.createdNote -> "Saved as a new note"
-                    else -> "Added to your latest note"
+                    result.unreadableNote -> addMessages.unreadable
+                    result.createdNote -> addMessages.savedNew
+                    else -> addMessages.added
                 }
-                AddToNoteResult.Off -> "Notes are off — turn on Keep notes on this phone in Settings → Notes"
-                AddToNoteResult.Failed -> "Couldn't add the note"
+                AddToNoteResult.Off -> addMessages.off
+                AddToNoteResult.Failed -> addMessages.failed
             }
             snackbar.showSnackbar(message, duration = SnackbarDuration.Long)
         }
@@ -214,37 +224,37 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
                 Column(if (twoPane) Modifier.weight(.45f).widthIn(max = 480.dp).fillMaxHeight() else Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Dictation history", Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
-                            Text("What you dictated, encrypted on this phone only", style = MaterialTheme.typography.bodyMedium,
+                            Text(stringResource(R.string.history_title), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
+                            Text(stringResource(R.string.history_subtitle), style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Box {
-                            IconButton({ menu = true }) { Icon(painterResource(R.drawable.ic_more_vert), "More options") }
+                            IconButton({ menu = true }) { Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.history_more_options)) }
                             DropdownMenu(menu, { menu = false }) {
-                                DropdownMenuItem({ Text("History settings") }, { menu = false; settings = true })
+                                DropdownMenuItem({ Text(stringResource(R.string.history_settings)) }, { menu = false; settings = true })
                             }
                         }
                     }
                     if (enabled || !entries.isNullOrEmpty()) DockedSearchBar(inputField = {
                         SearchBarDefaults.InputField(query, { query = it }, { }, expanded = false, onExpandedChange = { },
-                            modifier = Modifier.focusRequester(searchFocus), placeholder = { Text("Search history") }, leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
-                            trailingIcon = if (query.isEmpty()) null else ({ IconButton({ query = "" }) { Icon(painterResource(R.drawable.ic_close), "Clear search") } }))
+                            modifier = Modifier.focusRequester(searchFocus), placeholder = { Text(stringResource(R.string.history_search)) }, leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
+                            trailingIcon = if (query.isEmpty()) null else ({ IconButton({ query = "" }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.history_clear_search)) } }))
                     }, expanded = false, onExpandedChange = { }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { }
                     when {
-                        !enabled && entries.isNullOrEmpty() -> EmptyHistory(R.drawable.ic_history, "Dictation history is off",
-                            "Turn it on to keep recent dictations here, encrypted on this phone only.", "Turn on") { settings = true }
+                        !enabled && entries.isNullOrEmpty() -> EmptyHistory(R.drawable.ic_history, stringResource(R.string.history_off),
+                            stringResource(R.string.history_off_body), stringResource(R.string.history_turn_on)) { settings = true }
                         entries == null -> Unit
-                        shown.isEmpty() && query.isNotBlank() -> EmptyHistory(R.drawable.ic_search, "No matches", "Nothing in your history matches. Try other words.")
-                        shown.isEmpty() -> EmptyHistory(R.drawable.ic_history, "No dictations yet", "New dictations stay here for ${history.retention.label}.")
+                        shown.isEmpty() && query.isNotBlank() -> EmptyHistory(R.drawable.ic_search, stringResource(R.string.history_no_matches), stringResource(R.string.history_no_matches_body))
+                        shown.isEmpty() -> EmptyHistory(R.drawable.ic_history, stringResource(R.string.history_empty), stringResource(R.string.history_empty_body, history.retention.label(LocalResources.current)))
                         else -> LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             shown.groupBy { historyDay(now(), it.time, zone) }.forEach { (day, group) ->
                                 item(key = day.name) {
-                                    Text(day.label, Modifier.padding(start = 8.dp, top = 16.dp, bottom = 8.dp).semantics { heading() },
+                                    Text(stringResource(day.label), Modifier.padding(start = 8.dp, top = 16.dp, bottom = 8.dp).semantics { heading() },
                                         style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                                 }
                                 items(group, key = { "${it.id}/$restores" }) { entry ->
-                                    HistoryRow(entry, historyMeta(entry, now()), icons[entry.app], twoPane && entry.id == open,
+                                    HistoryRow(entry, historyMeta(LocalResources.current, entry, now()), icons[entry.app], twoPane && entry.id == open,
                                         { choose(entry.id) }, latest, { target -> addToNote(entry, target) },
                                         { addToNote(entry, newNote = true) }, { scope.launch { withContext(Dispatchers.IO) { library.refresh() } } }, { delete(entry) })
                                 }
@@ -256,7 +266,7 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
                     .background(MaterialTheme.colorScheme.surfaceContainer)) {
                     if (current != null) Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
                         HistoryDetail(current, now(), zone, actions)
-                    } else Text(if (shown.isNotEmpty()) "Select a dictation to see it in full." else "", Modifier.align(Alignment.Center).padding(24.dp),
+                    } else Text(if (shown.isNotEmpty()) stringResource(R.string.history_select_prompt) else "", Modifier.align(Alignment.Center).padding(24.dp),
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -296,6 +306,9 @@ private fun rememberAppIcons(): Map<String, Drawable> {
     }
 }
 
+/** Snackbar text for Add to note, resolved in composition so the coroutine never reads resources. */
+private class AddToNoteMessages(val unreadable: String, val savedNew: String, val added: String, val off: String, val failed: String)
+
 private class DetailActions(val copy: (String, String) -> Unit, val share: (String) -> Unit, val delete: (HistoryEntry) -> Unit, val teach: (HistoryEntry) -> Unit)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -311,20 +324,22 @@ private fun HistoryRow(entry: HistoryEntry, meta: String, icon: Drawable?, selec
         }
     }, onDismiss = { delete() }) {
         var menu by remember { mutableStateOf(false) }
-        val addLabel = latest?.let { "Add to latest note (“${it.title}”)" }
+        val addLabel = latest?.let { stringResource(R.string.history_add_to_latest, it.title) }
+        val saveAsNewLabel = stringResource(R.string.history_save_as_new)
+        val deleteLabel = stringResource(R.string.history_delete)
         Box {
             ListItem(headlineContent = { Text(entry.text, maxLines = 2, overflow = TextOverflow.Ellipsis) }, supportingContent = { Text(meta) },
                 leadingContent = { AppIcon(entry.app, icon) },
-                modifier = Modifier.clip(MaterialTheme.shapes.extraSmall).combinedClickable(onClickLabel = "Open", onClick = open, onLongClickLabel = "More options",
+                modifier = Modifier.clip(MaterialTheme.shapes.extraSmall).combinedClickable(onClickLabel = stringResource(R.string.history_open), onClick = open, onLongClickLabel = stringResource(R.string.history_more_options),
                     onLongClick = { refreshNotes(); menu = true })
                     .semantics { customActions = listOfNotNull(
                         latest?.let { target -> CustomAccessibilityAction(requireNotNull(addLabel)) { addToNote(target); true } },
-                        CustomAccessibilityAction("Save as new note") { saveAsNew(); true }, CustomAccessibilityAction("Delete") { delete(); true }) },
+                        CustomAccessibilityAction(saveAsNewLabel) { saveAsNew(); true }, CustomAccessibilityAction(deleteLabel) { delete(); true }) },
                 colors = ListItemDefaults.colors(containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer))
             DropdownMenu(menu, { menu = false }) {
                 if (latest != null) DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_notes_tab), null) },
                     text = { Text(requireNotNull(addLabel)) }, onClick = { menu = false; addToNote(latest) })
-                DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_add), null) }, text = { Text("Save as new note") },
+                DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_add), null) }, text = { Text(saveAsNewLabel) },
                     onClick = { menu = false; saveAsNew() })
             }
         }
@@ -355,21 +370,21 @@ private fun ButtonIcon(@DrawableRes icon: Int) {
 private fun HistoryDetail(entry: HistoryEntry, now: Long, zone: ZoneId, actions: DetailActions) {
     val time = remember(entry.time, zone) { DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withZone(zone).format(Instant.ofEpochMilli(entry.time)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(listOfNotNull(entry.app, time, if (entry.partial) "partial" else null).joinToString(" · "), style = MaterialTheme.typography.labelLarge,
+        Text(listOfNotNull(entry.app, time, if (entry.partial) stringResource(R.string.history_partial) else null).joinToString(" · "), style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         SelectionContainer { Text(entry.text, style = MaterialTheme.typography.bodyLarge) }
         entry.raw?.let { raw ->
-            Text("Before clean-up", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.history_before_cleanup), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
             SelectionContainer { Text(raw, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        Text(historyAge(now, entry.time).second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(historyAge(LocalResources.current, now, entry.time).second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton({ actions.copy("Chirp dictation", entry.text) }) { ButtonIcon(R.drawable.ic_copy); Text("Copy") }
-            entry.raw?.let { raw -> OutlinedButton({ actions.copy("Chirp dictation (raw)", raw) }) { Text("Copy raw") } }
-            if (!entry.partial) OutlinedButton({ actions.teach(entry) }) { Text("Teach Chirp") }
-            OutlinedButton({ actions.share(entry.text) }) { ButtonIcon(R.drawable.ic_share); Text("Share") }
+            FilledTonalButton({ actions.copy("Chirp dictation", entry.text) }) { ButtonIcon(R.drawable.ic_copy); Text(stringResource(R.string.history_copy)) }
+            entry.raw?.let { raw -> OutlinedButton({ actions.copy("Chirp dictation (raw)", raw) }) { Text(stringResource(R.string.history_copy_raw)) } }
+            if (!entry.partial) OutlinedButton({ actions.teach(entry) }) { Text(stringResource(R.string.learning_teach)) }
+            OutlinedButton({ actions.share(entry.text) }) { ButtonIcon(R.drawable.ic_share); Text(stringResource(R.string.history_share)) }
             TextButton({ actions.delete(entry) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                ButtonIcon(R.drawable.ic_delete); Text("Delete")
+                ButtonIcon(R.drawable.ic_delete); Text(stringResource(R.string.history_delete))
             }
         }
     }

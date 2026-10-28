@@ -13,7 +13,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import dev.chirp.android.AppColour
+import dev.chirp.android.R
 import dev.chirp.android.SettingsStore
 
 /** The Pond palette (spec §C): koi on a midnight pond, from the app icon's identity. */
@@ -132,9 +134,11 @@ internal fun AppColoursSettings() {
     val context = LocalContext.current
     val store = remember { SettingsStore(context) }
     var colour by remember { mutableStateOf(store.appColour) }
-    SettingsGroup("App colours") {
+    val dynamic = stringResource(R.string.settings_colour_dynamic)
+    val pond = stringResource(R.string.settings_colour_pond)
+    SettingsGroup(stringResource(R.string.settings_app_colours)) {
         SettingsItem {
-            ChoiceChips(listOf(AppColour.POND, AppColour.DYNAMIC), colour, { if (it == AppColour.DYNAMIC) "Match wallpaper" else "Pond" }) {
+            ChoiceChips(listOf(AppColour.POND, AppColour.DYNAMIC), colour, { if (it == AppColour.DYNAMIC) dynamic else pond }) {
                 colour = it; store.appColour = it
             }
         }

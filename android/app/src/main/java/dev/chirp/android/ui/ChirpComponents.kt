@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import dev.chirp.android.R
@@ -64,7 +65,8 @@ private fun Modifier.row() = fillMaxWidth().heightIn(min = 56.dp)
 @Composable
 private fun InfoIcon(title: String, body: String) {
     var open by rememberSaveable { mutableStateOf(false) }
-    IconButton({ open = true }, Modifier.semantics { contentDescription = "About $title" }) {
+    val about = stringResource(R.string.settings_about_row, title)
+    IconButton({ open = true }, Modifier.semantics { contentDescription = about }) {
         Icon(painterResource(R.drawable.ic_info), null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (open) InfoSheet(title, body) { open = false }
@@ -164,13 +166,13 @@ internal fun InfoSheetContent(title: String, body: String, onDismiss: () -> Unit
     Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
         Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextButton(onDismiss, Modifier.align(Alignment.End)) { Text("Close") }
+        TextButton(onDismiss, Modifier.align(Alignment.End)) { Text(stringResource(R.string.settings_close)) }
     }
 }
 
 /** "Learn more" link that opens an [InfoSheet]. */
 @Composable
-internal fun LearnMore(title: String, body: String, modifier: Modifier = Modifier, label: String = "Learn more") {
+internal fun LearnMore(title: String, body: String, modifier: Modifier = Modifier, label: String = stringResource(R.string.settings_learn_more)) {
     var open by rememberSaveable { mutableStateOf(false) }
     TextButton({ open = true }, modifier) { Text(label) }
     if (open) InfoSheet(title, body) { open = false }

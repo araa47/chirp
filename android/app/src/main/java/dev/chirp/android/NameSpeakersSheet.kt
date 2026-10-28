@@ -53,6 +53,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -98,11 +100,11 @@ internal fun NameSpeakersSheet(model: NotesModel, dismiss: () -> Unit) {
     val content: @Composable () -> Unit = {
         Column(Modifier.imePadding().navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Name speakers", Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-                TextButton(dismiss) { Text("Cancel") }
-                TextButton(::finish, Modifier.testTag("name_speakers_done")) { Text("Done") }
+                Text(stringResource(R.string.notes_speakers_name_all_title), Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+                TextButton(dismiss) { Text(stringResource(R.string.notes_action_cancel)) }
+                TextButton(::finish, Modifier.testTag("name_speakers_done")) { Text(stringResource(R.string.notes_speakers_done)) }
             }
-            Text("Names are used everywhere in this note: the transcript, the notes Chirp writes and exports.",
+            Text(stringResource(R.string.notes_speakers_name_all_detail),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 8.dp)) {
                 people.forEachIndexed { index, id ->
@@ -121,13 +123,13 @@ internal fun NameSpeakersSheet(model: NotesModel, dismiss: () -> Unit) {
                     if (model.voicesAvailable && model.rememberVoices) Row(Modifier.padding(start = 16.dp)
                         .clickable(role = Role.Checkbox) { rememberVoice[id] = rememberVoice[id] == false }, verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(rememberVoice[id] != false, { rememberVoice[id] = it })
-                        Text("Remember voice", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.notes_speakers_remember_voice), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
             if (count > 0) Row(Modifier.padding(top = 8.dp).clickable(role = Role.Checkbox) { replace = !replace }, verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(replace, null)
-                Text("Also replace names in the notes (${if (count == 1) "1 place" else "$count places"})", style = MaterialTheme.typography.bodyMedium)
+                Text(pluralStringResource(R.plurals.notes_speakers_replace_all, count, count), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -154,12 +156,13 @@ private fun SpeakerRow(roster: SpeakerRoster, id: Int, name: String, change: (St
                        merge: (Int) -> Unit, others: List<Int>) {
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val color = SpeakerColors.of(roster.colorIndex(id), dark)
+    val fieldDescription = stringResource(R.string.notes_speakers_name_for, id)
     Column(Modifier.testTag("name_speaker_$id"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(12.dp).clip(CircleShape).background(color))
             Spacer(Modifier.width(10.dp))
-            OutlinedTextField(name, change, Modifier.weight(1f).onFocusChanged { focus(it.isFocused) }.semantics { contentDescription = "Name for Person $id" },
-                label = { Text("Person $id", color = color) }, placeholder = { Text("Person $id") }, singleLine = true,
+            OutlinedTextField(name, change, Modifier.weight(1f).onFocusChanged { focus(it.isFocused) }.semantics { contentDescription = fieldDescription },
+                label = { Text(stringResource(R.string.notes_speakers_person, id), color = color) }, placeholder = { Text(stringResource(R.string.notes_speakers_person, id)) }, singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { finish() }))
         }
@@ -168,14 +171,14 @@ private fun SpeakerRow(roster: SpeakerRoster, id: Int, name: String, change: (St
         }
         Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             if (play != null) IconButton(play, Modifier.size(40.dp)) {
-                Icon(painterResource(if (playing) R.drawable.ic_stop else R.drawable.ic_play), if (playing) "Stop sample" else "Play a sample of Person $id", tint = MaterialTheme.colorScheme.primary)
+                Icon(painterResource(if (playing) R.drawable.ic_stop else R.drawable.ic_play), if (playing) stringResource(R.string.notes_speakers_stop_sample) else stringResource(R.string.notes_speakers_play_sample, id), tint = MaterialTheme.colorScheme.primary)
             }
-            Text(sample?.let { "“$it”" }.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text(sample?.let { stringResource(R.string.notes_speakers_sample, it) }.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (others.isNotEmpty()) {
                 var open by remember { mutableStateOf(false) }
                 Box {
-                    TextButton({ open = true }) { Text("Same as ▸") }
+                    TextButton({ open = true }) { Text(stringResource(R.string.notes_speakers_same_as)) }
                     DropdownMenu(open, { open = false }) {
                         others.forEach { other -> DropdownMenuItem({ Text(roster.displayName(other)) }, { open = false; merge(other) }) }
                     }

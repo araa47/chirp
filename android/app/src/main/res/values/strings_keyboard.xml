@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The keyboard strip, the floating mic panel, the in-keyboard history and the dictation options menu.
+     Dictation status lines (Listening…, Inserted, errors) still come from the dictation state as English text. -->
+<resources>
+    <string name="strip_options">Dictation options</string>
+    <string name="strip_mic_idle">Microphone: tap to dictate, hold to talk</string>
+    <string name="strip_cancel">Cancel dictation</string>
+    <string name="strip_use_raw">Use raw</string>
+    <string name="strip_use_raw_description">Use raw dictation</string>
+    <string name="strip_undo">Undo</string>
+    <string name="strip_undo_description">Undo last dictation</string>
+    <string name="strip_private">Private</string>
+    <string name="strip_private_description">Private session · exclude history</string>
+    <string name="strip_polishing">Polishing dictation</string>
+    <string name="strip_stop">Stop dictation</string>
+    <string name="strip_history_close">Close dictation history</string>
+    <string name="strip_level">Microphone level</string>
+    <!-- %1$s is the dictation status line. -->
+    <string name="strip_debug_retention">Debug retention on · %1$s</string>
+    <string name="strip_debug_retention_spoken">Debug retention on. </string>
+    <!-- %1$s is a clean-up style name such as Polished. -->
+    <string name="strip_style_description">Clean-up style: %1$s</string>
+    <!-- The elapsed timer on its second and later segments: %1$s is the time (1:05), %2$d the segment. -->
+    <string name="strip_timer_segment">%1$s · #%2$d</string>
+    <string name="strip_timer_segment_spoken">%1$s, part %2$d</string>
+    <plurals name="elapsed_seconds">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
+    <plurals name="elapsed_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <!-- The spoken elapsed time with minutes and seconds, e.g. "1 minute 5 seconds". -->
+    <string name="elapsed_minutes_seconds">%1$s %2$s</string>
+    <!-- A chip's label while it counts down, e.g. "Undo (4s)". -->
+    <string name="action_countdown">%1$s (%2$ds)</string>
+    <plurals name="action_available">
+        <item quantity="one">%1$s, available for %2$d second</item>
+        <item quantity="other">%1$s, available for %2$d seconds</item>
+    </plurals>
+
+    <string name="options_cleanup">Clean-up</string>
+    <string name="options_style">Style</string>
+    <string name="options_rewrites">rewrites</string>
+    <string name="options_cleanup_off">Clean-up is off on your computer</string>
+    <string name="options_chirp">Chirp</string>
+    <string name="options_settings">Chirp settings</string>
+    <string name="options_private">Private session</string>
+    <string name="options_private_detail">Exclude history · ends on lock or after 1 hour</string>
+
+    <string name="panel_polished">Polished</string>
+    <string name="panel_hide">Hide panel</string>
+    <string name="panel_dictate">Dictate</string>
+    <string name="panel_mic">Microphone: tap to toggle, hold to talk</string>
+    <string name="panel_cancel">Cancel</string>
+    <string name="panel_cancel_description">Cancel dictation and discard text</string>
+    <string name="panel_use_raw_description">Use raw: replace the polished text with what you said</string>
+    <string name="panel_done">Done</string>
+    <string name="panel_done_description">Done: discard this text</string>
+    <string name="panel_scratchpad">Open in Scratchpad</string>
+    <string name="panel_copy">Copy</string>
+    <string name="panel_copy_description">Copy your words</string>
+    <string name="panel_error">Couldn\'t dictate</string>
+    <string name="panel_ready">Ready</string>
+    <string name="panel_listening">Listening…</string>
+    <string name="panel_finished">Finished</string>
+    <string name="panel_copy_hint">Your words will be ready to copy</string>
+    <string name="panel_start_speaking">Start speaking…</string>
+    <string name="panel_polishing">Polishing…</string>
+    <string name="panel_finishing">Finishing…</string>
+    <string name="panel_stop">Stop</string>
+
+    <string name="bubble_hidden">Floating mic hidden in this app</string>
+    <string name="bubble_channel">Dictation microphone</string>
+    <string name="bubble_listening_title">Chirp is listening</string>
+    <string name="bubble_listening_text">Tap Cancel to discard</string>
+    <string name="bubble_copied">Copied — long-press the field to paste</string>
+    <string name="bubble_connecting">Connecting…</string>
+    <string name="bubble_inserted">Inserted</string>
+    <string name="bubble_hide_here">Hide here</string>
+
+    <!-- %1$s is how long history is kept, e.g. 7 days. -->
+    <string name="keyboard_history_subtitle_on">Encrypted on this phone · %1$s</string>
+    <string name="keyboard_history_subtitle_off">History off · kept for %1$s</string>
+    <string name="keyboard_history_subtitle_never">Off · nothing is saved</string>
+    <string name="keyboard_history_locked">Unlock your phone to see dictation history.</string>
+    <string name="keyboard_history_offer">Keep your recent dictations on this phone so you can reinsert them. Encrypted, never sent to your computer or backed up, kept for %1$s.</string>
+    <string name="keyboard_history_keep">Keep history on this phone</string>
+    <string name="keyboard_history_not_now">Not now</string>
+    <string name="keyboard_history_loading">Loading…</string>
+    <string name="keyboard_history_empty">No dictations yet. New dictations stay here for %1$s.</string>
+    <string name="keyboard_history_manage">Manage</string>
+    <string name="keyboard_history_manage_description">Search and manage dictation history</string>
+    <string name="keyboard_history_back">Back to keyboard</string>
+    <string name="keyboard_history_polished">Polished</string>
+    <string name="keyboard_history_partial">partial</string>
+    <!-- The spoken row: "5 minutes ago in Messages". -->
+    <string name="keyboard_history_age_in_app">%1$s in %2$s</string>
+    <string name="keyboard_history_partial_spoken">Partial</string>
+    <string name="keyboard_history_insert">Insert</string>
+    <string name="keyboard_history_more">More options</string>
+    <string name="keyboard_history_copy">Copy</string>
+    <string name="keyboard_history_insert_raw">Insert raw</string>
+    <string name="keyboard_history_delete">Delete</string>
+
+    <plurals name="retention_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+
+    <string name="age_just_now">Just now</string>
+    <string name="age_yesterday">Yesterday</string>
+    <string name="age_minutes">%d min ago</string>
+    <string name="age_hours">%d h ago</string>
+    <plurals name="age_days">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
+    <plurals name="age_minutes_spoken">
+        <item quantity="one">%d minute ago</item>
+        <item quantity="other">%d minutes ago</item>
+    </plurals>
+    <plurals name="age_hours_spoken">
+        <item quantity="one">%d hour ago</item>
+        <item quantity="other">%d hours ago</item>
+    </plurals>
+    <plurals name="age_days_spoken">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
+</resources>

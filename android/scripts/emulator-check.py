@@ -284,6 +284,7 @@ def main():
     args.add_argument("--speakers-check", action="store_true")
     args.add_argument("--keepkb-check", action="store_true")
     args.add_argument("--visual-check", action="store_true")
+    args.add_argument("--wallpaper-check", action="store_true")
     args.add_argument("--bubble-check", action="store_true")
     args.add_argument("--quickdictate-check", action="store_true")
     args.add_argument("--serial")
@@ -349,7 +350,8 @@ def main():
                 time.sleep(.1)
             token = token_path.read_text().strip()
             wait_health(token, base=base, context=context)
-            warm_cleanup(opt.python, token_path, env, opt.tls, opt.server_port)
+            # The wallpaper pass never dictates, so it doesn't wait on the clean-up model.
+            if not opt.wallpaper_check: warm_cleanup(opt.python, token_path, env, opt.tls, opt.server_port)
             # Plain HTTP can be probed without credentials. A TLS server closes plaintext
             # connections (nc can exit nonzero); verified pairing below checks its route and trust.
             if not opt.tls:
@@ -422,6 +424,9 @@ def main():
             safe_capture = True
             if opt.visual_check:
                 runpy.run_path(str(Path(__file__).with_name("emulator-visual-check.py")))["check"](dict(_probe, adb=adb), work, output)
+                return
+            if opt.wallpaper_check:
+                runpy.run_path(str(Path(__file__).with_name("emulator-wallpaper-check.py")))["check"](dict(_probe, adb=adb), work, output)
                 return
             if opt.device_check:
                 module = runpy.run_path(str(Path(__file__).with_name("emulator-device-check.py")))

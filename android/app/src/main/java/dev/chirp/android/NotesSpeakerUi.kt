@@ -39,6 +39,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -62,8 +64,9 @@ internal object SpeakerColors {
 internal fun SpeakerChip(name: String, colorIndex: Int, onClick: () -> Unit, modifier: Modifier = Modifier, recognized: Boolean = false) {
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val color = SpeakerColors.of(colorIndex, dark)
+    val description = stringResource(if (recognized) R.string.notes_speakers_chip_recognised else R.string.notes_speakers_chip, name)
     Box(modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onClick)
-        .semantics(mergeDescendants = true) { role = Role.Button; contentDescription = "$name${if (recognized) ", recognised" else ""}. Rename, merge or reassign this speaker" },
+        .semantics(mergeDescendants = true) { role = Role.Button; contentDescription = description },
         contentAlignment = Alignment.CenterStart) {
     Row(Modifier.clip(CircleShape).background(color.copy(alpha = if (dark) .18f else .12f))
         .padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -84,29 +87,29 @@ internal fun SpeakerMenu(open: Boolean, dismiss: () -> Unit, roster: SpeakerRost
     var assigning by remember(open) { mutableStateOf(false) }
     DropdownMenu(open, dismiss) {
         if (assigning && reassign != null) {
-            DropdownMenuItem({ Text("This turn is") }, { assigning = false })
+            DropdownMenuItem({ Text(stringResource(R.string.notes_speakers_turn_is_heading)) }, { assigning = false })
             HorizontalDivider()
             others.forEach { id -> DropdownMenuItem({ Text(roster.displayName(id)) }, { dismiss(); reassign(id) }) }
-            DropdownMenuItem({ Text("New person") }, { dismiss(); reassign(null) })
+            DropdownMenuItem({ Text(stringResource(R.string.notes_speakers_new_person)) }, { dismiss(); reassign(null) })
             return@DropdownMenu
         }
-        if (reassign != null) DropdownMenuItem({ Text("This turn is…") }, { assigning = true })
-        DropdownMenuItem({ Text("Rename “${roster.displayName(target)}”…") }, { dismiss(); rename() })
+        if (reassign != null) DropdownMenuItem({ Text(stringResource(R.string.notes_speakers_turn_is)) }, { assigning = true })
+        DropdownMenuItem({ Text(stringResource(R.string.notes_speakers_rename_menu, roster.displayName(target))) }, { dismiss(); rename() })
         if (roster.person(target)?.recognized != null && reject != null)
-            DropdownMenuItem({ Text("Not ${roster.displayName(target)}") }, { dismiss(); reject() })
+            DropdownMenuItem({ Text(stringResource(R.string.notes_speakers_not, roster.displayName(target))) }, { dismiss(); reject() })
         if (roster.person(target)?.name != null && update != null)
-            DropdownMenuItem({ Text("Update ${roster.displayName(target)}’s voice") }, { dismiss(); update() })
-        if (nameAll != null) DropdownMenuItem({ Text("Name speakers…") }, { dismiss(); nameAll() })
+            DropdownMenuItem({ Text(stringResource(R.string.notes_speakers_update_voice, roster.displayName(target))) }, { dismiss(); update() })
+        if (nameAll != null) DropdownMenuItem({ Text(stringResource(R.string.notes_speakers_name_all_menu)) }, { dismiss(); nameAll() })
         if (others.isNotEmpty()) {
             HorizontalDivider()
-            Text("Same person as", Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium,
+            Text(stringResource(R.string.notes_speakers_same_person_as), Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             others.forEach { id -> DropdownMenuItem({ Text(roster.displayName(id)) }, { dismiss(); merge(id) }) }
         }
         if (merged.isNotEmpty()) {
             HorizontalDivider()
             merged.forEach { id ->
-                DropdownMenuItem({ Text("Separate " + (roster.person(id)?.name ?: "Person $id")) }, { dismiss(); separate(id) })
+                DropdownMenuItem({ Text(stringResource(R.string.notes_speakers_separate, roster.person(id)?.name ?: stringResource(R.string.notes_speakers_person, id))) }, { dismiss(); separate(id) })
             }
         }
     }
@@ -136,34 +139,34 @@ internal fun RenameSpeakerDialog(model: NotesModel, person: Int, dismiss: () -> 
         model.savedVoices.library?.voices.orEmpty().map { it.name } + model.recentNames, name, used) else emptyList()
     fun commit() { rename(name, replace && count > 0 && new != old, offerRemember && rememberVoice) }
     AlertDialog(onDismissRequest = dismiss,
-        title = { Text("Rename “$old”") },
+        title = { Text(stringResource(R.string.notes_speakers_rename_title, old)) },
         text = {
             Column {
                 OutlinedTextField(name, { name = it.take(SpeakerRoster.MAX_NAME) }, Modifier.onFocusChanged { focused = it.isFocused },
-                    label = { Text("Name") }, singleLine = true,
-                    placeholder = { Text("Person $resolved") },
+                    label = { Text(stringResource(R.string.notes_speakers_name)) }, singleLine = true,
+                    placeholder = { Text(stringResource(R.string.notes_speakers_person, resolved)) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { commit() }))
                 if (ideas.isNotEmpty()) Row(Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ideas.forEach { SuggestionChip({ name = it }, { Text(it) }) }
                 }
-                Text("Used everywhere in this note: the transcript, the notes Chirp writes and exports.", Modifier.padding(top = 8.dp),
+                Text(stringResource(R.string.notes_speakers_rename_detail), Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (offerRemember) Row(Modifier.padding(top = 4.dp).clickable(role = Role.Checkbox) { rememberVoice = !rememberVoice },
                     verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(rememberVoice, { rememberVoice = it })
-                    Text("Remember voice", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.notes_speakers_remember_voice), style = MaterialTheme.typography.bodyMedium)
                 }
                 if (count > 0 && new != old) Row(Modifier.padding(top = 4.dp).clickable(role = Role.Checkbox) { replace = !replace },
                     verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(replace, null)
-                    Text("Also replace “$old” with “$new” in the notes (${if (count == 1) "1 place" else "$count places"})",
+                    Text(pluralStringResource(R.plurals.notes_speakers_replace_one, count, old, new, count),
                         style = MaterialTheme.typography.bodyMedium)
                 }
             }
         },
-        confirmButton = { TextButton(::commit) { Text("Rename") } },
-        dismissButton = { TextButton(dismiss) { Text("Cancel") } })
+        confirmButton = { TextButton(::commit) { Text(stringResource(R.string.notes_speakers_rename)) } },
+        dismissButton = { TextButton(dismiss) { Text(stringResource(R.string.notes_action_cancel)) } })
 }
 
 /** Model preparation can coexist with recovery and connection notices. */
@@ -176,8 +179,8 @@ internal fun SpeakerModelStatus(model: NotesSpeakerModel, modifier: Modifier = M
             Text(status, style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite })
             Row {
-                if (model.retryable) TextButton(model::retry) { Text("Retry") }
-                if (model.enabled) TextButton({ model.setLabels(false) }) { Text("Turn off") }
+                if (model.retryable) TextButton(model::retry) { Text(stringResource(R.string.notes_speakers_retry)) }
+                if (model.enabled) TextButton({ model.setLabels(false) }) { Text(stringResource(R.string.notes_speakers_turn_off)) }
             }
         }
     }

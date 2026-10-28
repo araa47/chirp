@@ -35,8 +35,8 @@ open class ChirpImeService : LatinIME() {
     // Insert in that frame, including when HeliBoard replaces the view on a theme/layout change.
     override fun setInputView(keys: View) {
         val suggestions = keys.findViewById<android.widget.RelativeLayout>(helium314.keyboard.latin.R.id.suggestion_strip_view)
-        suggestions.findViewWithTag<View>("chirp_strip")?.let(suggestions::removeView)
-        val strip = KeyboardStrip(ContextThemeWrapper(this, R.style.Theme_Chirp)).apply { tag = "chirp_strip" }
+        val previous = suggestions.findViewWithTag<KeyboardStrip>("chirp_strip")?.also(suggestions::removeView)
+        val strip = KeyboardStrip(ContextThemeWrapper(this, R.style.Theme_Chirp)).apply { tag = "chirp_strip"; previous?.let(::continueTimer) }
         strip.mount(suggestions)
         dictation.attach(strip)
         history.mount(keys, strip)

@@ -1,11 +1,13 @@
 package dev.chirp.android
 
+import androidx.compose.ui.platform.LocalResources
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,54 +21,53 @@ import dev.chirp.android.ui.SwitchRow
 
 /** History switch, retention and clear. Turning history off offers to keep or delete existing dictations. */
 @Composable
-internal fun HistorySettings(showOpen: Boolean = true, store: DictationHistory? = null, title: String? = "Dictation history", changed: () -> Unit = {}) {
+internal fun HistorySettings(showOpen: Boolean = true, store: DictationHistory? = null, title: String? = stringResource(R.string.history_title), changed: () -> Unit = {}) {
     val context = LocalContext.current
     val history = store ?: remember { DictationHistory(context) }
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(history.enabled) }
     var retention by remember { mutableStateOf(history.retention) }
+    val resources = LocalResources.current
     var confirmOff by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
     SettingsGroup(title = title) {
-        SwitchRow("Keep dictation history on this phone", enabled, { on ->
+        SwitchRow(stringResource(R.string.history_keep), enabled, { on ->
             if (on) { history.enable(); enabled = true; changed() } else confirmOff = true
-        }, summary = if (enabled) "On · encrypted on this phone only" else "Off",
-            infoTitle = "Keep dictation history on this phone",
-            infoBody = "Saves recent dictations encrypted on this phone only, so you can reinsert them from the keyboard's clock button. " +
-                "Never sent to your computer, backed up or logged. Password and incognito fields are never saved. " +
-                "Turning off stops new entries; existing dictations stay until they expire or you delete history.")
+        }, summary = stringResource(if (enabled) R.string.history_keep_on else R.string.history_keep_off),
+            infoTitle = stringResource(R.string.history_keep),
+            infoBody = stringResource(R.string.history_keep_info))
         SettingsItem {
-            Text("Keep for", style = MaterialTheme.typography.bodyMedium)
-            ChoiceChips(HistoryRetention.entries, retention, { it.label }) { option ->
+            Text(stringResource(R.string.history_keep_for), style = MaterialTheme.typography.bodyMedium)
+            ChoiceChips(HistoryRetention.entries, retention, { it.label(resources) }) { option ->
                 retention = option
                 scope.launch { withContext(Dispatchers.IO) { history.retention = option }; changed() }
             }
         }
-        if (showOpen) NavRow("Open history", { context.startActivity(Intent(context, HistoryActivity::class.java)) })
-        ActionRow("Delete history", { confirmClear = true }, destructive = true)
+        if (showOpen) NavRow(stringResource(R.string.history_open_history), { context.startActivity(Intent(context, HistoryActivity::class.java)) })
+        ActionRow(stringResource(R.string.history_delete_history), { confirmClear = true }, destructive = true)
     }
     if (confirmOff) AlertDialog(onDismissRequest = { confirmOff = false },
-        title = { Text("Turn off dictation history?") },
-        text = { Text("New dictations won’t be saved. Keep existing dictations until they expire, or delete them from this phone now.") },
+        title = { Text(stringResource(R.string.history_off_confirm)) },
+        text = { Text(stringResource(R.string.history_off_confirm_body)) },
         confirmButton = { TextButton({
             confirmOff = false
             scope.launch { withContext(Dispatchers.IO) { history.disable(deleteHistory = true) }; enabled = false; changed() }
-        }) { Text("Turn off and delete") } },
+        }) { Text(stringResource(R.string.history_off_delete)) } },
         dismissButton = { androidx.compose.foundation.layout.Column {
             TextButton({
                 confirmOff = false
                 scope.launch { withContext(Dispatchers.IO) { history.disable() }; enabled = false; changed() }
-            }) { Text("Turn off, keep history") }
-            TextButton({ confirmOff = false }) { Text("Cancel") }
+            }) { Text(stringResource(R.string.history_off_keep)) }
+            TextButton({ confirmOff = false }) { Text(stringResource(R.string.settings_cancel)) }
         } })
     if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false },
-        title = { Text("Delete dictation history?") },
-        text = { Text("This deletes every saved dictation and its encryption key from this phone. This can’t be undone. The Keep dictation history setting stays the same.") },
+        title = { Text(stringResource(R.string.history_delete_confirm)) },
+        text = { Text(stringResource(R.string.history_delete_confirm_body)) },
         confirmButton = { TextButton({
             confirmClear = false
             scope.launch { withContext(Dispatchers.IO) { history.clear() }; changed() }
-        }) { Text("Delete history") } },
-        dismissButton = { TextButton({ confirmClear = false }) { Text("Cancel") } })
+        }) { Text(stringResource(R.string.history_delete_history)) } },
+        dismissButton = { TextButton({ confirmClear = false }) { Text(stringResource(R.string.settings_cancel)) } })
 }
 
 /** The keyboard's "open history" link and older shortcuts: a thin deep link into the app shell's History tab. */

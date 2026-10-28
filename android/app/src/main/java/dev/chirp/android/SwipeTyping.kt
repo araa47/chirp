@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.edit
 import dev.chirp.android.ui.ActionRow
 import dev.chirp.android.ui.SettingsGroup
@@ -120,12 +121,12 @@ internal fun restartChirp(activity: Activity) {
     Runtime.getRuntime().exit(0)
 }
 
-internal fun swipeTypingSummary(context: Context) = when (GestureLibrary.status(context)) {
-    GestureLibrary.Status.ACTIVE -> "Swipe typing: on, using the gesture library you added"
-    GestureLibrary.Status.BUILT_IN -> "Swipe typing: on, built into this build of Chirp"
-    GestureLibrary.Status.NOT_LOADED -> "Swipe typing: the added library did not load"
-    GestureLibrary.Status.NONE -> "Swipe typing: optional. Add a gesture library in Chirp settings → Keyboard → Swipe typing"
-}
+internal fun swipeTypingSummary(context: Context) = context.getString(when (GestureLibrary.status(context)) {
+    GestureLibrary.Status.ACTIVE -> R.string.swipe_summary_active
+    GestureLibrary.Status.BUILT_IN -> R.string.swipe_summary_built_in
+    GestureLibrary.Status.NOT_LOADED -> R.string.swipe_summary_not_loaded
+    GestureLibrary.Status.NONE -> R.string.swipe_summary_none
+})
 
 @Composable
 internal fun SwipeTypingSettings() {
@@ -149,35 +150,29 @@ internal fun SwipeTypingSettings() {
         }
     }
     fun restart() { context.getActivity()?.let(::restartChirp) }
-    SettingsGroup("Swipe typing") {
+    SettingsGroup(stringResource(R.string.swipe_title)) {
         when (status) {
             GestureLibrary.Status.ACTIVE -> {
-                SwitchRow("Swipe to type", enabled, {
+                SwitchRow(stringResource(R.string.swipe_to_type), enabled, {
                     enabled = it; prefs.edit { putBoolean(Settings.PREF_GESTURE_INPUT, it) }
-                }, summary = "Using the gesture library you added. Trail and preview options are in Keyboard layouts & settings → Gesture typing.")
-                ActionRow("Remove gesture library", { confirmRemove = true }, destructive = true)
+                }, summary = stringResource(R.string.swipe_to_type_added))
+                ActionRow(stringResource(R.string.swipe_remove), { confirmRemove = true }, destructive = true)
             }
-            GestureLibrary.Status.BUILT_IN -> SwitchRow("Swipe to type", enabled, {
+            GestureLibrary.Status.BUILT_IN -> SwitchRow(stringResource(R.string.swipe_to_type), enabled, {
                 enabled = it; prefs.edit { putBoolean(Settings.PREF_GESTURE_INPUT, it) }
-            }, summary = "Built into this build of Chirp. Trail and preview options are in Keyboard layouts & settings → Gesture typing.")
+            }, summary = stringResource(R.string.swipe_to_type_built_in))
             GestureLibrary.Status.NOT_LOADED -> {
                 SettingsItem {
-                    Text("The library you added did not load on this phone ($abi). Remove it, then add a compatible file.",
+                    Text(stringResource(R.string.swipe_not_loaded, abi),
                         style = MaterialTheme.typography.bodySmall)
                 }
-                ActionRow("Remove gesture library", { confirmRemove = true }, destructive = true)
+                ActionRow(stringResource(R.string.swipe_remove), { confirmRemove = true }, destructive = true)
             }
             GestureLibrary.Status.NONE -> SettingsItem {
-                Text("Chirp has no built-in swipe typing. You can add a compatible gesture library yourself.", style = MaterialTheme.typography.bodyMedium)
-                LearnMore("Swipe typing", "Like HeliBoard, Chirp can use a compatible gesture library " +
-                    "that you add yourself, usually Google's libjni_latinimegoogle.so taken from a Google Apps (GApps) package. " +
-                    "Chirp never downloads or includes it. Using it is your choice and is subject to that library's own licence.\n\n" +
-                    "This phone needs the $abi version. Chirp checks the file's SHA-256 against the known release and warns " +
-                    "about anything else. A library not built for 16 KB memory pages may fail to load on Android 15+ phones " +
-                    "that use them. The library runs inside Chirp with Chirp's permissions, including network access, " +
-                    "so use only a file from a source you trust.")
+                Text(stringResource(R.string.swipe_none), style = MaterialTheme.typography.bodyMedium)
+                LearnMore(stringResource(R.string.swipe_title), stringResource(R.string.swipe_learn_more, abi))
                 OutlinedButton({ picker.launch(arrayOf("*/*")) }, Modifier.fillMaxWidth(), enabled = !busy) {
-                    Text(if (busy) "Checking…" else "Add gesture library…")
+                    Text(stringResource(if (busy) R.string.swipe_checking else R.string.swipe_add))
                 }
             }
         }
@@ -186,26 +181,23 @@ internal fun SwipeTypingSettings() {
         fun dismiss() { GestureLibrary.candidate(context).apply { setWritable(true); delete() }; staged = null }
         when (check) {
             GestureLibrary.Check.NOT_LIBRARY, GestureLibrary.Check.WRONG_ABI -> AlertDialog(onDismissRequest = ::dismiss,
-                title = { Text(if (check == GestureLibrary.Check.WRONG_ABI) "Wrong library version" else "Not a gesture library") },
-                text = { Text(if (check == GestureLibrary.Check.WRONG_ABI) "That library is for a different processor. This phone needs the $abi version."
-                    else "That file is not an Android native library. Nothing was installed.") },
-                confirmButton = { TextButton(::dismiss) { Text("OK") } })
+                title = { Text(stringResource(if (check == GestureLibrary.Check.WRONG_ABI) R.string.swipe_wrong_abi else R.string.swipe_not_library)) },
+                text = { Text(if (check == GestureLibrary.Check.WRONG_ABI) stringResource(R.string.swipe_wrong_abi_body, abi)
+                    else stringResource(R.string.swipe_not_library_body)) },
+                confirmButton = { TextButton(::dismiss) { Text(stringResource(R.string.settings_ok)) } })
             else -> AlertDialog(onDismissRequest = ::dismiss,
-                title = { Text(if (check == GestureLibrary.Check.KNOWN) "Verified gesture library" else "Unknown library") },
-                text = { Text(if (check == GestureLibrary.Check.KNOWN)
-                    "The SHA-256 matches the known gesture library for $abi. Chirp will restart to load it."
-                    else "Its SHA-256 (${checksum.take(12)}…) does not match the known library for $abi. It may be another version " +
-                        "or a modified file. Continue only if you trust where it came from. An incompatible library can crash " +
-                        "the keyboard when you swipe; you can remove it here. Chirp will restart to load it.") },
+                title = { Text(stringResource(if (check == GestureLibrary.Check.KNOWN) R.string.swipe_known else R.string.swipe_unknown)) },
+                text = { Text(if (check == GestureLibrary.Check.KNOWN) stringResource(R.string.swipe_known_body, abi)
+                    else stringResource(R.string.swipe_unknown_body, checksum.take(12), abi)) },
                 confirmButton = { TextButton({
                     GestureLibrary.install(context, GestureLibrary.candidate(context), checksum); staged = null; restart()
-                }) { Text(if (check == GestureLibrary.Check.KNOWN) "Install and restart" else "Use anyway and restart") } },
-                dismissButton = { TextButton(::dismiss) { Text("Cancel") } })
+                }) { Text(stringResource(if (check == GestureLibrary.Check.KNOWN) R.string.swipe_install_restart else R.string.swipe_use_anyway)) } },
+                dismissButton = { TextButton(::dismiss) { Text(stringResource(R.string.settings_cancel)) } })
         }
     }
     if (confirmRemove) AlertDialog(onDismissRequest = { confirmRemove = false },
-        title = { Text("Remove gesture library?") },
-        text = { Text("Swipe typing turns off. Chirp will restart.") },
-        confirmButton = { TextButton({ GestureLibrary.remove(context); confirmRemove = false; restart() }) { Text("Remove and restart") } },
-        dismissButton = { TextButton({ confirmRemove = false }) { Text("Cancel") } })
+        title = { Text(stringResource(R.string.swipe_remove_confirm)) },
+        text = { Text(stringResource(R.string.swipe_remove_confirm_body)) },
+        confirmButton = { TextButton({ GestureLibrary.remove(context); confirmRemove = false; restart() }) { Text(stringResource(R.string.swipe_remove_restart)) } },
+        dismissButton = { TextButton({ confirmRemove = false }) { Text(stringResource(R.string.settings_cancel)) } })
 }

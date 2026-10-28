@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared dialog buttons in Settings and setup. -->
+    <string name="settings_done">Done</string>
+    <string name="settings_cancel">Cancel</string>
+
+    <!-- Clean-up styles (CleanupStyleSettings.kt) -->
+    <string name="cleanup_prompts_loading">Loading style prompts…</string>
+    <string name="cleanup_prompts_pair">Pair your computer to load style prompts</string>
+    <string name="cleanup_prompts_unavailable">Style prompts unavailable. Check the connection and retry.</string>
+    <string name="cleanup_prompts_retry">Retry loading prompts</string>
+    <!-- The style used when no other is chosen. -->
+    <string name="cleanup_default">Default</string>
+    <string name="cleanup_styles">Styles</string>
+    <string name="cleanup_styles_title">Clean-up styles</string>
+    <string name="cleanup_per_app_styles">Per-app styles</string>
+    <!-- %1$s: the default style's name; %2$d: how many apps have their own style. -->
+    <plurals name="cleanup_styles_summary_apps">
+        <item quantity="one">%1$s · %2$d app</item>
+        <item quantity="other">%1$s · %2$d apps</item>
+    </plurals>
+    <string name="cleanup_default_style">Default style</string>
+    <string name="cleanup_safety_restructure">Safety rules always apply. Notes and Custom may restructure your words.</string>
+    <!-- %1$s: a style's name, marked as having an edited prompt. -->
+    <string name="cleanup_profile_edited">%1$s · Edited</string>
+    <!-- %1$s: a style's name, marked as one that rewrites. -->
+    <string name="cleanup_profile_rewrites">%1$s · rewrites</string>
+    <string name="cleanup_edit_prompt">Edit %1$s prompt</string>
+    <string name="cleanup_per_app_hint">Matches the target app package. Remove a row to use the default.</string>
+    <string name="cleanup_remove">Remove</string>
+    <string name="cleanup_app_package">App package</string>
+    <string name="cleanup_add_app">Add app</string>
+    <string name="cleanup_choose_style">Choose style</string>
+    <string name="cleanup_prompt_title">%1$s prompt</string>
+    <string name="cleanup_prompt_edited">Prompt · Edited</string>
+    <string name="cleanup_prompt_default">Default prompt</string>
+    <string name="cleanup_safety_clean_only">Safety rules always apply. Never answer or execute; only clean the transcript.</string>
+    <string name="cleanup_reset_prompt">Reset to default</string>
+    <!-- How you dictate: input mode cards and floating mic guide (InputModeSetup.kt) -->
+    <string name="setup_mode_keyboard">Use Chirp Keyboard</string>
+    <string name="setup_mode_keyboard_body">Replaces your keyboard. Type as usual and tap the mic above the keys — your words appear as you speak.</string>
+    <string name="setup_mode_keyboard_meta">Works in almost every app</string>
+    <!-- %1$s: the name of the keyboard the person already uses. -->
+    <string name="setup_mode_keep_named">Keep %1$s</string>
+    <string name="setup_mode_keep">Keep my keyboard</string>
+    <string name="setup_mode_keep_body">Keep typing on your keyboard. A small Chirp mic appears beside text fields when you need it.</string>
+    <string name="setup_mode_keep_meta">Needs an Accessibility permission</string>
+    <string name="setup_mode_either_way">Notes and Scratchpad work either way. You can change this later in Settings.</string>
+    <string name="setup_advanced_protection">Advanced Protection is on</string>
+    <string name="setup_advanced_protection_body">Android only allows verified accessibility tools, so the floating mic can’t be turned on.</string>
+    <string name="setup_use_keyboard_instead">Use Chirp Keyboard instead</string>
+    <string name="setup_bubble_permission">Android calls this an Accessibility permission. Chirp uses it only to show a mic next to the field you’re typing in and to put your words there.</string>
+    <string name="setup_bubble_sees">What Chirp can see</string>
+    <string name="setup_bubble_sees_field">The text field you’re typing in — on this phone only</string>
+    <string name="setup_bubble_sees_never">Never passwords, the rest of the screen or other apps’ content</string>
+    <string name="setup_bubble_sees_voice">Only your voice is sent, to your own computer</string>
+    <string name="setup_bubble_battery">No battery use while idle — the mic, network and timers start only when you tap it.</string>
+    <string name="setup_bubble_on">Floating mic on</string>
+    <string name="setup_bubble_turn_on">Turn on Chirp floating mic, then tap Allow.</string>
+    <string name="setup_restricted_question">Did Android say “Restricted setting”?</string>
+    <string name="setup_restricted_hide">Hide help</string>
+    <string name="setup_restricted_show">Show help</string>
+    <string name="setup_restricted_steps">1. Open Chirp app info.\n2. Tap ⋮ (top right), then Allow restricted settings, and confirm with your screen lock.\n3. Come back and open Accessibility settings again.</string>
+    <string name="setup_open_app_info">Open Chirp app info</string>
+    <string name="setup_open_accessibility_again">Open Accessibility settings again</string>
+    <string name="setup_restricted_menu_note">The ⋮ option appears only after Android has blocked the setting once. Menus differ between phones.</string>
+    <string name="setup_restricted_managed">If your organisation manages this phone, it may block this.</string>
+    <string name="setup_keyboard_enabled">Enabled</string>
+    <string name="setup_keyboard_selected">Selected</string>
+    <string name="setup_enable_keyboard">Enable Chirp Keyboard</string>
+    <string name="setup_choose_keyboard">Choose keyboard</string>
+    <string name="setup_switch_back">Switch back to your keyboard</string>
+    <string name="setup_bubble_blocked">Turned off by Advanced Protection</string>
+    <string name="setup_open_accessibility">Open Accessibility settings</string>
+    <!-- #167: the clipboard is the floating mic's fallback, never automatic. -->
+    <string name="setup_bubble_clipboard">If a field can’t take your words, they wait in the floating mic’s panel until you tap Copy. Chirp never copies on its own and marks copies as sensitive, but Samsung’s clipboard history may still keep them.</string>
+    <string name="setup_other_ways">Other ways to dictate</string>
+    <string name="setup_other_ways_body">Notes and Scratchpad work with any keyboard.</string>
+    <!-- Learning from edits (LearningSettings.kt) -->
+    <string name="learning_title">Learning</string>
+    <string name="learning_from_edits">Learn from my edits</string>
+    <string name="learning_from_edits_summary">On while dictation history is on</string>
+    <string name="learning_from_edits_info">After dictating, fix a word in the same field within 60 seconds. The same correction seen twice teaches Chirp your vocabulary or that app\'s style. Password, incognito and private sessions are excluded. Learned items are encrypted on this phone. Active items go only to your own server with dictation, including its configured clean-up host.</string>
+    <string name="learning_learned">Learned</string>
+    <string name="learning_learned_summary">Review, approve or undo corrections</string>
+    <string name="learning_learned_body">Your terms work everywhere. Style belongs to the app where you edited.</string>
+    <string name="learning_open_failed">Couldn\'t open learned items. Unlock your phone and try again.</string>
+    <string name="learning_empty">Nothing learned yet. Correct the same dictation word twice, or use Teach Chirp in History.</string>
+    <!-- The group of learned items that apply in every app. -->
+    <string name="learning_all_apps">All apps</string>
+    <string name="learning_reset_app">Reset app</string>
+    <!-- A correction seen %1$d of the %2$d times it needs before it is learned. -->
+    <string name="learning_progress">Learning · %1$d of %2$d</string>
+    <string name="learning_approve">Approve</string>
+    <string name="learning_undo">Undo</string>
+    <string name="learning_delete">Delete</string>
+    <string name="learning_teach">Teach Chirp</string>
+    <string name="learning_teach_body">Correct a name or technical word, or adjust this app\'s capitalization and final period.</string>
+    <string name="learning_teach_wanted">What you wanted</string>
+    <string name="learning_teach_not_allowed">Turn on history and learning, and end Private session to teach Chirp.</string>
+    <string name="learning_teach_failed">Couldn\'t save. Try again.</string>
+    <string name="learning_teach_nothing_new">No new correction found. An item turned off stays off until you approve it in Learned.</string>
+    <!-- Dictation history screen (shell/HistoryScreen.kt); its title reuses history_title. -->
+    <string name="history_today">Today</string>
+    <string name="history_yesterday">Yesterday</string>
+    <string name="history_earlier">Earlier</string>
+    <string name="history_deleted">Dictation deleted</string>
+    <string name="history_undo">Undo</string>
+    <string name="history_note_unreadable">Couldn\'t open that note, saved as a new note</string>
+    <string name="history_note_saved_new">Saved as a new note</string>
+    <string name="history_note_added">Added to your latest note</string>
+    <string name="history_notes_off">Notes are off — turn on Keep notes on this phone in Settings → Notes</string>
+    <string name="history_note_failed">Couldn\'t add the note</string>
+    <string name="history_subtitle">What you dictated, encrypted on this phone only</string>
+    <string name="history_more_options">More options</string>
+    <string name="history_settings">History settings</string>
+    <string name="history_search">Search history</string>
+    <string name="history_clear_search">Clear search</string>
+    <string name="history_off">Dictation history is off</string>
+    <string name="history_off_body">Turn it on to keep recent dictations here, encrypted on this phone only.</string>
+    <string name="history_turn_on">Turn on</string>
+    <string name="history_no_matches">No matches</string>
+    <string name="history_no_matches_body">Nothing in your history matches. Try other words.</string>
+    <string name="history_empty">No dictations yet</string>
+    <!-- %1$s: how long history keeps dictations, such as "7 days". -->
+    <string name="history_empty_body">New dictations stay here for %1$s.</string>
+    <string name="history_select_prompt">Select a dictation to see it in full.</string>
+    <!-- %1$s: the latest note's title. -->
+    <string name="history_add_to_latest">Add to latest note (“%1$s”)</string>
+    <string name="history_save_as_new">Save as new note</string>
+    <string name="history_delete">Delete</string>
+    <string name="history_open">Open</string>
+    <!-- Marks a dictation that was cut off before it finished. -->
+    <string name="history_partial">partial</string>
+    <string name="history_before_cleanup">Before clean-up</string>
+    <string name="history_copy">Copy</string>
+    <string name="history_copy_raw">Copy raw</string>
+    <string name="history_share">Share</string>
+    <!-- App updates from the paired computer (UpdateSettings.kt) -->
+    <string name="update_needs_tailscale">Updates need a computer paired over Tailscale</string>
+    <string name="update_unreachable">Couldn\'t reach your computer — is Tailscale on, and is the update folder hosted?</string>
+    <string name="update_download_failed">Download failed — check Tailscale and try again</string>
+    <string name="update_title">Updates</string>
+    <string name="update_body">Chirp checks only your paired computer, over Tailscale, for a newer signed build. Nothing is installed without your tap and Android\'s confirmation.</string>
+    <string name="update_checking">Checking your computer…</string>
+    <string name="update_current">Chirp is up to date.</string>
+    <string name="update_downloading">Downloading update…</string>
+    <string name="update_installing">Confirm the install in Android\'s dialog. Chirp restarts when it finishes.</string>
+    <string name="update_needs_permission">Allow Chirp to install updates, then tap Download and install again.</string>
+    <string name="update_allow_installs">Allow installing updates</string>
+    <string name="update_install">Download and install</string>
+    <!-- %1$s: the new version, such as 1.4.2. -->
+    <string name="update_available">Chirp %1$s is available.</string>
+    <string name="update_check">Check for updates</string>
+
+    <!-- Dictation history settings (HistorySettings.kt) -->
+    <string name="history_keep">Keep dictation history on this phone</string>
+    <string name="history_keep_on">On · encrypted on this phone only</string>
+    <string name="history_keep_off">Off</string>
+    <string name="history_keep_info">Saves recent dictations encrypted on this phone only, so you can reinsert them from the keyboard\'s clock button. Never sent to your computer, backed up or logged. Password and incognito fields are never saved. Turning off stops new entries; existing dictations stay until they expire or you delete history.</string>
+    <string name="history_keep_for">Keep for</string>
+    <string name="history_open_history">Open history</string>
+    <string name="history_delete_history">Delete history</string>
+    <string name="history_off_confirm">Turn off dictation history?</string>
+    <string name="history_off_confirm_body">New dictations won’t be saved. Keep existing dictations until they expire, or delete them from this phone now.</string>
+    <string name="history_off_delete">Turn off and delete</string>
+    <string name="history_off_keep">Turn off, keep history</string>
+    <string name="history_delete_confirm">Delete dictation history?</string>
+    <string name="history_delete_confirm_body">This deletes every saved dictation and its encryption key from this phone. This can’t be undone. The Keep dictation history setting stays the same.</string>
+    <!-- Swipe typing and the optional gesture library (SwipeTyping.kt). %1$s: the phone's processor ABI, such as arm64-v8a. -->
+    <string name="settings_ok">OK</string>
+    <string name="swipe_summary_active">Swipe typing: on, using the gesture library you added</string>
+    <string name="swipe_summary_built_in">Swipe typing: on, built into this build of Chirp</string>
+    <string name="swipe_summary_not_loaded">Swipe typing: the added library did not load</string>
+    <string name="swipe_summary_none">Swipe typing: optional. Add a gesture library in Chirp settings → Keyboard → Swipe typing</string>
+    <string name="swipe_title">Swipe typing</string>
+    <string name="swipe_to_type">Swipe to type</string>
+    <string name="swipe_to_type_added">Using the gesture library you added. Trail and preview options are in Keyboard layouts &amp; settings → Gesture typing.</string>
+    <string name="swipe_to_type_built_in">Built into this build of Chirp. Trail and preview options are in Keyboard layouts &amp; settings → Gesture typing.</string>
+    <string name="swipe_remove">Remove gesture library</string>
+    <string name="swipe_not_loaded">The library you added did not load on this phone (%1$s). Remove it, then add a compatible file.</string>
+    <string name="swipe_none">Chirp has no built-in swipe typing. You can add a compatible gesture library yourself.</string>
+    <string name="swipe_learn_more">Like HeliBoard, Chirp can use a compatible gesture library that you add yourself, usually Google\'s libjni_latinimegoogle.so taken from a Google Apps (GApps) package. Chirp never downloads or includes it. Using it is your choice and is subject to that library\'s own licence.\n\nThis phone needs the %1$s version. Chirp checks the file\'s SHA-256 against the known release and warns about anything else. A library not built for 16 KB memory pages may fail to load on Android 15+ phones that use them. The library runs inside Chirp with Chirp\'s permissions, including network access, so use only a file from a source you trust.</string>
+    <string name="swipe_checking">Checking…</string>
+    <string name="swipe_add">Add gesture library…</string>
+    <string name="swipe_wrong_abi">Wrong library version</string>
+    <string name="swipe_not_library">Not a gesture library</string>
+    <string name="swipe_wrong_abi_body">That library is for a different processor. This phone needs the %1$s version.</string>
+    <string name="swipe_not_library_body">That file is not an Android native library. Nothing was installed.</string>
+    <string name="swipe_known">Verified gesture library</string>
+    <string name="swipe_unknown">Unknown library</string>
+    <string name="swipe_known_body">The SHA-256 matches the known gesture library for %1$s. Chirp will restart to load it.</string>
+    <!-- %1$s: the first characters of the file's checksum; %2$s: the phone's processor ABI. -->
+    <string name="swipe_unknown_body">Its SHA-256 (%1$s…) does not match the known library for %2$s. It may be another version or a modified file. Continue only if you trust where it came from. An incompatible library can crash the keyboard when you swipe; you can remove it here. Chirp will restart to load it.</string>
+    <string name="swipe_install_restart">Install and restart</string>
+    <string name="swipe_use_anyway">Use anyway and restart</string>
+    <string name="swipe_remove_confirm">Remove gesture library?</string>
+    <string name="swipe_remove_confirm_body">Swipe typing turns off. Chirp will restart.</string>
+    <string name="swipe_remove_restart">Remove and restart</string>
+    <!-- Settings categories and their one-line summaries (settings/SettingsScreen.kt, settings/SettingsHome.kt) -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_page_connection">Connection</string>
+    <string name="settings_page_how_you_dictate">How you dictate</string>
+    <string name="settings_page_dictation">Dictation</string>
+    <string name="settings_page_keyboard">Keyboard</string>
+    <string name="settings_page_feedback">Feedback &amp; look</string>
+    <string name="settings_page_history">Privacy &amp; history</string>
+    <string name="settings_page_about">About</string>
+    <string name="settings_summary_pair">Pair your computer to dictate</string>
+    <!-- %1$s: the keyboard the person keeps, or settings_your_keyboard_lower. -->
+    <string name="settings_summary_keyboard_unused">Not in use — you’re keeping %1$s</string>
+    <string name="settings_your_keyboard_lower">your keyboard</string>
+    <string name="settings_your_keyboard">Your keyboard</string>
+    <!-- %1$s: how long history keeps dictations. -->
+    <string name="settings_summary_history_on">History on · keeps %1$s</string>
+    <string name="settings_summary_history_off">Dictation history off</string>
+    <!-- %1$s: the app version. -->
+    <string name="settings_summary_version">Chirp %1$s</string>
+    <string name="settings_summary_stops_on_pause">stops on pause</string>
+    <string name="settings_summary_stops_on_tap">stops on tap</string>
+    <!-- %1$s: settings_summary_stops_on_pause or settings_summary_stops_on_tap. -->
+    <string name="settings_summary_cleanup_on">Clean-up on · %1$s</string>
+    <string name="settings_summary_cleanup_off">Clean-up off · %1$s</string>
+    <string name="settings_summary_cleanup_none">No clean-up from your computer · %1$s</string>
+    <string name="settings_summary_look_custom">Custom</string>
+    <!-- %1$s: the keyboard look, such as Gboard. -->
+    <string name="settings_summary_swipe_on">%1$s · swipe on</string>
+    <string name="settings_summary_swipe_off">%1$s · swipe off</string>
+    <string name="settings_app_colours">App colours</string>
+    <!-- Onboarding progress, e.g. "Step 2 of 5". -->
+    <string name="setup_step">Step %1$d of %2$d</string>
+    <string name="settings_colour_dynamic">Match wallpaper</string>
+    <string name="settings_colour_pond">Pond</string>
+    <!-- %1$s: settings_colour_dynamic or settings_colour_pond. -->
+    <string name="settings_summary_haptics_on">%1$s · haptic cues on</string>
+    <string name="settings_summary_haptics_off">%1$s · haptic cues off</string>
+    <!-- %1$s: the keyboard the person keeps. -->
+    <string name="settings_summary_own_bubble_on">%1$s + floating mic</string>
+    <string name="settings_summary_own_bubble_off">%1$s · floating mic off</string>
+    <string name="settings_summary_choose_mode">Choose how you dictate</string>
+    <!-- Settings detail pages (settings/SettingsPages.kt) -->
+    <string name="settings_open_tailscale">Open Tailscale</string>
+    <string name="settings_check_connection">Check connection</string>
+    <string name="settings_allow_wifi">Allow Wi-Fi server access</string>
+    <string name="settings_allow_wifi_summary">Needed only for servers on your Wi-Fi. Tailscale works without it.</string>
+    <string name="settings_change_pairing">Change pairing</string>
+    <string name="settings_pair_computer">Pair computer</string>
+    <string name="settings_forget_pairing">Forget pairing</string>
+    <string name="settings_forget_confirm">Forget this computer?</string>
+    <string name="settings_forget_confirm_body">You’ll need to scan a new code to dictate. This also ends the session.</string>
+    <string name="settings_forget">Forget</string>
+    <string name="settings_cleanup">Clean-up</string>
+    <!-- %1$s: the host that runs clean-up when it is not the paired computer. -->
+    <string name="settings_cleanup_summary_host">Polishes punctuation and filler words on %1$s</string>
+    <string name="settings_cleanup_summary_computer">Polishes punctuation and filler words on your computer</string>
+    <string name="settings_cleanup_off_computer">Clean-up is off on your computer</string>
+    <string name="settings_stopping">Stopping</string>
+    <string name="settings_spoken_commands">Spoken commands</string>
+    <string name="settings_off_by_default">Off by default</string>
+    <string name="settings_spoken_commands_info">Ending a dictation with \"new line\" or \"new paragraph\" types a line break instead of the words.</string>
+    <string name="settings_press_send">Press Send</string>
+    <string name="settings_keys">Keys and shortcuts</string>
+    <string name="settings_hardware_shortcut">Hardware keyboard shortcut</string>
+    <string name="settings_hardware_shortcut_summary">Ctrl+Alt+Space · Works with Chirp Keyboard</string>
+    <string name="settings_hardware_shortcut_info">Ctrl+Alt+Space starts and stops dictation; Esc cancels while listening.</string>
+    <string name="settings_larger_mic">Larger mic on the inner screen</string>
+    <string name="settings_keyboard_preferences">Layouts, languages &amp; typing</string>
+    <string name="settings_keyboard_preferences_summary">Opens the keyboard\'s own settings</string>
+    <string name="settings_cues">Cues</string>
+    <string name="settings_haptic_cues">Haptic cues</string>
+    <string name="settings_sound_cues">Sound cues</string>
+    <string name="settings_sound_cues_summary">Short tones for start, stop, inserted and error</string>
+    <string name="settings_sound_cues_info">Short tones for start, stop, inserted and error. Silent when the phone is on vibrate or mute.</string>
+    <string name="settings_private_session">Private session</string>
+    <string name="settings_private_session_summary">Exclude history</string>
+    <string name="settings_what_chirp_keeps">What Chirp keeps</string>
+    <string name="settings_what_chirp_keeps_body">Dictations, notes and kept audio never leave this phone.</string>
+    <string name="settings_local_only">Local only</string>
+    <string name="settings_local_only_body">Dictation history is on by default and encrypted on this phone. Turn it off in Privacy &amp; history. Notes are sealed with the phone\'s keystore and never backed up or synced. Kept audio stays next to its note. Diagnostics carry numbers only — no text, audio, hosts or tokens.</string>
+    <string name="settings_diagnostics">Diagnostics</string>
+    <string name="settings_debug_overlay">Debug overlay (timings only)</string>
+    <string name="settings_copy_diagnostics">Copy diagnostics</string>
+    <string name="settings_clear_timings">Clear timings</string>
+    <string name="settings_diagnostics_body">Timings of the last 50 sessions and Notes session counts (numbers only), and the last 5 local crashes (exception class, stack frames, app version and time). No messages, text, audio, hosts or tokens.</string>
+    <!-- Quick dictate sheet (QuickDictateActivity.kt) -->
+    <string name="quick_dictate_title">Quick dictate</string>
+    <string name="quick_dictate_finished">Finished</string>
+    <string name="quick_dictate_use_raw">Use raw</string>
+    <string name="quick_dictate_raw_available">Use raw, available for 4 seconds</string>
+    <!-- %1$d: seconds left to use the raw dictation. -->
+    <string name="quick_dictate_use_raw_seconds">Use raw (%1$ds)</string>
+    <string name="quick_dictate_edit">Edit in Scratchpad</string>
+    <string name="quick_dictate_allow">Allow</string>
+    <string name="quick_dictate_tailscale_on">Turn on Tailscale</string>
+    <string name="quick_dictate_check_again">Check again</string>
+    <string name="quick_dictate_stop">Stop</string>
+    <!-- Scratchpad (ScratchpadActivity.kt) -->
+    <string name="scratchpad_raw_available">Use raw, available for 5 seconds</string>
+    <string name="scratchpad_copy">Copy</string>
+    <string name="scratchpad_share">Share</string>
+    <string name="scratchpad_placeholder">Dictate, then edit here</string>
+    <string name="scratchpad_privacy_history">Each dictation is also saved to history, encrypted on this phone. The text above is not.</string>
+    <string name="scratchpad_privacy_none">Nothing is saved. This text is gone when you leave.</string>
+    <string name="scratchpad_save_as_note">Save as note</string>
+    <string name="scratchpad_clear">Clear</string>
+    <!-- The style chip for dictation without clean-up. -->
+    <string name="scratchpad_style_raw">Raw</string>
+    <string name="scratchpad_mic_stop">Microphone: stop dictation</string>
+    <string name="scratchpad_mic_start">Microphone: tap to dictate</string>
+    <!-- Onboarding pages (OnboardingPages.kt). Page titles shared with iOS stay as constants there. -->
+    <string name="onboarding_get_started">Get started</string>
+    <string name="onboarding_welcome_body">Speak on your phone and your computer writes the words into any app, privately over Tailscale. Meetings and thoughts can live in Notes: a recording that transcribes and organises itself while you talk.</string>
+    <string name="onboarding_welcome_privacy">Dictation history and learning from your edits are on by default, encrypted on this phone. Turn history off in Settings → Privacy &amp; history, and learning off in Settings → Dictation.</string>
+    <string name="onboarding_choice_title">How you’ll dictate</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_bubble_title">Turn on the floating mic</string>
+    <string name="onboarding_continue_without">Continue without it</string>
+    <string name="onboarding_skip">Skip for now</string>
+    <string name="onboarding_select_keyboard">Select Chirp Keyboard</string>
+    <string name="onboarding_keyboard_body">A full keyboard with Chirp’s microphone built in. Type normally, or tap the mic above the keys to dictate.</string>
+    <string name="onboarding_selected_default">Selected as default</string>
+    <!-- %1$s: the swipe typing status line, such as "Swipe typing: on, built into this build of Chirp". -->
+    <string name="onboarding_keyboard_tips">Samsung: Settings → General management → Keyboard list and default.\n\nEnglish autocorrect, next-word and emoji suggestions are ready to use. Personalised suggestions learn typed words on this device; turn them off in Chirp settings → Keyboard → Layouts, languages &amp; typing → Text correction. Dictation finals bypass keyboard learning.\n\n%1$s</string>
+    <string name="onboarding_allow_mic">Allow microphone</string>
+    <string name="onboarding_mic_body">Chirp listens only while you dictate or record a note. Notes and optional kept audio stay on this phone.</string>
+    <string name="onboarding_mic_allowed">Microphone allowed</string>
+    <string name="onboarding_mic_denied">Allow the microphone to dictate</string>
+    <string name="onboarding_open_permissions">Open app permissions</string>
+    <string name="onboarding_mic_tips_title">Your microphone</string>
+    <string name="onboarding_mic_tips">The mic opens only when you start dictation or a note and is released when you stop. Dictation history and learning from your edits are on by default, encrypted on this phone; turn history off in Settings → Privacy &amp; history, and learning off in Settings → Dictation. Notes are kept locally; keeping their audio is optional and off by default.</string>
+    <string name="onboarding_connected">Connected</string>
+    <string name="onboarding_finish">Finish</string>
+    <string name="onboarding_scanning">Scanning…</string>
+    <string name="onboarding_connecting">Connecting…</string>
+    <string name="onboarding_scan">Scan code</string>
+    <string name="onboarding_connecting_computer">Connecting to your computer…</string>
+    <string name="onboarding_unreachable">Couldn’t reach your computer</string>
+    <string name="onboarding_unreachable_body">Check Tailscale is on for both devices and Chirp is running on the computer.</string>
+    <string name="onboarding_try_again">Try again</string>
+    <string name="onboarding_scanner_unavailable">Scanner unavailable</string>
+    <string name="onboarding_scanner_unavailable_body">QR scanning uses Google Play services.</string>
+    <string name="onboarding_paste_link">Paste link instead</string>
+    <string name="onboarding_invalid_code">That isn’t a Chirp pairing code</string>
+    <string name="onboarding_scan_again">Scan again</string>
+    <string name="onboarding_link_description">Private Chirp pairing link</string>
+    <string name="onboarding_link_label">Pairing link</string>
+    <string name="onboarding_link_invalid">That isn’t a Chirp pairing link</string>
+    <string name="onboarding_link_hint">Pasting a valid link connects right away</string>
+    <string name="onboarding_pairing_tips_title">Pairing</string>
+    <string name="onboarding_pairing_tips">Turn on Tailscale on both devices. QR scanning uses Google Play services; Chirp needs no camera permission. Pasting the link works without the scanner. The pairing is encrypted with Android Keystore, and nothing is saved until your computer answers.</string>
+    <string name="onboarding_done">Done</string>
+    <string name="onboarding_not_done">Not done yet</string>
+    <!-- First-run Try it card (TryItCard.kt) -->
+    <string name="try_it_title">Try it</string>
+    <string name="try_it_body_bubble">Tap a text field, then the floating Chirp mic</string>
+    <string name="try_it_body_keyboard">Tap the field, type on Chirp Keyboard, then tap its mic to dictate. Tap ✓ to finish (or pause, if you chose When I pause); hold the mic to talk, or tap ⋯ for quick options.</string>
+    <string name="try_it_hint">Test dictation here</string>
+    <string name="try_it_dismiss">Dismiss</string>
+
+    <!-- Stop dictation (StopDictationSettings.kt) -->
+    <string name="stop_title">Stop dictation</string>
+    <string name="stop_when_pause">When I pause</string>
+    <string name="stop_when_tap">When I tap</string>
+    <string name="stop_pause_length">Pause length</string>
+    <string name="stop_info_pause">Chirp stops after you pause, judged against the room\'s background noise. It never stops before you speak, and gives up after 10 seconds of silence. Either way, dictation ends at 10 minutes.</string>
+    <string name="stop_info_tap">Tap the stop button to finish. Either way, a countdown starts 15 seconds before the limit and dictation ends at 10 minutes.</string>
+
+    <!-- Press Send after dictating (AutoEnterSettings.kt) -->
+    <string name="auto_enter_title">Press Send after dictating</string>
+    <string name="auto_enter_body">After the last words land, presses the field\'s Send, Go or Done (or Enter in a chat box). Never in password fields, and not after a failed or partial dictation. Chat apps are the ones set to the Chat style.</string>
+
+    <!-- HeliBoard's Chirp section (ChirpSettingsSection.kt); its heading is the app name. -->
+    <string name="settings_open_chirp">Open Chirp settings</string>
+    <!-- Keyboard look chooser (KeyboardLook.kt); the looks' own names and descriptions stay in KeyboardLook. -->
+    <string name="look_title">Keyboard look</string>
+    <!-- %1$s: a keyboard look's name, marked as the default one. -->
+    <string name="look_default">%1$s · default</string>
+    <string name="look_custom">Custom look from Appearance is in use. Pick one above to switch.</string>
+    <string name="look_fine_tune">Fine-tune colours, key borders, height and background in Appearance.</string>
+
+    <!-- Quick Settings tiles and the widget (ChirpWidget.kt). %1$s: the tile's name, Notes or Dictate. -->
+    <string name="widget_tile_manual">Swipe down twice → Edit, then drag %1$s into Quick Settings.</string>
+    <string name="widget_tile_prompt">Choose Add in the system prompt.</string>
+    <string name="widget_tile_fallback">Swipe down twice → Edit to add the tile.</string>
+    <string name="widget_pin_prompt">Choose Add in the launcher prompt.</string>
+    <string name="widget_pin_manual">Long-press your home screen → Widgets → Chirp.</string>
+    <string name="widget_quick_dictate_body">Quick dictate copies your final so you can paste anywhere. Copies are marked sensitive; Samsung’s clipboard history may still keep them.</string>
+    <string name="widget_add_dictate_tile">Add Dictate tile</string>
+    <string name="widget_add_notes_tile">Add Notes tile</string>
+    <string name="widget_add_widget">Add Widget</string>
+    <string name="widget_recognizer_body">In apps with a Speak button, Android may ask you to choose Chirp or another recognizer. Choose Just once or Always.</string>
+
+    <!-- Shared settings rows (ui/ChirpComponents.kt) -->
+    <!-- The ⓘ button's spoken name. %1$s: the row's title. -->
+    <string name="settings_about_row">About %1$s</string>
+    <string name="settings_close">Close</string>
+    <string name="settings_learn_more">Learn more</string>
+    <!-- Shown only when the paired server runs with debug retention. -->
+    <string name="settings_debug_retention_on">DEBUG RETENTION IS ON — the Chirp server may retain audio and text</string>
+</resources>

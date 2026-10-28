@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
 import dev.chirp.android.ui.ActionRow
 import dev.chirp.android.ui.SettingsGroup
@@ -49,10 +50,10 @@ internal class UpdateController(
         scope.launch {
             val result: UpdateStatus = try {
                 withContext(Dispatchers.IO) {
-                    val base = pairing()?.let(AppUpdates::base) ?: return@withContext UpdateStatus.Failed("Updates need a computer paired over Tailscale")
+                    val base = pairing()?.let(AppUpdates::base) ?: return@withContext UpdateStatus.Failed(context.getString(R.string.update_needs_tailscale))
                     AppUpdates.check(client, base, installed())?.let { UpdateStatus.Available(it) } ?: UpdateStatus.Current
                 }
-            } catch (_: Exception) { UpdateStatus.Failed("Couldn't reach your computer — is Tailscale on, and is the update folder hosted?") }
+            } catch (_: Exception) { UpdateStatus.Failed(context.getString(R.string.update_unreachable)) }
             busy = false
             if (manual || result is UpdateStatus.Available) status = result
         }
@@ -70,7 +71,7 @@ internal class UpdateController(
                     AppUpdates.download(client.newBuilder().callTimeout(0, java.util.concurrent.TimeUnit.SECONDS).build(), info, apk)
                     UpdateInstaller.install(context, apk, info)
                 }
-            } catch (_: Exception) { "Download failed — check Tailscale and try again" }
+            } catch (_: Exception) { context.getString(R.string.update_download_failed) }
             busy = false
             status = if (error == null) UpdateStatus.Installing else UpdateStatus.Failed(error)
         }
@@ -92,28 +93,28 @@ internal fun UpdateSettings(controller: UpdateController? = null) {
     LaunchedEffect(updates) { updates.check(manual = false) }
     val status = updates.status
     val working = status == UpdateStatus.Checking || status == UpdateStatus.Downloading
-    SettingsGroup("Updates") {
+    SettingsGroup(stringResource(R.string.update_title)) {
         SettingsItem {
-            Text("Chirp checks only your paired computer, over Tailscale, for a newer signed build. Nothing is installed without your tap and Android's confirmation.",
+            Text(stringResource(R.string.update_body),
                 style = MaterialTheme.typography.bodySmall)
             when (status) {
                 UpdateStatus.Idle -> {}
-                UpdateStatus.Checking -> Text("Checking your computer…")
-                UpdateStatus.Current -> Text("Chirp is up to date.")
-                UpdateStatus.Downloading -> Text("Downloading update…")
-                UpdateStatus.Installing -> Text("Confirm the install in Android's dialog. Chirp restarts when it finishes.")
+                UpdateStatus.Checking -> Text(stringResource(R.string.update_checking))
+                UpdateStatus.Current -> Text(stringResource(R.string.update_current))
+                UpdateStatus.Downloading -> Text(stringResource(R.string.update_downloading))
+                UpdateStatus.Installing -> Text(stringResource(R.string.update_installing))
                 is UpdateStatus.NeedsPermission -> {
-                    Text("Allow Chirp to install updates, then tap Download and install again.")
-                    OutlinedButton(updates::allowInstalls, Modifier.fillMaxWidth()) { Text("Allow installing updates") }
-                    Button({ updates.install(status.info) }, Modifier.fillMaxWidth()) { Text("Download and install") }
+                    Text(stringResource(R.string.update_needs_permission))
+                    OutlinedButton(updates::allowInstalls, Modifier.fillMaxWidth()) { Text(stringResource(R.string.update_allow_installs)) }
+                    Button({ updates.install(status.info) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.update_install)) }
                 }
                 is UpdateStatus.Available -> {
-                    Text("Chirp ${status.info.versionName} is available.")
-                    Button({ updates.install(status.info) }, Modifier.fillMaxWidth()) { Text("Download and install") }
+                    Text(stringResource(R.string.update_available, status.info.versionName))
+                    Button({ updates.install(status.info) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.update_install)) }
                 }
                 is UpdateStatus.Failed -> Text(status.message)
             }
         }
-        ActionRow("Check for updates", { updates.check() }, enabled = !working)
+        ActionRow(stringResource(R.string.update_check), { updates.check() }, enabled = !working)
     }
 }

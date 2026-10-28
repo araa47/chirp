@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -156,8 +157,9 @@ internal fun QuickDictateScreen(model: QuickDictateModel, prompt: String? = null
                                useRaw: () -> Unit = {}, edit: () -> Unit = {}, done: () -> Unit = {}) {
     val deadline = model.closeAt
     val view = androidx.compose.ui.platform.LocalView.current
+    val rawAvailable = stringResource(R.string.quick_dictate_raw_available)
     androidx.compose.runtime.LaunchedEffect(model.raw) {
-        if (model.raw != null && deadline != null) view.announceForAccessibility("Use raw, available for 4 seconds")
+        if (model.raw != null && deadline != null) view.announceForAccessibility(rawAvailable)
     }
     val seconds by androidx.compose.runtime.produceState(deadline?.let { actionSeconds(it, SystemClock.elapsedRealtime()) }, deadline) {
         value = deadline?.let { actionSeconds(it, SystemClock.elapsedRealtime()) }
@@ -174,16 +176,16 @@ internal fun QuickDictateScreen(model: QuickDictateModel, prompt: String? = null
         Surface(Modifier.widthIn(max = 560.dp).fillMaxWidth(), shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), color = colors.surface) {
             Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Text("Quick dictate", style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.quick_dictate_title), style = MaterialTheme.typography.headlineSmall)
                 prompt?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant) }
                 Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
                     if (model.active && !model.stopping) Ripple(model.level.toFloat(), Modifier.fillMaxSize())
                     else Ripple(model.level.toFloat(), Modifier.fillMaxSize(), animate = false)
                     Icon(painterResource(R.drawable.ic_mic), null, Modifier.size(32.dp), tint = colors.primary)
                 }
-                Text(if (recognizing && model.copied) "Finished" else model.status,
+                Text(if (recognizing && model.copied) stringResource(R.string.quick_dictate_finished) else model.status,
                     Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium)
-                if (model.retained) Text("DEBUG: recordings kept on the server", style = MaterialTheme.typography.bodySmall)
+                if (model.retained) Text(stringResource(R.string.debug_retention), style = MaterialTheme.typography.bodySmall)
                 val content = if (model.copied) model.text else model.partial
                 if (content.isNotEmpty()) Text(buildAnnotatedString {
                     val stable = if (model.copied) content else model.stable.takeIf { content.startsWith(it) }.orEmpty()
@@ -192,24 +194,25 @@ internal fun QuickDictateScreen(model: QuickDictateModel, prompt: String? = null
                 }, Modifier.fillMaxWidth().heightIn(min = 72.dp), style = MaterialTheme.typography.bodyLarge)
                 if (model.active) Button(stop, enabled = !model.stopping,
                     colors = ButtonDefaults.buttonColors(containerColor = record, contentColor = onRecord)) {
-                    Icon(painterResource(R.drawable.ic_stop), null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Stop")
+                    Icon(painterResource(R.drawable.ic_stop), null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.quick_dictate_stop))
                 } else if (model.copied && !recognizing) {
+                    val useRawLabel = stringResource(R.string.quick_dictate_use_raw)
                     if (model.raw != null && seconds != 0) OutlinedButton(useRaw, Modifier.fillMaxWidth().semantics {
-                        contentDescription = if (deadline == null) "Use raw" else "Use raw, available for 4 seconds"
-                    }) { Text(if (seconds != null) "Use raw (${seconds}s)" else "Use raw",
+                        contentDescription = if (deadline == null) useRawLabel else rawAvailable
+                    }) { Text(seconds?.let { stringResource(R.string.quick_dictate_use_raw_seconds, it) } ?: useRawLabel,
                         Modifier.clearAndSetSemantics { }, style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum")) }
-                    OutlinedButton(edit, Modifier.fillMaxWidth()) { Text("Edit in Scratchpad") }
-                    Button(done, Modifier.fillMaxWidth()) { Text("Done") }
+                    OutlinedButton(edit, Modifier.fillMaxWidth()) { Text(stringResource(R.string.quick_dictate_edit)) }
+                    Button(done, Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_done)) }
                 } else {
-                    Button(retry, Modifier.fillMaxWidth()) { Text(when (DictationAction.forStatus(model.status)) {
-                        DictationAction.PAIR -> "Pair computer"
-                        DictationAction.MICROPHONE -> "Allow"
-                        DictationAction.TAILSCALE_ON, DictationAction.TAILSCALE_OPEN, DictationAction.TAILSCALE_SETUP -> "Turn on Tailscale"
-                        else -> "Check again"
-                    }) }
-                    TextButton(done) { Text("Done") }
+                    Button(retry, Modifier.fillMaxWidth()) { Text(stringResource(when (DictationAction.forStatus(model.status)) {
+                        DictationAction.PAIR -> R.string.settings_pair_computer
+                        DictationAction.MICROPHONE -> R.string.quick_dictate_allow
+                        DictationAction.TAILSCALE_ON, DictationAction.TAILSCALE_OPEN, DictationAction.TAILSCALE_SETUP -> R.string.quick_dictate_tailscale_on
+                        else -> R.string.quick_dictate_check_again
+                    })) }
+                    TextButton(done) { Text(stringResource(R.string.settings_done)) }
                 }
-                if (!model.copied) TextButton(cancel) { Text("Cancel") }
+                if (!model.copied) TextButton(cancel) { Text(stringResource(R.string.settings_cancel)) }
             }
         }
     }

@@ -1,7 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug only: WallpaperProbeActivity sets test wallpapers for the emulator Match wallpaper check. -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <application android:networkSecurityConfig="@xml/debug_network_security">
         <activity android:name=".RetranscribeProbeActivity" android:exported="true" />
         <activity android:name=".EditorProbeActivity" android:exported="true" />
         <activity android:name=".E2eEditorActivity" android:exported="true" />
+        <activity android:name=".WallpaperProbeActivity" android:exported="true" android:theme="@android:style/Theme.NoDisplay" />
     </application>
 </manifest>

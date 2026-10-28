@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
@@ -74,7 +75,9 @@ private fun inline(text: String): AnnotatedString {
 @Composable
 internal fun NotesBlockView(block: NotesBlock, edit: (NotesBlock) -> Unit, toggle: (NotesBlock.Task) -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val tap = Modifier.testTag("notes-block").clickable(remember { MutableInteractionSource() }, null, onClickLabel = "Edit") { edit(block) }
+    val editLabel = stringResource(R.string.notes_block_edit)
+    val tickLabel = stringResource(if ((block as? NotesBlock.Task)?.checked == true) R.string.notes_task_untick else R.string.notes_task_tick)
+    val tap = Modifier.testTag("notes-block").clickable(remember { MutableInteractionSource() }, null, onClickLabel = editLabel) { edit(block) }
     val indent = Modifier.padding(start = (24 * ((block as? NotesBlock.Item)?.depth ?: (block as? NotesBlock.Task)?.depth ?: (block as? NotesBlock.Callout)?.depth ?: 0)).dp)
     when (block) {
         is NotesBlock.Heading -> Text(inline(block.text), modifier.then(tap).padding(top = if (block.level <= 2) 20.dp else 14.dp, bottom = 4.dp).semantics { heading() },
@@ -90,8 +93,8 @@ internal fun NotesBlockView(block: NotesBlock, edit: (NotesBlock) -> Unit, toggl
         // One node for TalkBack: a checkbox named by its words, with Edit as an action. By touch the box ticks and the words edit.
         is NotesBlock.Task -> Row(modifier.then(indent).padding(vertical = 1.dp).testTag("notes-block").clearAndSetSemantics {
             role = Role.Checkbox; text = AnnotatedString(block.text); toggleableState = ToggleableState(block.checked)
-            onClick(if (block.checked) "Untick" else "Tick") { toggle(block); true }
-            customActions = listOf(CustomAccessibilityAction("Edit") { edit(block); true })
+            onClick(tickLabel) { toggle(block); true }
+            customActions = listOf(CustomAccessibilityAction(editLabel) { edit(block); true })
         }, verticalAlignment = Alignment.Top) {
             Marker(Modifier.width(34.dp).toggleable(block.checked, role = Role.Checkbox) { toggle(block) }) { TaskBox(block.checked) }
             Text(inline(block.text), Modifier.weight(1f).clickable(remember { MutableInteractionSource() }, null) { edit(block) }.padding(vertical = 2.dp),
@@ -153,7 +156,8 @@ private fun TaskBox(checked: Boolean) {
 @Composable
 internal fun HearingLine(text: String, listening: Boolean, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Row(modifier.testTag("notes-hearing").padding(vertical = 8.dp).semantics(mergeDescendants = true) { contentDescription = "Hearing: $text" },
+    val description = stringResource(R.string.notes_hearing_description, text)
+    Row(modifier.testTag("notes-hearing").padding(vertical = 8.dp).semantics(mergeDescendants = true) { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         val pulse = if (listening) rememberInfiniteTransition(label = "hearing").animateFloat(.35f, 1f,
             infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "dot").value else .35f
@@ -168,13 +172,13 @@ internal fun HearingLine(text: String, listening: Boolean, modifier: Modifier = 
 @Composable
 internal fun NotesEmpty(recording: Boolean, type: () -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Column(modifier.clickable(onClickLabel = "Type notes", onClick = type).padding(top = 56.dp, bottom = 24.dp, start = 24.dp, end = 24.dp),
+    Column(modifier.clickable(onClickLabel = stringResource(R.string.notes_empty_type), onClick = type).padding(top = 56.dp, bottom = 24.dp, start = 24.dp, end = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(72.dp).clip(CircleShape).background(scheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
             Icon(painterResource(R.drawable.ic_notes_tab), null, Modifier.size(32.dp), tint = scheme.primary)
         }
-        Text(if (recording) "Notes appear as you talk" else "Your notes appear here", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-        Text(if (recording) "Headings, lists and to-dos land here a moment after each pause." else "Tap Record and talk. Chirp turns it into headings, lists and to-dos. Or tap here to type.",
+        Text(stringResource(if (recording) R.string.notes_empty_recording_title else R.string.notes_empty_title), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(stringResource(if (recording) R.string.notes_empty_recording_detail else R.string.notes_empty_detail),
             style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }

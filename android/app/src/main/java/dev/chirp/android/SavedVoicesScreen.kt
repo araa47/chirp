@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import dev.chirp.android.settings.PageScaffold
 import androidx.compose.ui.unit.dp
@@ -23,7 +25,7 @@ internal fun SavedVoicesScreen(model: SavedVoicesModel, dismiss: () -> Unit) {
     Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize()) {
             BackHandler(onBack = dismiss)
-            PageScaffold("Saved voices", back = dismiss, scroll = rememberScrollState(), modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+            PageScaffold(stringResource(R.string.saved_voices_title), back = dismiss, scroll = rememberScrollState(), modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                 SavedVoicesContent(model)
             }
         }
@@ -39,19 +41,19 @@ internal fun SavedVoicesContent(model: SavedVoicesModel) {
     var name by remember { mutableStateOf("") }
     val library = model.library
     SettingsGroup {
-        SwitchRow("Remember voices of people I name", library?.enabled == true, { on ->
+        SwitchRow(stringResource(R.string.saved_voices_remember), library?.enabled == true, { on ->
             if (on) model.action(VoiceAction.Enable) else disable = true
-        }, enabled = library != null && !model.busy, summary = "Shared by all devices paired to this computer")
+        }, enabled = library != null && !model.busy, summary = stringResource(R.string.saved_voices_remember_summary))
         SettingsItem {
-            Text("Chirp recognises these people in new notes on all your devices. They’re kept on your paired computer, never uploaded.",
+            Text(stringResource(R.string.saved_voices_about),
                 style = MaterialTheme.typography.bodyMedium)
         }
         model.error?.let { message ->
             SettingsItem { Text(message, color = MaterialTheme.colorScheme.error) }
         }
-        if (model.busy) SettingsItem { Text("Updating saved voices…") }
+        if (model.busy) SettingsItem { Text(stringResource(R.string.saved_voices_updating)) }
         if (library?.voices?.isEmpty() == true) SettingsItem {
-            Text("Name a speaker in a note and Chirp will recognise them next time.", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.saved_voices_empty), style = MaterialTheme.typography.bodyMedium)
         }
         library?.voices.orEmpty().forEach { voice ->
             SettingsItem {
@@ -59,56 +61,59 @@ internal fun SavedVoicesContent(model: SavedVoicesModel) {
                     Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                         Text(voice.name, style = MaterialTheme.typography.titleMedium)
                         Text(voiceDetail(voice), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (!voice.compatible) Text("Name them again to keep recognising this voice", style = MaterialTheme.typography.bodySmall)
+                        if (!voice.compatible) Text(stringResource(R.string.saved_voices_incompatible), style = MaterialTheme.typography.bodySmall)
                     }
                     var menu by remember(voice.id) { mutableStateOf(false) }
                     Box {
                         IconButton({ menu = true }, Modifier.size(48.dp), enabled = !model.busy,
                             colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                            Icon(painterResource(R.drawable.ic_more_horiz), "Options for ${voice.name}")
+                            Icon(painterResource(R.drawable.ic_more_horiz), stringResource(R.string.saved_voices_options, voice.name))
                         }
                         DropdownMenu(menu, { menu = false }) {
-                            DropdownMenuItem({ Text("Rename…") }, { menu = false; renaming = voice; name = voice.name })
-                            DropdownMenuItem({ Text("Forget…") }, { menu = false; forgetting = voice })
+                            DropdownMenuItem({ Text(stringResource(R.string.saved_voices_rename_menu)) }, { menu = false; renaming = voice; name = voice.name })
+                            DropdownMenuItem({ Text(stringResource(R.string.saved_voices_forget_menu)) }, { menu = false; forgetting = voice })
                         }
                     }
                 }
             }
         }
-        ActionRow("Refresh saved voices", { model.refresh() })
-        if (library?.voices?.isNotEmpty() == true) ActionRow("Forget all voices…", { forgetAll = true }, destructive = true)
+        ActionRow(stringResource(R.string.saved_voices_refresh), { model.refresh() })
+        if (library?.voices?.isNotEmpty() == true) ActionRow(stringResource(R.string.saved_voices_forget_all_menu), { forgetAll = true }, destructive = true)
     }
-    if (disable) AlertDialog(onDismissRequest = { disable = false }, title = { Text("Stop remembering voices?") },
-        text = { Text("Stops saving and recognising on every device. Also forget ${library?.voices?.size ?: 0} saved voices?") },
-        confirmButton = { TextButton({ disable = false; model.action(VoiceAction.Disable(true)) }) { Text("Turn off and forget") } },
+    if (disable) AlertDialog(onDismissRequest = { disable = false }, title = { Text(stringResource(R.string.saved_voices_stop_title)) },
+        text = { val count = library?.voices?.size ?: 0; Text(pluralStringResource(R.plurals.saved_voices_stop_message, count, count)) },
+        confirmButton = { TextButton({ disable = false; model.action(VoiceAction.Disable(true)) }) { Text(stringResource(R.string.saved_voices_turn_off_forget)) } },
         dismissButton = { Row {
-            TextButton({ disable = false; model.action(VoiceAction.Disable(false)) }) { Text("Keep voices") }
-            TextButton({ disable = false }) { Text("Cancel") }
+            TextButton({ disable = false; model.action(VoiceAction.Disable(false)) }) { Text(stringResource(R.string.saved_voices_keep)) }
+            TextButton({ disable = false }) { Text(stringResource(R.string.notes_action_cancel)) }
         } })
     if (forgetAll || forgetting != null) AlertDialog(onDismissRequest = { forgetAll = false; forgetting = null },
-        title = { Text(if (forgetAll) "Forget all voices?" else "Forget ${forgetting?.name}?") },
-        text = { Text(if (forgetAll) "Removes all saved voices from your computer for every device. Names in existing notes stay. This can’t be undone."
-            else "Removes ${forgetting?.name}’s voice from your computer for every device. Names in existing notes stay. This can’t be undone.") },
+        title = { Text(if (forgetAll) stringResource(R.string.saved_voices_forget_all_title) else stringResource(R.string.saved_voices_forget_title, forgetting?.name.orEmpty())) },
+        text = { Text(if (forgetAll) stringResource(R.string.saved_voices_forget_all_message)
+            else stringResource(R.string.saved_voices_forget_message, forgetting?.name.orEmpty())) },
         confirmButton = { TextButton({
             val action = forgetting?.let { VoiceAction.Forget(it.id) } ?: VoiceAction.ForgetAll
             forgetAll = false; forgetting = null; model.action(action)
-        }) { Text("Forget") } }, dismissButton = { TextButton({ forgetAll = false; forgetting = null }) { Text("Cancel") } })
+        }) { Text(stringResource(R.string.saved_voices_forget)) } }, dismissButton = { TextButton({ forgetAll = false; forgetting = null }) { Text(stringResource(R.string.notes_action_cancel)) } })
     renaming?.let { voice ->
-        AlertDialog(onDismissRequest = { renaming = null }, title = { Text("Rename saved voice") },
+        AlertDialog(onDismissRequest = { renaming = null }, title = { Text(stringResource(R.string.saved_voices_rename_title)) },
             text = { Column {
-                OutlinedTextField(name, { name = it.take(60) }, label = { Text("Name") }, singleLine = true)
-                Text("Names in existing notes stay.", style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(name, { name = it.take(60) }, label = { Text(stringResource(R.string.saved_voices_name)) }, singleLine = true)
+                Text(stringResource(R.string.saved_voices_names_stay), style = MaterialTheme.typography.bodySmall)
             } }, confirmButton = { TextButton({
                 renaming = null; model.action(VoiceAction.Rename(voice.id, cleanVoiceName(name)))
-            }, enabled = validVoiceName(cleanVoiceName(name))) { Text("Rename") } },
-            dismissButton = { TextButton({ renaming = null }) { Text("Cancel") } })
+            }, enabled = validVoiceName(cleanVoiceName(name))) { Text(stringResource(R.string.saved_voices_rename)) } },
+            dismissButton = { TextButton({ renaming = null }) { Text(stringResource(R.string.notes_action_cancel)) } })
     }
 }
 
+@Composable
 private fun voiceDetail(voice: SavedVoice): String {
+    val earlier = stringResource(R.string.saved_voices_date_earlier)
     fun date(value: String): String = try {
         java.time.Instant.parse(value).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
             .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
-    } catch (_: Exception) { "earlier" }
-    return "Saved ${date(voice.created)}" + (if (voice.updated != voice.created) " · updated ${date(voice.updated)}" else "") + " · ${voice.seconds.toInt()} s"
+    } catch (_: Exception) { earlier }
+    return if (voice.updated != voice.created) stringResource(R.string.saved_voices_detail_updated, date(voice.created), date(voice.updated), voice.seconds.toInt())
+    else stringResource(R.string.saved_voices_detail, date(voice.created), voice.seconds.toInt())
 }

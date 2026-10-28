@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -45,48 +46,42 @@ internal const val PAIRING_STEPS =
 internal fun OnboardingPage(page: Int, state: SetupState, actions: OnboardingActions) {
     val next = { state.step = page + 1 }
     when (page) {
-        PAGE_WELCOME -> PageFrame(WELCOME_TITLE, { PondHero() }, PrimaryAction("Get started") { next() }) {
-            Body("Speak on your phone and your computer writes the words into any app, privately over Tailscale. " +
-                "Meetings and thoughts can live in Notes: a recording that transcribes and organises itself while you talk.")
-            Body("Dictation history and learning from your edits are on by default, encrypted on this phone. Turn history off in Settings → Privacy & history, and learning off in Settings → Dictation.")
+        PAGE_WELCOME -> PageFrame(WELCOME_TITLE, { PondHero() }, PrimaryAction(stringResource(R.string.onboarding_get_started)) { next() }) {
+            Body(stringResource(R.string.onboarding_welcome_body))
+            Body(stringResource(R.string.onboarding_welcome_privacy))
         }
-        PAGE_CHOICE -> PageFrame("How you’ll dictate", {}, PrimaryAction("Continue", state.inputMode != null) { next() }) {
+        PAGE_CHOICE -> PageFrame(stringResource(R.string.onboarding_choice_title), {}, PrimaryAction(stringResource(R.string.onboarding_continue), state.inputMode != null) { next() }) {
             InputModeCards(state, actions.chooseMode)
         }
         PAGE_KEYBOARD -> if (state.inputMode == InputMode.OWN_KEYBOARD) {
-            PageFrame("Turn on the floating mic", {}, when {
-                state.advancedProtection -> PrimaryAction("Continue without it", onClick = actions.skipFloatingMic)
-                state.bubbleEnabled -> PrimaryAction("Continue") { next() }
-                else -> PrimaryAction("Open Accessibility settings", onClick = actions.accessibility)
+            PageFrame(stringResource(R.string.onboarding_bubble_title), {}, when {
+                state.advancedProtection -> PrimaryAction(stringResource(R.string.onboarding_continue_without), onClick = actions.skipFloatingMic)
+                state.bubbleEnabled -> PrimaryAction(stringResource(R.string.onboarding_continue)) { next() }
+                else -> PrimaryAction(stringResource(R.string.setup_open_accessibility), onClick = actions.accessibility)
             }) {
                 FloatingMicGuide(state, actions.accessibility, actions.appSettings,
                     useKeyboard = { actions.chooseMode(InputMode.KEYBOARD) })
-                if (!state.advancedProtection) TextButton(actions.skipFloatingMic) { Text("Skip for now") }
+                if (!state.advancedProtection) TextButton(actions.skipFloatingMic) { Text(stringResource(R.string.onboarding_skip)) }
             }
         } else PageFrame(KEYBOARD_TITLE, { Illustration(R.drawable.ic_keyboard) }, when {
-            !state.inputEnabled -> PrimaryAction("Enable Chirp Keyboard", onClick = actions.keyboardSettings)
-            !state.inputSelected -> PrimaryAction("Select Chirp Keyboard", onClick = actions.picker)
-            else -> PrimaryAction("Continue") { next() }
+            !state.inputEnabled -> PrimaryAction(stringResource(R.string.setup_enable_keyboard), onClick = actions.keyboardSettings)
+            !state.inputSelected -> PrimaryAction(stringResource(R.string.onboarding_select_keyboard), onClick = actions.picker)
+            else -> PrimaryAction(stringResource(R.string.onboarding_continue)) { next() }
         }) {
-            Body("A full keyboard with Chirp’s microphone built in. Type normally, or tap the mic above the keys to dictate.")
+            Body(stringResource(R.string.onboarding_keyboard_body))
             SettingsGroup {
-                CheckRow("Enabled", state.inputEnabled)
-                CheckRow("Selected as default", state.inputSelected)
+                CheckRow(stringResource(R.string.setup_keyboard_enabled), state.inputEnabled)
+                CheckRow(stringResource(R.string.onboarding_selected_default), state.inputSelected)
             }
             val swipe = swipeTypingSummary(LocalContext.current)
-            Tips(ABOUT_KEYBOARD, "Chirp Keyboard",
-                "Samsung: Settings → General management → Keyboard list and default.\n\n" +
-                    "English autocorrect, next-word and emoji suggestions are ready to use. Personalised suggestions learn typed words on this device; " +
-                    "turn them off in Chirp settings → Keyboard → Layouts, languages & typing → Text correction. Dictation finals bypass keyboard learning.\n\n$swipe")
+            Tips(ABOUT_KEYBOARD, stringResource(R.string.ime_name), stringResource(R.string.onboarding_keyboard_tips, swipe))
         }
-        PAGE_MIC -> PageFrame(MICROPHONE_TITLE, { Illustration(R.drawable.ic_mic) }, if (state.mic) PrimaryAction("Continue") { next() }
-            else PrimaryAction("Allow microphone", onClick = actions.grantMic)) {
-            Body("Chirp listens only while you dictate or record a note. Notes and optional kept audio stay on this phone.")
-            if (state.mic) SettingsGroup { CheckRow("Microphone allowed", true) }
-            else if (state.micDenied) StatusBanner(StatusKind.Warning, "Allow the microphone to dictate", action = "Open app permissions", onAction = actions.appSettings, live = true)
-            Tips(ABOUT_MICROPHONE, "Your microphone",
-                "The mic opens only when you start dictation or a note and is released when you stop. Dictation history and learning from your edits are on by default, encrypted on this phone; turn history off in Settings → Privacy & history, and learning off in Settings → Dictation. " +
-                "Notes are kept locally; keeping their audio is optional and off by default.")
+        PAGE_MIC -> PageFrame(MICROPHONE_TITLE, { Illustration(R.drawable.ic_mic) }, if (state.mic) PrimaryAction(stringResource(R.string.onboarding_continue)) { next() }
+            else PrimaryAction(stringResource(R.string.onboarding_allow_mic), onClick = actions.grantMic)) {
+            Body(stringResource(R.string.onboarding_mic_body))
+            if (state.mic) SettingsGroup { CheckRow(stringResource(R.string.onboarding_mic_allowed), true) }
+            else if (state.micDenied) StatusBanner(StatusKind.Warning, stringResource(R.string.onboarding_mic_denied), action = stringResource(R.string.onboarding_open_permissions), onAction = actions.appSettings, live = true)
+            Tips(ABOUT_MICROPHONE, stringResource(R.string.onboarding_mic_tips_title), stringResource(R.string.onboarding_mic_tips))
         }
         else -> PairPage(state, actions)
     }
@@ -98,42 +93,41 @@ private fun PairPage(state: SetupState, actions: OnboardingActions) {
     val context = LocalContext.current
     if (state.connected) {
         val connection = connectionSummary(true, state.host, state.reachable, false, state.health)
-        PageFrame("Connected", { Illustration(R.drawable.ic_check_circle) }, PrimaryAction("Finish", onClick = actions.finish)) {
+        PageFrame(stringResource(R.string.onboarding_connected), { Illustration(R.drawable.ic_check_circle) }, PrimaryAction(stringResource(R.string.onboarding_finish), onClick = actions.finish)) {
             StatusBanner(connection.kind, connection.title, body = connection.summary, live = true)
-            if (state.health?.debugRetention == true) StatusBanner(StatusKind.Error, "DEBUG RETENTION IS ON — the Chirp server may retain audio and text")
+            if (state.health?.debugRetention == true) StatusBanner(StatusKind.Error, stringResource(R.string.settings_debug_retention_on))
         }
         return
     }
     val busy = state.scanning || state.checking
     PageFrame(PAIR_PAGE_TITLE, { Illustration(R.drawable.ic_qr_scan) },
-        PrimaryAction(when { state.scanning -> "Scanning…"; state.checking -> "Connecting…"; else -> "Scan code" }, !busy, actions.scan)) {
+        PrimaryAction(stringResource(when { state.scanning -> R.string.onboarding_scanning; state.checking -> R.string.onboarding_connecting; else -> R.string.onboarding_scan }), !busy, actions.scan)) {
         PairingSteps()
-        if (!state.pairFromShell) TextButton(actions.skipPairing, Modifier.align(Alignment.CenterHorizontally)) { Text("Skip for now") }
-        if (state.wifiPermissionNeeded && !state.localNetwork) StatusBanner(StatusKind.Warning, "Allow Wi-Fi server access",
-            body = "Needed only for servers on your Wi-Fi. Tailscale works without it.", action = "Allow", onAction = actions.grantNetwork)
-        if (state.checking) StatusBanner(StatusKind.Info, "Connecting to your computer…", live = true)
+        if (!state.pairFromShell) TextButton(actions.skipPairing, Modifier.align(Alignment.CenterHorizontally)) { Text(stringResource(R.string.onboarding_skip)) }
+        if (state.wifiPermissionNeeded && !state.localNetwork) StatusBanner(StatusKind.Warning, stringResource(R.string.settings_allow_wifi),
+            body = stringResource(R.string.settings_allow_wifi_summary), action = stringResource(R.string.quick_dictate_allow), onAction = actions.grantNetwork)
+        if (state.checking) StatusBanner(StatusKind.Info, stringResource(R.string.onboarding_connecting_computer), live = true)
         else when (state.pairIssue) {
             PairIssue.Unreachable -> {
                 val tailscale = remember(context) { AndroidTailscale(context).installed() }
-                StatusBanner(StatusKind.Error, "Couldn’t reach your computer", body = "Check Tailscale is on for both devices and Chirp is running on the computer.",
-                    action = if (tailscale) "Open Tailscale" else "Try again", onAction = if (tailscale) actions.openTailscale else actions.retry, live = true)
+                StatusBanner(StatusKind.Error, stringResource(R.string.onboarding_unreachable), body = stringResource(R.string.onboarding_unreachable_body),
+                    action = stringResource(if (tailscale) R.string.settings_open_tailscale else R.string.onboarding_try_again), onAction = if (tailscale) actions.openTailscale else actions.retry, live = true)
             }
-            PairIssue.ScannerUnavailable -> StatusBanner(StatusKind.Warning, "Scanner unavailable", body = "QR scanning uses Google Play services.",
-                action = "Paste link instead", onAction = { paste = true }, live = true)
-            PairIssue.InvalidLink -> StatusBanner(StatusKind.Error, "That isn’t a Chirp pairing code", action = "Scan again", onAction = actions.scan, live = true)
+            PairIssue.ScannerUnavailable -> StatusBanner(StatusKind.Warning, stringResource(R.string.onboarding_scanner_unavailable), body = stringResource(R.string.onboarding_scanner_unavailable_body),
+                action = stringResource(R.string.onboarding_paste_link), onAction = { paste = true }, live = true)
+            PairIssue.InvalidLink -> StatusBanner(StatusKind.Error, stringResource(R.string.onboarding_invalid_code), action = stringResource(R.string.onboarding_scan_again), onAction = actions.scan, live = true)
             null -> {}
         }
-        if (!paste && state.link.isEmpty()) { if (state.pairIssue != PairIssue.ScannerUnavailable) TextButton({ paste = true }, Modifier.align(Alignment.CenterHorizontally)) { Text("Paste link instead") } }
+        if (!paste && state.link.isEmpty()) { if (state.pairIssue != PairIssue.ScannerUnavailable) TextButton({ paste = true }, Modifier.align(Alignment.CenterHorizontally)) { Text(stringResource(R.string.onboarding_paste_link)) } }
         else {
             val invalid = state.link.isNotBlank() && runCatching { Pairing.parse(state.link) }.isFailure
-            OutlinedTextField(state.link, { actions.pasteLink(it) }, Modifier.fillMaxWidth().semantics { contentDescription = "Private Chirp pairing link" },
-                label = { Text("Pairing link") }, singleLine = true, isError = invalid,
-                supportingText = { Text(if (invalid) "That isn’t a Chirp pairing link" else "Pasting a valid link connects right away") },
+            val linkDescription = stringResource(R.string.onboarding_link_description)
+            OutlinedTextField(state.link, { actions.pasteLink(it) }, Modifier.fillMaxWidth().semantics { contentDescription = linkDescription },
+                label = { Text(stringResource(R.string.onboarding_link_label)) }, singleLine = true, isError = invalid,
+                supportingText = { Text(stringResource(if (invalid) R.string.onboarding_link_invalid else R.string.onboarding_link_hint)) },
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
         }
-        Tips(ABOUT_PAIRING, "Pairing",
-            "Turn on Tailscale on both devices. QR scanning uses Google Play services; Chirp needs no camera permission. Pasting the link works without the scanner. " +
-                "The pairing is encrypted with Android Keystore, and nothing is saved until your computer answers.")
+        Tips(ABOUT_PAIRING, stringResource(R.string.onboarding_pairing_tips_title), stringResource(R.string.onboarding_pairing_tips))
     }
 }
 
@@ -194,8 +188,9 @@ private fun PairingSteps() {
 /** One requirement: a check in a circle when met, an empty circle when not (an icon, not a "✓" character). */
 @Composable
 internal fun CheckRow(title: String, done: Boolean) {
+    val doneState = stringResource(if (done) R.string.onboarding_done else R.string.onboarding_not_done)
     ListItem(headlineContent = { Text(title) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
-        .semantics(mergeDescendants = true) { stateDescription = if (done) "Done" else "Not done yet" },
+        .semantics(mergeDescendants = true) { stateDescription = doneState },
         leadingContent = { Icon(painterResource(if (done) R.drawable.ic_check_circle else R.drawable.ic_circle_outline), null,
             tint = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline) },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer))

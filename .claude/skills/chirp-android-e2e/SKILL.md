@@ -37,7 +37,7 @@ trusts its certificate for `https://10.0.2.2` (any port) only in debug.
 
 | Script under `android/scripts/` | Coverage / invocation |
 | --- | --- |
-| `e2e-all.sh`, `e2e-all.py` | One-command lifecycle and pass/fail table; `--only dictation cleanup notes speakers history learn stop device bubble quickdictate visual keepkb release` selects checks |
+| `e2e-all.sh`, `e2e-all.py` | One-command lifecycle and pass/fail table; `--only dictation cleanup notes speakers history learn stop device bubble quickdictate visual wallpaper keepkb release` selects checks |
 | `emulator-check.py --quickdictate-check --tls …` | Dictate tile, sensitive clipboard, Speak result/cancel/error, Share, Notes tile and a **real launcher widget** (pinned through the probe's *Pin widget* button, tapped, resized to one and four cells, light/dark/200% font); no Accessibility service |
 | `e2e-all.sh --only quickdictate release` | The entry-point matrix, release smoke and entry-point TalkBack checks in the same owned AVD |
 | `emulator-check.py` / `emulator-dictation-check.py` | Real verified pairing, native IME tap/hold, composing partial/final and light/dark; device-side listening/Ripple screenshots |
@@ -51,6 +51,7 @@ trusts its certificate for `https://10.0.2.2` (any port) only in debug.
 | `emulator-check.py --device-check --tls …` / `emulator-device-check.py` | Fresh onboarding, real TalkBack, font 200%, actual folded/open states; individual device results retained |
 | `emulator-check.py --bubble-check --tls …` / `emulator-bubble-check.py` | First-class floating mic: tap/hold, real final insertion, copy fallback, drag/snap, cancellation and keyboard retention |
 | `emulator-smoke.sh` / `emulator-smoke.py` | Separate release acceptance: onboarding, scanner, typing, unpaired recovery; builds/installs release, not needed to exercise real-server debug |
+| `e2e-all.sh --only wallpaper` / `emulator-wallpaper-check.py` | Match wallpaper on five real system wallpapers (set by the debug-only `WallpaperProbeActivity`), light and dark: Notes, note, History, Settings, Feedback & look, Quick dictate; not in the default sweep. Then `uv run --with pillow python3 android/scripts/text-contrast-report.py <evidence>/wallpaper` lists low-contrast text |
 | `emulator-fold-layout.py` | Keyboard geometry across cover/inner and rotations; run with probe installed |
 | `emulator-talkback.py` | Enable TalkBack, accessible mic click, ⋯ options and cancel and restore previous services |
 | `build-ui-probe.sh`, `UiHierarchy.java` | Shell-only all-window UiAutomator probe; never packaged into the app |

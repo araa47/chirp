@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -211,7 +212,7 @@ internal fun KeyboardLookChooser() {
     val prefs = remember { keyboardPrefs(context) }
     var selected by remember { mutableStateOf(currentKeyboardLook(prefs)) }
     val night = androidx.compose.foundation.isSystemInDarkTheme()
-    SettingsGroup("Keyboard look", Modifier.selectableGroup()) {
+    SettingsGroup(stringResource(R.string.look_title), Modifier.selectableGroup()) {
         for (look in KeyboardLook.entries) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(MaterialTheme.shapes.extraSmall)
                 .background(MaterialTheme.colorScheme.surfaceContainer).selectable(selected == look, role = Role.RadioButton) {
@@ -221,15 +222,15 @@ internal fun KeyboardLookChooser() {
                 RadioButton(selected == look, onClick = null)
                 LookPreview(look, night)
                 Column(Modifier.weight(1f)) {
-                    Text(look.label + if (look == KeyboardLook.DEFAULT) " · default" else "", style = MaterialTheme.typography.bodyLarge)
+                    Text(if (look == KeyboardLook.DEFAULT) stringResource(R.string.look_default, look.label) else look.label, style = MaterialTheme.typography.bodyLarge)
                     Text(look.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
         SettingsItem {
-            if (selected == null) Text("Custom look from Appearance is in use. Pick one above to switch.",
+            if (selected == null) Text(stringResource(R.string.look_custom),
                 style = MaterialTheme.typography.bodySmall)
-            Text("Fine-tune colours, key borders, height and background in Appearance.",
+            Text(stringResource(R.string.look_fine_tune),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

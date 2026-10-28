@@ -42,13 +42,13 @@ internal class StripMenu(private val anchor: View) {
 
     /** The menu body; tests and [show] share it. */
     val content: View = ScrollView(context).apply {
-        addView(list); isFillViewport = false; accessibilityPaneTitle = "Dictation options"
+        addView(list); isFillViewport = false; accessibilityPaneTitle = context.getString(R.string.strip_options)
         background = GradientDrawable().apply { setColor(surface); cornerRadius = context.dp(16).toFloat() }
         clipToOutline = true; outlineProvider = ViewOutlineProvider.BACKGROUND; elevation = context.dp(8).toFloat()
     }
 
     init {
-        toggle("Private session", "Exclude history · ends on lock or after 1 hour", PrivateSession.enabled) { PrivateSession.set(it) }
+        toggle(context.getString(R.string.options_private), context.getString(R.string.options_private_detail), PrivateSession.enabled) { PrivateSession.set(it) }
     }
 
     private fun text(value: String, size: Float, color: Int) = TextView(context).apply {

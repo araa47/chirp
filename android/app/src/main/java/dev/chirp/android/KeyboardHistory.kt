@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.graphics.Typeface
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
@@ -41,17 +42,18 @@ internal object HistoryIo {
     fun run(work: () -> Unit) { executor.execute { try { work() } catch (_: Exception) { /* History is best effort and never logged. */ } } }
 }
 
-internal fun historyAge(now: Long, time: Long): Pair<String, String> {
+/** How long ago, short and spoken: "5 min ago" and "5 minutes ago". */
+internal fun historyAge(resources: Resources, now: Long, time: Long): Pair<String, String> {
     val minutes = (now - time).coerceAtLeast(0) / 60_000
     val hours = minutes / 60
     val days = hours / 24
-    fun plural(count: Long, unit: String) = "$count $unit${if (count == 1L) "" else "s"} ago"
+    fun plural(id: Int, count: Long) = resources.getQuantityString(id, count.toInt(), count.toInt())
     return when {
-        minutes < 1 -> "Just now" to "Just now"
-        minutes < 60 -> "$minutes min ago" to plural(minutes, "minute")
-        hours < 24 -> "$hours h ago" to plural(hours, "hour")
-        days == 1L -> "Yesterday" to "Yesterday"
-        else -> "$days days ago" to plural(days, "day")
+        minutes < 1 -> resources.getString(R.string.age_just_now).let { it to it }
+        minutes < 60 -> resources.getString(R.string.age_minutes, minutes.toInt()) to plural(R.plurals.age_minutes_spoken, minutes)
+        hours < 24 -> resources.getString(R.string.age_hours, hours.toInt()) to plural(R.plurals.age_hours_spoken, hours)
+        days == 1L -> resources.getString(R.string.age_yesterday).let { it to it }
+        else -> plural(R.plurals.age_days, days) to plural(R.plurals.age_days_spoken, days)
     }
 }
 
@@ -186,24 +188,23 @@ internal class KeyboardHistory(
         render()
     }
 
-    @SuppressLint("SetTextI18n")
     private fun render() {
         val view = panel ?: return
         view.list.removeAllViews()
-        view.subtitle.text = if (store.enabled) "Encrypted on this phone · ${store.retention.label}" else "History off · kept for ${store.retention.label}"
+        val kept = store.retention.label(host.resources)
+        view.subtitle.text = host.getString(if (store.enabled) R.string.keyboard_history_subtitle_on else R.string.keyboard_history_subtitle_off, kept)
         view.manage.visibility = if (state == State.LOCKED) View.GONE else View.VISIBLE
         when (state) {
             State.CLOSED -> Unit
-            State.LOCKED -> view.message("Unlock your phone to see dictation history.")
+            State.LOCKED -> view.message(host.getString(R.string.keyboard_history_locked))
             State.OPT_IN -> {
-                view.subtitle.text = "Off · nothing is saved"
-                view.message("Keep your recent dictations on this phone so you can reinsert them. " +
-                    "Encrypted, never sent to your computer or backed up, kept for ${store.retention.label}.")
-                view.action("Keep history on this phone", primary = true) { enable() }
-                view.action("Not now", primary = false) { close() }
+                view.subtitle.text = host.getString(R.string.keyboard_history_subtitle_never)
+                view.message(host.getString(R.string.keyboard_history_offer, kept))
+                view.action(host.getString(R.string.keyboard_history_keep), primary = true) { enable() }
+                view.action(host.getString(R.string.keyboard_history_not_now), primary = false) { close() }
             }
-            State.LOADING -> view.message("Loading…")
-            State.LIST -> if (entries.isEmpty()) view.message("No dictations yet. New dictations stay here for ${store.retention.label}.")
+            State.LOADING -> view.message(host.getString(R.string.keyboard_history_loading))
+            State.LIST -> if (entries.isEmpty()) view.message(host.getString(R.string.keyboard_history_empty, kept))
                 else { val now = clock(); entries.forEach { entry -> view.row(entry, now, this) } }
         }
     }
@@ -211,20 +212,20 @@ internal class KeyboardHistory(
     companion object { const val TAG = "chirp_history" }
 }
 
-@SuppressLint("SetTextI18n", "ViewConstructor")
+@SuppressLint("ViewConstructor")
 internal class HistoryPanel(context: Context) : LinearLayout(context) {
     private val colors = VoicePalette.of(context)
-    val title = context.label("Dictation history", 15f).apply { setTypeface(typeface, Typeface.BOLD) }
+    val title = context.label(context.getString(R.string.history_title), 15f).apply { setTypeface(typeface, Typeface.BOLD) }
     val subtitle = context.label("", 12f).apply { setTextColor(colors.muted); setPadding(context.dp(4), 0, context.dp(4), 0) }
     val manage = MaterialButton(context, null, android.R.attr.borderlessButtonStyle).apply {
-        text = "Manage"; contentDescription = "Search and manage dictation history"; isSaveEnabled = false
+        text = context.getString(R.string.keyboard_history_manage); contentDescription = context.getString(R.string.keyboard_history_manage_description); isSaveEnabled = false
         isAllCaps = false; setTextColor(colors.accent)
     }
     val close = MaterialButton(context, null, android.R.attr.borderlessButtonStyle).apply {
         text = ""; setIconResource(R.drawable.ic_keyboard); iconPadding = 0; iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
         iconTint = android.content.res.ColorStateList.valueOf(colors.accent)
         minWidth = 0; minimumWidth = 0; setPadding(0, 0, 0, 0); insetTop = 0; insetBottom = 0
-        contentDescription = "Back to keyboard"; isSaveEnabled = false
+        contentDescription = context.getString(R.string.keyboard_history_back); isSaveEnabled = false
     }
     val list = LinearLayout(context).apply { orientation = VERTICAL }
     private val scroll = ScrollView(context).apply { addView(list); isFillViewport = true }
@@ -232,7 +233,7 @@ internal class HistoryPanel(context: Context) : LinearLayout(context) {
         orientation = VERTICAL
         setBackgroundColor(colors.background)
         isClickable = true // Touches on empty panel space must never reach the keys underneath.
-        accessibilityPaneTitle = "Dictation history"
+        accessibilityPaneTitle = context.getString(R.string.history_title)
         val header = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(context.dp(12), context.dp(6), context.dp(4), context.dp(2))
@@ -262,8 +263,9 @@ internal class HistoryPanel(context: Context) : LinearLayout(context) {
             })
     }
     fun row(entry: HistoryEntry, now: Long, owner: KeyboardHistory) {
-        val (age, spokenAge) = historyAge(now, entry.time)
-        val meta = listOfNotNull(age, entry.app, if (entry.raw != null) "Polished" else null, if (entry.partial) "partial" else null).joinToString(" · ")
+        val (age, spokenAge) = historyAge(resources, now, entry.time)
+        val polished = context.getString(R.string.keyboard_history_polished).takeIf { entry.raw != null }
+        val meta = listOfNotNull(age, entry.app, polished, context.getString(R.string.keyboard_history_partial).takeIf { entry.partial }).joinToString(" · ")
         val ripple = TypedValue().also { context.theme.resolveAttribute(android.R.attr.selectableItemBackground, it, true) }
         val row = LinearLayout(context).apply {
             orientation = VERTICAL; minimumHeight = context.dp(56)
@@ -273,29 +275,30 @@ internal class HistoryPanel(context: Context) : LinearLayout(context) {
                 maxLines = 2; ellipsize = TextUtils.TruncateAt.END; setPadding(0, 0, 0, 0)
             })
             addView(context.label(meta, 12f).apply { setTextColor(colors.muted); setPadding(0, context.dp(2), 0, 0) })
-            contentDescription = entry.text + ". " + spokenAge + (entry.app?.let { " in $it" } ?: "") +
-                (if (entry.raw != null) ". Polished" else "") + if (entry.partial) ". Partial" else ""
+            val where = entry.app?.let { context.getString(R.string.keyboard_history_age_in_app, spokenAge, it) } ?: spokenAge
+            contentDescription = listOfNotNull(entry.text, where, polished, context.getString(R.string.keyboard_history_partial_spoken).takeIf { entry.partial })
+                .joinToString(". ")
             setOnClickListener { owner.insertEntry(entry) }
             setOnLongClickListener { menu(this, entry, owner); true }
         }
         ViewCompat.setAccessibilityDelegate(row, object : AccessibilityDelegateCompat() {
             override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
                 super.onInitializeAccessibilityNodeInfo(host, info)
-                info.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat(AccessibilityNodeInfoCompat.ACTION_CLICK, "Insert"))
-                info.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat(AccessibilityNodeInfoCompat.ACTION_LONG_CLICK, "More options"))
+                info.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat(AccessibilityNodeInfoCompat.ACTION_CLICK, context.getString(R.string.keyboard_history_insert)))
+                info.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat(AccessibilityNodeInfoCompat.ACTION_LONG_CLICK, context.getString(R.string.keyboard_history_more)))
             }
         })
-        ViewCompat.addAccessibilityAction(row, "Copy") { _, _ -> owner.copy(entry); true }
-        if (entry.raw != null) ViewCompat.addAccessibilityAction(row, "Insert raw") { _, _ -> owner.insertEntry(entry, raw = true); true }
-        ViewCompat.addAccessibilityAction(row, "Delete") { _, _ -> owner.delete(entry); true }
+        ViewCompat.addAccessibilityAction(row, context.getString(R.string.keyboard_history_copy)) { _, _ -> owner.copy(entry); true }
+        if (entry.raw != null) ViewCompat.addAccessibilityAction(row, context.getString(R.string.keyboard_history_insert_raw)) { _, _ -> owner.insertEntry(entry, raw = true); true }
+        ViewCompat.addAccessibilityAction(row, context.getString(R.string.keyboard_history_delete)) { _, _ -> owner.delete(entry); true }
         if (list.isNotEmpty()) list.addView(divider(), LayoutParams(LayoutParams.MATCH_PARENT, 1).apply { marginStart = context.dp(16) })
         list.addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
     }
     private fun menu(anchor: View, entry: HistoryEntry, owner: KeyboardHistory) {
         StripMenu(anchor).apply {
-            item(R.drawable.ic_copy, "Copy") { owner.copy(entry) }
-            if (entry.raw != null) item(R.drawable.ic_undo, "Insert raw") { owner.insertEntry(entry, raw = true) }
-            item(R.drawable.ic_delete, "Delete") { owner.delete(entry) }
+            item(R.drawable.ic_copy, context.getString(R.string.keyboard_history_copy)) { owner.copy(entry) }
+            if (entry.raw != null) item(R.drawable.ic_undo, context.getString(R.string.keyboard_history_insert_raw)) { owner.insertEntry(entry, raw = true) }
+            item(R.drawable.ic_delete, context.getString(R.string.keyboard_history_delete)) { owner.delete(entry) }
             show()
         }
     }

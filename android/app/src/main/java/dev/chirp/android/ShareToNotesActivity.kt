@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -31,9 +32,9 @@ open class ShareToNotesActivity : ComponentActivity() {
             intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() else null
         subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)?.take(200)
         message = when {
-            shared == null -> "Only text can be shared to Notes."
-            shared!!.length > MAX_TEXT -> "This text is too long. Share up to 100,000 characters."
-            shared!!.isBlank() -> "There’s no text to save."
+            shared == null -> getString(R.string.share_notes_only_text)
+            shared!!.length > MAX_TEXT -> getString(R.string.share_notes_too_long)
+            shared!!.isBlank() -> getString(R.string.share_notes_empty)
             else -> null
         }
         if (message != null) shared = null
@@ -51,7 +52,7 @@ open class ShareToNotesActivity : ComponentActivity() {
         if (append) {
             val current = target
             if (current != null && NotesControls.session === current && canAppend(current) && current.appendShared(text)) finish()
-            else { target = null; message = "That note has stopped. Save as a new note instead." }
+            else { target = null; message = getString(R.string.share_notes_stopped) }
             return
         }
         saving = true
@@ -59,15 +60,15 @@ open class ShareToNotesActivity : ComponentActivity() {
             val error = withContext(Dispatchers.IO) {
                 try {
                     val notes = library()
-                    if (!notes.enabled) "Notes are off. Turn on Keep notes on this phone in Settings → Notes."
+                    if (!notes.enabled) getString(R.string.share_notes_off)
                     else {
                         val note = NotesDocument().apply {
                             userEdit(0, 0, text)
                             name = subject?.trim()?.takeIf(String::isNotBlank) ?: text.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(200)
                         }
-                        if (notes.put(note.uid, note.toJson())) null else "Couldn’t save the note. Try again."
+                        if (notes.put(note.uid, note.toJson())) null else getString(R.string.share_notes_save_failed)
                     }
-                } catch (_: Exception) { "Couldn’t save the note. Try again." }
+                } catch (_: Exception) { getString(R.string.share_notes_save_failed) }
             }
             saving = false
             if (error == null) finish() else message = error
@@ -84,15 +85,15 @@ open class ShareToNotesActivity : ComponentActivity() {
 internal fun ShareToNotesDialog(recordingTitle: String?, message: String?, enabled: Boolean,
                                save: () -> Unit, append: () -> Unit, cancel: () -> Unit) {
     AlertDialog(onDismissRequest = cancel,
-        title = { Text("Save to Notes") },
+        title = { Text(stringResource(R.string.share_notes_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(message ?: "Keep this text on this phone. It stays local unless you choose Organize later.")
+                Text(message ?: stringResource(R.string.share_notes_message))
                 if (recordingTitle != null) OutlinedButton(append, Modifier.fillMaxWidth(), enabled = enabled) {
-                    Text("Add to “$recordingTitle”")
+                    Text(stringResource(R.string.share_notes_add_to, recordingTitle))
                 }
             }
         },
-        confirmButton = { TextButton(save, enabled = enabled) { Text("Save as new note") } },
-        dismissButton = { TextButton(cancel) { Text("Cancel") } })
+        confirmButton = { TextButton(save, enabled = enabled) { Text(stringResource(R.string.share_notes_save_new)) } },
+        dismissButton = { TextButton(cancel) { Text(stringResource(R.string.notes_action_cancel)) } })
 }
