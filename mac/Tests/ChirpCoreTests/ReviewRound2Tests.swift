@@ -7,8 +7,19 @@ import Testing
 @Suite struct ReviewRound2Tests {
     /// An inserter whose sleeps park on continuations the test resumes: a fake clock.
     @MainActor final class Clock {
-        var sleepers: [CheckedContinuation<Void, Never>] = []
-        func waitForSleepers(_ n: Int) async { while sleepers.count < n { await Task.yield() } }
+        var sleepers: [CheckedContinuation<Void, Never>] = [] {
+            didSet {
+                let ready = waiters.filter { $0.0 <= sleepers.count }
+                waiters.removeAll { $0.0 <= sleepers.count }
+                for (_, c) in ready { c.resume() }
+            }
+        }
+        private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
+        /// Suspends until `n` sleeps have parked, without spinning on the main actor (#315).
+        func waitForSleepers(_ n: Int) async {
+            guard sleepers.count < n else { return }
+            await withCheckedContinuation { waiters.append((n, $0)) }
+        }
         func fireAll() {
             let pending = sleepers
             sleepers.removeAll()
@@ -111,7 +122,7 @@ import Testing
         #expect(inserter.canUseRaw)
         await clock.waitForSleepers(1)
         clock.fireAll()                                  // the five seconds elapse
-        while inserter.canUseRaw { await Task.yield() }
+        #expect(await pollUntil(within: 60) { !inserter.canUseRaw })
         #expect(await inserter.useRaw() == nil)
         #expect(calls.isEmpty && board.text == "user clipboard")
     }

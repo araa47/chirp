@@ -464,7 +464,7 @@ private func labelledNote() -> NotesDocument {
         let runner = NotesRetranscriber(makeSession: server.makeSession, options: notesOptions, health: notesHealth,
                                         audio: silentClip)
         let task = Task { await runner.run([clip(0), clip(1), clip(2)]) }
-        while server.stops.count < 2 { await Task.yield() }
+        #expect(await pollUntil(within: 60) { server.stops.count >= 2 })
         task.cancel()
         let result = await task.value
         #expect(result.end == .cancelled && result.segments.isEmpty)

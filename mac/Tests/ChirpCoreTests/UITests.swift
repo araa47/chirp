@@ -506,14 +506,25 @@ import Testing
 
 @MainActor
 @Suite struct SnapshotTests {
-    private func render(_ names: [String]? = nil) throws -> (URL, [URL]) {
+    private func render(_ names: [String]? = nil) async throws -> (URL, [URL]) {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("chirp-snap-\(UUID().uuidString)")
         let scenarios = names.map { names in Snapshots.allScenarios.filter { names.contains($0.name) } }
-        return (dir, try Snapshots.render(to: dir, scenarios: scenarios))
+        return (dir, try await renderYielding(scenarios ?? Snapshots.allScenarios, to: dir))
     }
 
-    @Test func rendersEveryStateInLightAndDarkAsNonBlankPNGs() throws {
-        let (dir, files) = try render()
+    /// Renders one scenario at a time and lets other main-actor work run in between. Every scenario in one go holds
+    /// the main actor for minutes, and other suites' main-actor tests run out their time limits waiting (#315).
+    private func renderYielding(_ scenarios: [Snapshots.Scenario], to dir: URL) async throws -> [URL] {
+        var files: [URL] = []
+        for scenario in scenarios {
+            files += try Snapshots.render(to: dir, scenarios: [scenario])
+            await Task.yield()
+        }
+        return files
+    }
+
+    @Test func rendersEveryStateInLightAndDarkAsNonBlankPNGs() async throws {
+        let (dir, files) = try await render()
         defer { try? FileManager.default.removeItem(at: dir) }
         #expect(files.count == Snapshots.allScenarios.count * 2)
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).count == files.count)
@@ -546,9 +557,9 @@ import Testing
         }
     }
 
-    @Test func lightAndDarkAreDifferentImages() throws {
+    @Test func lightAndDarkAreDifferentImages() async throws {
         let names = ["hud-listening", "settings-general-ready", "menu-ready"]
-        let (dir, _) = try render(names)
+        let (dir, _) = try await render(names)
         defer { try? FileManager.default.removeItem(at: dir) }
         for name in names {
             let light = try Data(contentsOf: dir.appendingPathComponent("\(name)-light.png"))
@@ -557,8 +568,8 @@ import Testing
         }
     }
 
-    @Test func multilineHUDIsTallerThanASingleLineOne() throws {
-        let (dir, _) = try render(["hud-listening-multiline", "hud-listening-no-text"])
+    @Test func multilineHUDIsTallerThanASingleLineOne() async throws {
+        let (dir, _) = try await render(["hud-listening-multiline", "hud-listening-no-text"])
         defer { try? FileManager.default.removeItem(at: dir) }
         func height(_ n: String) throws -> Int {
             try #require(NSBitmapImageRep(data: Data(contentsOf: dir.appendingPathComponent(n)))).pixelsHigh
@@ -595,10 +606,10 @@ import Testing
         #expect(total < 20_000_000, "\(total) bytes")
     }
 
-    @Test func curatedRenderingWritesOnlyTheCommittedNames() throws {
+    @Test func curatedRenderingWritesOnlyTheCommittedNames() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("chirp-curated-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
-        let files = try Snapshots.render(to: dir, scenarios: Snapshots.committedScenarios)
+        let files = try await renderYielding(Snapshots.committedScenarios, to: dir)
         #expect(Set(files.map(\.lastPathComponent)) == Set(Snapshots.committedNames.flatMap { ["\($0)-dark.png", "\($0)-light.png"] }))
     }
 

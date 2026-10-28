@@ -1466,7 +1466,10 @@ public enum Snapshots {
         var written: [URL] = []
         for scenario in scenarios ?? allScenarios {
             for (label, appearance) in appearances {
-                guard let data = png(scenario, appearance: appearance) else {
+                // Each render's views, windows and observers go when it is done. Left to one pool pop at the end, the
+                // hundreds of hosts hold gigabytes and their observer removals take minutes (#315).
+                let data = autoreleasepool { png(scenario, appearance: appearance) }
+                guard let data else {
                     throw CocoaError(.fileWriteUnknown, userInfo: [NSLocalizedDescriptionKey: "could not render \(scenario.name)"])
                 }
                 let url = directory.appendingPathComponent("\(scenario.name)-\(label).png")
