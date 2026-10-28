@@ -139,7 +139,7 @@ class Bubble:
         self.tap(self.wait(self.bubble, 'bubble'))
         self.label('Listening…', 40)
         # A partial: some panel text beyond the fixed labels (and the probe's own report line); its length only.
-        fixed = ('', 'Start speaking…', 'Listening', 'Cancel', 'Stop', 'Probe ready', 'Connecting to your Mac…')
+        fixed = ('', 'Start speaking…', 'Listening', 'Cancel', 'Stop', 'Probe ready', 'Connecting to your computer…')
         self.wait(lambda h: any(n.get('content-desc', '') == '' and n.get('text', '') not in fixed
                                 and not n.get('text', '').startswith(('Paste length', 'Recognize'))
                                 and n.get('package') == PACKAGE and n.get('class') == 'android.widget.TextView'

@@ -65,7 +65,9 @@ public final class UiHierarchy {
                 return;
             }
             if (args.length == 4 && args[0].equals("stop-case")) {
-                stopCase(automation, args[1], Float.parseFloat(args[2]), Float.parseFloat(args[3]));
+                // An uncaught exception ends app_process with SIGKILL, which the check takes for a teardown kill (#344): say why and exit 1.
+                try { stopCase(automation, args[1], Float.parseFloat(args[2]), Float.parseFloat(args[3])); }
+                catch (IllegalStateException e) { System.out.println("Stop scenario failed: " + e.getMessage()); System.out.flush(); System.exit(1); }
                 return;
             }
             if (args.length == 3 && args[0].equals("await-click")) {
@@ -208,7 +210,7 @@ public final class UiHierarchy {
                         if (trackedStatus == null) {
                             trackedStatus = find(root, "Listening…");
                             if (trackedStatus == null) trackedStatus = find(root, "Finishing…");
-                            if (trackedStatus == null) trackedStatus = find(root, "Connecting to Mac…");
+                            if (trackedStatus == null) trackedStatus = find(root, "Connecting to your computer…");
                         }
                         listening |= find(root, "Listening…") != null;
                         polished |= find(root, "Polishing…") != null;
@@ -452,9 +454,12 @@ public final class UiHierarchy {
         AccessibilityNodeInfo status = null;
         tap(automation, x, y);
         if (mode.equals("immediate")) {
-            android.os.SystemClock.sleep(10);
-            if (!has(automation, "Connecting to Mac…"))
-                throw new IllegalStateException("Immediate stop was not before Ready");
+            // Stop while still connecting. The synthetic input holds its first frame for 4 s, so nothing has been sent yet.
+            long deadline = android.os.SystemClock.uptimeMillis() + 1500;
+            while (!has(automation, "Connecting to your computer…")) {
+                if (android.os.SystemClock.uptimeMillis() > deadline) throw new IllegalStateException("Immediate stop was not before Ready");
+                android.os.SystemClock.sleep(10);
+            }
         } else {
             await(automation, "Listening…");
             if (mode.equals("polishing")) {
