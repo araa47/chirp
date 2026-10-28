@@ -35,15 +35,6 @@ final class ChirpSettingsUITests: XCTestCase {
         XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: format), object: element)], timeout: timeout) == .completed
     }
 
-    /// Taps a row that pushes a page, and taps once more if the page has not come up while the row is still there: a
-    /// tap that lands while the row's own page is still sliding in can be dropped (seen once on the iPhone Duo, #329).
-    @MainActor func open(_ row: XCUIElement, showing page: XCUIElement, _ message: String,
-                         file: StaticString = #filePath, line: UInt = #line) {
-        row.tap()
-        if !page.waitForExistence(timeout: 3), row.isHittable { row.tap() }
-        XCTAssertTrue(page.waitForExistence(timeout: 5), message, file: file, line: line)
-    }
-
     @MainActor func screenshot(_ name: String, _ app: XCUIApplication) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name; shot.lifetime = .keepAlways
@@ -256,8 +247,8 @@ final class ChirpSettingsUITests: XCTestCase {
         for _ in 0..<6 where !footer.isHittable { app.swipeUp() }
         XCTAssertTrue((footer.label as NSString).contains("no per-app style"))
         screenshot("settings-dictation-learning", app)
-        open(element("chirp.settings.learned", in: app), showing: element("chirp.learned.empty", in: app),
-             "Learned is not empty at first")
+        element("chirp.settings.learned", in: app).tap()
+        XCTAssertTrue(element("chirp.learned.empty", in: app).waitForExistence(timeout: 5), "Learned is not empty at first")
         screenshot("settings-learned-empty", app)
 
         openCategory("chirp.settings.privacy", app)
@@ -287,11 +278,16 @@ final class ChirpSettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Learned: GitHub"].waitForExistence(timeout: 5), "Teach Chirp learned nothing")
 
         app.selectChirpTab("Settings")
+        // The dictation above left the mic session armed. The list scrolls under its capsule, and on the iPhone Duo
+        // XCUITest called the Learned row hittable while the capsule covered its middle, so the tap ended there (#329).
+        app.endChirpSession()
+        XCTAssertTrue(waitFor(app.buttons["chirp.session.end"], "exists == false"), "The session did not end")
         openCategory("chirp.settings.dictation", app)
         let learned = element("chirp.settings.learned", in: app)
         XCTAssertTrue(learned.waitForExistence(timeout: 5))
         for _ in 0..<6 where !learned.isHittable { app.swipeUp() }
-        open(learned, showing: app.staticTexts["GitHub"], "The taught term is not in Learned")
+        learned.tap()
+        XCTAssertTrue(app.staticTexts["GitHub"].waitForExistence(timeout: 5), "The taught term is not in Learned")
         XCTAssertTrue(app.staticTexts["In use"].exists)
         screenshot("settings-learned", app)
     }
