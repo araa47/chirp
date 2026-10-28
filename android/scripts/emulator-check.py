@@ -350,7 +350,8 @@ def main():
                 time.sleep(.1)
             token = token_path.read_text().strip()
             wait_health(token, base=base, context=context)
-            warm_cleanup(opt.python, token_path, env, opt.tls, opt.server_port)
+            # The wallpaper pass never dictates, so it doesn't wait on the clean-up model.
+            if not opt.wallpaper_check: warm_cleanup(opt.python, token_path, env, opt.tls, opt.server_port)
             # Plain HTTP can be probed without credentials. A TLS server closes plaintext
             # connections (nc can exit nonzero); verified pairing below checks its route and trust.
             if not opt.tls:

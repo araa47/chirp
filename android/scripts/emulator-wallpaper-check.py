@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 """Match wallpaper (dynamic colour) on real system wallpapers, light and dark (#332).
 
-Run through e2e-all.sh --only wallpaper, which owns the emulator. Each wallpaper is set through the
-system wallpaper service, so Android extracts its colours exactly as it would from a person's photo;
+Run through e2e-all.sh --only wallpaper, which owns the emulator. Each wallpaper is set through
+WallpaperManager (the debug-only WallpaperProbeActivity), so Android extracts its colours as it would from a photo;
 the app's Match wallpaper scheme then comes from that extraction, not from a test fixture.
 Captures are for human review; text-contrast-report.py measures the text in them afterwards.
 """
 import json
 import re
 import shlex
-import struct
 import time
-import zlib
 
-# Photo-like gradients covering the extraction's range: warm, cool, green, pale (light) and near-black (dark).
+# Photo-like gradients (drawn by WallpaperProbeActivity) covering the extraction's range: warm, cool, green, pale (light) and near-black (dark).
 WALLPAPERS = {
     'sunset': ((255, 183, 94), (214, 72, 96), (58, 32, 74)),
     'ocean': ((168, 222, 236), (28, 120, 168), (6, 36, 66)),
@@ -21,24 +19,6 @@ WALLPAPERS = {
     'snow': ((250, 251, 253), (226, 232, 240), (196, 206, 220)),
     'night': ((44, 40, 92), (20, 18, 46), (4, 4, 12)),
 }
-
-
-def png(top, middle, bottom, width=540, height=1260):
-    """A vertical three-stop gradient with fine grain, so the quantiser sees a photo rather than flat fills."""
-    rows = []
-    for y in range(height):
-        t = y / (height - 1)
-        a, b, f = (top, middle, t * 2) if t < .5 else (middle, bottom, t * 2 - 1)
-        base = [round(a[i] + (b[i] - a[i]) * f) for i in range(3)]
-        row = bytearray(b'\0')
-        for x in range(width):
-            grain = ((x * 7919 + y * 104729) % 23) - 11
-            row += bytes(max(0, min(255, c + grain)) for c in base)
-        rows.append(bytes(row))
-    def chunk(kind, data):
-        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
-    header = struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)
-    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(b''.join(rows), 6)) + chunk(b'IEND', b'')
 
 
 def check(p, work, output):
@@ -95,20 +75,37 @@ def check(p, work, output):
             '-n', package + '/.ShareToNotesActivity')
         wait('Save to Notes'); click('Save as new note')
         for wallpaper, stops in WALLPAPERS.items():
-            image = work / f'wallpaper-{wallpaper}.png'
-            image.write_bytes(png(*stops))
-            adb('push', str(image), '/data/local/tmp/chirp-wallpaper.png')
-            before = palette()
-            print(adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/',
-                      'dev.chirp.smoke.UiHierarchy', 'set-wallpaper', '/data/local/tmp/chirp-wallpaper.png').decode().strip(), flush=True)
+            before = (palette(), accent())
+            colours = ','.join(str((0xff << 24 | r << 16 | g << 8 | b) - (1 << 32)) for r, g, b in stops)
+            adb('logcat', '-c')
+            adb('shell', 'am', 'start', '-W', '-n', package + '/.WallpaperProbeActivity', '--eia', 'colors', colours)
+            seed = None
+            for _ in range(20):
+                found = re.search(r'wallpaper set primary=(\w+) source=(\w+)', adb('logcat', '-d', '-s', 'ChirpWallpaperProbe:I').decode(errors='replace'))
+                if found: seed, extracted = found.groups(); break
+                time.sleep(.5)
+            if not seed or seed == 'none':
+                log = adb('logcat', '-d', '-s', 'ChirpWallpaperProbe', 'AndroidRuntime', 'WallpaperManager', 'WallpaperManagerService', 'ActivityTaskManager').decode(errors='replace')
+                print(log[-4000:], adb('shell', 'dumpsys', 'wallpaper').decode(errors='replace')[:3000], sep='\n', flush=True)
+                raise AssertionError(f'{wallpaper}: the wallpaper was not set or Android extracted no colours')
             # System UI applies new wallpaper colours when the screen next turns off: sleep, wake, unlock.
-            deadline = time.monotonic() + 45
-            while palette() == before and time.monotonic() < deadline:
+            source = 'system'
+            deadline = time.monotonic() + 20
+            while (palette(), accent()) == before and time.monotonic() < deadline:
                 adb('shell', 'input', 'keyevent', 'KEYCODE_SLEEP'); time.sleep(2)
                 adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'); adb('shell', 'wm', 'dismiss-keyguard'); time.sleep(2)
-            palettes[wallpaper] = {'overlay': palette(), 'accent1_600': accent()}
-            print('PALETTE:', wallpaper, palettes[wallpaper]['overlay'], flush=True)
-            if palettes[wallpaper]['overlay'] == before:
+            if (palette(), accent()) == before:
+                # This AVD's System UI didn't re-theme by itself: apply the extracted seed the way the
+                # Wallpaper & style picker does, which runs the same Monet palette generation.
+                source = 'seed'
+                setting = json.dumps({'android.theme.customization.system_palette': seed, 'android.theme.customization.theme_style': 'TONAL_SPOT',
+                                      'android.theme.customization.color_source': 'home_wallpaper', '_applied_timestamp': int(time.time() * 1000)})
+                adb('shell', 'settings', 'put', 'secure', 'theme_customization_overlay_packages', shlex.quote(setting))
+                deadline = time.monotonic() + 30
+                while (palette(), accent()) == before and time.monotonic() < deadline: time.sleep(2)
+            palettes[wallpaper] = {'seed': seed, 'extracted_by': extracted, 'applied_by': source, 'overlay': palette(), 'accent1_600': accent()}
+            print('PALETTE:', wallpaper, palettes[wallpaper], flush=True)
+            if (palettes[wallpaper]['overlay'], palettes[wallpaper]['accent1_600']) == before:
                 raise AssertionError(f'{wallpaper}: System UI did not apply new wallpaper colours')
             for theme in ('light', 'dark'):
                 adb('shell', 'cmd', 'uimode', 'night', 'yes' if theme == 'dark' else 'no')

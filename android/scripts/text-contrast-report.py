@@ -30,7 +30,8 @@ def contrast(a, b):
 def measure(image, box):
     x1, y1, x2, y2 = box
     if x2 - x1 < 4 or y2 - y1 < 4: return None
-    pixels = Counter(image.crop(box).getdata())
+    data = image.crop(box).tobytes()
+    pixels = Counter(zip(data[0::3], data[1::3], data[2::3]))
     total = sum(pixels.values())
     background = pixels.most_common(1)[0][0]
     # Glyph cores: colours covering at least 0.5% of the box; anti-aliased edges are rarer.
