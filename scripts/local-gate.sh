@@ -68,7 +68,9 @@ if [ "$POST" = 1 ]; then
         echo "error: GitHub does not know $SHA; push the branch first (or use --no-post)." >&2
         exit 2
     fi
-    [ -n "$PR" ] || PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
+    # Only by branch: `gh pr list --head ""` (a detached HEAD) would name some other open PR.
+    [ -n "$PR" ] || [ -z "$BRANCH" ] ||
+        PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
 fi
 mkdir -p "$OUT"
 
@@ -93,8 +95,9 @@ gate_command() {
     esac
 }
 
-# Test counts are read from the log (and, for Android, the JUnit XML), so they are as good as the tools' own summaries.
-gate_counts() { # gate log
+# Test counts are read from the log (and, for Android, the JUnit XML this run wrote), so they are as good as the tools'
+# own summaries.
+gate_counts() { # gate log start
     case $1 in
     mac | ios)
         python3 - "$2" <<'PY'
@@ -111,10 +114,12 @@ print(" + ".join(parts) or "no count found in the log")
 PY
         ;;
     android)
-        python3 - "$ROOT/android" <<'PY'
-import glob, sys, xml.etree.ElementTree as ET
+        python3 - "$ROOT/android" "$3" <<'PY'
+import glob, os, sys, xml.etree.ElementTree as ET
 t = f = s = 0
 for p in glob.glob(sys.argv[1] + "/**/build/test-results/**/*.xml", recursive=True):
+    if os.path.getmtime(p) < int(sys.argv[2]):
+        continue  # an earlier build's results: this run stopped before its tests
     r = ET.parse(p).getroot()
     t += int(r.get("tests", 0)); f += int(r.get("failures", 0)) + int(r.get("errors", 0)); s += int(r.get("skipped", 0))
 print(f"{t} unit tests, {f} failed, {s} skipped" if t else "no JUnit results found")
@@ -161,13 +166,12 @@ for g in $GATES; do
         release_lease
     fi
     secs=$(($(date +%s) - start))
-    counts=$(gate_counts "$g" "$log")
+    counts=$(gate_counts "$g" "$log" "$start")
     [ "$state" = success ] || overall=failure
     tail -3 "$log" | sed 's/^/   /'
     echo "== $g: $state, $counts, $((secs / 60)) min"
     printf '%s\t%s\t%s\t%s\t%s\n' "$g" "$state" "$counts" "$((secs / 60))" "$ctx" >>"$RESULTS"
-    final=$SHA
-    if [ "$(git rev-parse HEAD)" != "$final" ] || [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    if [ "$(git rev-parse HEAD)" != "$SHA" ] || [ -n "$(git status --porcelain --untracked-files=no)" ]; then
         # Never vouch for a commit whose tree moved under the run.
         echo "error: the tree changed during the run; not recording $g for $SHA" >&2
         state=error counts="the tree changed during the run"
