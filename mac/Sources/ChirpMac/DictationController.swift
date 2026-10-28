@@ -560,8 +560,8 @@ final class DictationController {
             if let rawFirst, let early = await rawFirst.value {
                 await replaceRaw(early, with: final, text: text)
             } else {
-                // The cleaned text is shown with its changes highlighted before it is inserted, once.
-                if final.canUseRaw, settings.showChangesAfterCleanup { await hud.model.playChangeHighlight(raw: final.raw, cleaned: text) }
+                // The cleaned text is shown with its changes highlighted, once, while it is inserted: never before.
+                if final.canUseRaw, settings.showChangesAfterCleanup { hud.model.startChangeHighlight(raw: final.raw, cleaned: text) }
                 else if !final.corrected, let words = final.words { hud.model.finishWords(text: text, words: words) }
                 else { hud.model.settle(on: text) }
                 hud.model.status = HUDStatus.inserting
@@ -570,8 +570,8 @@ final class DictationController {
                 let outcome = await inserter.insert(text, undoRaw: final.canUseRaw && settings.showRawAfterCleanup ? final.raw : nil)
                 keep(outcome, final: final, text: text, secureField: secure)
                 watchEdits(outcome, text: text, raw: final.raw, secureField: secure)
-                show(outcome, final: final)
-                await pressReturn(after: outcome)
+                let lingers = show(outcome, final: final)
+                await pressReturn(after: outcome, hudLingers: lingers)
             }
             send(.insertionFinished)
         }
@@ -582,14 +582,14 @@ final class DictationController {
     private func replaceRaw(_ early: InsertionOutcome, with final: FinalResult, text: String) async {
         var shown = final
         if early == .inserted(.ax), final.canUseRaw || final.text != final.raw {
-            if settings.showChangesAfterCleanup { await hud.model.playChangeHighlight(raw: final.raw, cleaned: text) }
+            if settings.showChangesAfterCleanup { hud.model.startChangeHighlight(raw: final.raw, cleaned: text) }
             else { hud.model.settle(on: text) }
             if await inserter.replaceInserted(with: text) {
                 let secure = SystemInsertion.focusedFieldIsSecure()
                 keep(early, final: final, text: text, secureField: secure)
                 watchEdits(early, text: text, raw: final.raw, secureField: secure)
-                show(early, final: final)
-                await pressReturn(after: early)
+                let lingers = show(early, final: final)
+                await pressReturn(after: early, hudLingers: lingers)
                 return
             }
             hud.model.settle(on: final.raw)
@@ -603,23 +603,27 @@ final class DictationController {
         let secure = SystemInsertion.focusedFieldIsSecure()
         keep(early, final: shown, text: shown.text.trimmingCharacters(in: .whitespacesAndNewlines), secureField: secure)
         watchEdits(early, text: shown.text, raw: final.raw, secureField: secure)
-        show(early, final: shown)
-        await pressReturn(after: early)
+        let lingers = show(early, final: shown)
+        await pressReturn(after: early, hudLingers: lingers)
     }
 
-    /// "Press Return after inserting": one Return once the text is in, then a small "↵ sent" on the HUD.
-    private func pressReturn(after outcome: InsertionOutcome) async {
+    /// "Press Return after inserting": one Return once the text is in, then a small "↵ sent" on a HUD that is still up.
+    /// A HUD already fading away is not brought back for it: the Return shows in the app.
+    private func pressReturn(after outcome: InsertionOutcome, hudLingers: Bool) async {
         let mode = settings.autoEnter
         guard mode != .off else { return }
         let skipped = autoEnterSkipped
         guard await autoEnter.send(after: outcome, mode: mode, rules: settings.appStyles, skipped: skipped) else { return }
+        guard hudLingers else { hud.announce("Return sent"); return }
         hud.model.status += HUDStatus.returnSent
         hud.show()
         hud.hide(after: 1.2)
         hud.announce(hud.model.status)
     }
 
-    private func show(_ outcome: InsertionOutcome, final: FinalResult) {
+    /// Shows the outcome, and returns whether the HUD stays up for it (false: it is already fading out).
+    @discardableResult
+    private func show(_ outcome: InsertionOutcome, final: FinalResult) -> Bool {
         let p = OutcomePresentation.of(outcome, final: final, offerRaw: settings.showRawAfterCleanup,
                                        showChanges: settings.showChangesAfterCleanup)
         hud.model.status = p.status
@@ -629,10 +633,13 @@ final class DictationController {
         hud.model.isError = p.isError
         hud.model.showUseRaw = p.showUseRaw
         hud.model.onUseRaw = p.showUseRaw ? { [weak self] in self?.useRaw() } : nil
-        hud.show()
-        if p.linger > 0 { hud.hide(after: p.linger) } else { hud.hide() }
+        // A successful insertion fades the HUD at once (and never brings one up just to fade it, as Insert Again would).
+        if p.linger > 0 { hud.show(); hud.hide(after: p.linger) } else { hud.hide() }
         hud.announce(p.status)
         if p.offersRawOutsideHUD, inserter.canUseRaw, !isPaused { rawOffer.open(avoiding: settings.hotkey) }
+        // How each dictation ended and how long the HUD stays for it: never the text.
+        chirpLog.info("dictation outcome=\(outcome.logName, privacy: .public) cleaned=\(p.cleaned, privacy: .public) kept=\(p.keptOriginal, privacy: .public) hud_linger=\(p.linger, privacy: .public)")
+        return p.linger > 0
     }
 
     /// Replace the inserted correction with the raw transcript, in place for a verified AX insertion and otherwise

@@ -141,37 +141,60 @@ public final class HUDModel {
         withAnimation(.easeInOut(duration: 0.2)) { polishing = true }
     }
 
+    /// The change highlight still playing; settling or resetting cancels it, so it never lands on the next dictation.
+    @ObservationIgnored private var highlightTask: Task<Void, Never>?
+
     /// The cleaned text arrived: crossfade to it with the changes highlighted (removed words struck through and fading,
     /// changed words tinted) for `OutcomePresentation.highlightDuration`, then settle on the plain cleaned text.
     /// Without a usable diff (or nothing changed) it is a plain crossfade. Reduce Motion shows the highlight without the fade.
-    public func playChangeHighlight(raw: String, cleaned: String) async {
+    /// Returns at once with the highlight running: the text is inserted while it plays, never after it.
+    @discardableResult
+    public func startChangeHighlight(raw: String, cleaned: String) -> Task<Void, Never> {
+        highlightTask?.cancel()
         let segments = WordDiff.segments(raw: raw, cleaned: cleaned)
         status = HUDStatus.polished
         indicator = .sparkle
         if let segments {
             diffFade = 0
             withAnimation(.easeInOut(duration: 0.22)) { polishing = false; diff = segments }
-            let total = OutcomePresentation.highlightDuration
-            if reduceMotion {
-                try? await Task.sleep(for: .seconds(total))
-            } else {
-                // Hold the strike-through for a beat, then fade the removed words out; the model is stepped by hand
-                // because a concatenated Text cannot animate individual runs.
-                let hold = 0.3, steps = 12, fadeTime = total - hold
-                try? await Task.sleep(for: .seconds(hold))
-                for step in 1...steps {
-                    diffFade = Double(step) / Double(steps)
-                    try? await Task.sleep(for: .seconds(fadeTime / Double(steps)))
-                }
-            }
-        } else {
-            try? await Task.sleep(for: .seconds(reduceMotion ? 0.2 : 0.3))
         }
-        settle(on: cleaned)
+        let reduceMotion = reduceMotion
+        let task = Task { [weak self] in
+            func pause(_ seconds: Double) async -> Bool {
+                (try? await Task.sleep(for: .seconds(seconds))) != nil
+            }
+            if segments != nil {
+                let total = OutcomePresentation.highlightDuration
+                if reduceMotion {
+                    guard await pause(total) else { return }
+                } else {
+                    // Hold the strike-through for a beat, then fade the removed words out; the model is stepped by hand
+                    // because a concatenated Text cannot animate individual runs.
+                    let hold = 0.3, steps = 12, fadeTime = total - hold
+                    guard await pause(hold) else { return }
+                    for step in 1...steps {
+                        self?.diffFade = Double(step) / Double(steps)
+                        guard await pause(fadeTime / Double(steps)) else { return }
+                    }
+                }
+            } else {
+                guard await pause(reduceMotion ? 0.2 : 0.3) else { return }
+            }
+            self?.settle(on: cleaned)
+        }
+        highlightTask = task
+        return task
+    }
+
+    /// `startChangeHighlight`, waiting for it to finish.
+    public func playChangeHighlight(raw: String, cleaned: String) async {
+        await startChangeHighlight(raw: raw, cleaned: cleaned).value
     }
 
     /// Shows `text` as plain solid text: no shimmer, no highlight, and no word waveform (its words were the raw ones).
     public func settle(on text: String) {
+        highlightTask?.cancel()
+        highlightTask = nil
         withAnimation(.easeInOut(duration: 0.2)) {
             polishing = false
             diff = nil
@@ -184,6 +207,7 @@ public final class HUDModel {
     public func silence() { levels.clear() }
 
     public func reset() {
+        highlightTask?.cancel(); highlightTask = nil
         privateSession = false; duration = nil
         status = ""; stable = ""; unstable = ""; levels.clear(); indicator = .waveform
         isError = false; showUseRaw = false; cleaned = false; onUseRaw = nil
@@ -606,15 +630,17 @@ public struct OutcomePresentation: Equatable, Sendable {
     /// Seconds the HUD stays up. 0 fades it out at once.
     public var linger: Double
 
-    /// How long the diff highlight shows before the cleaned text is inserted.
+    /// How long the diff highlight plays. It runs alongside the insertion and never delays it.
     public static let highlightDuration = 0.8
 
     /// The note when clean-up did not deliver and the raw text was kept stays up this long at most.
     public static let keptNoteLinger = 1.0
 
     /// `offerRaw` is the "Show raw after clean-up" preference: off drops "Use raw" altogether. `showChanges` is "Show
-    /// changes after clean-up": on keeps the HUD up with the diff and the Use raw button; off (the default) fades the
-    /// HUD out at once after a cleaned insertion and offers Use raw outside it.
+    /// changes after clean-up": on keeps the HUD up with the diff and the Use raw button; off (the default) offers Use
+    /// raw outside the HUD. A successful insertion fades the HUD out at once: the text in the field is the outcome.
+    /// It stays up only to tell the user something: copied, maybe not inserted, a secure field, clean-up kept the
+    /// original, or the changes they asked to see.
     public static func of(_ outcome: InsertionOutcome, final: FinalResult, offerRaw: Bool = true,
                           showChanges: Bool = false) -> OutcomePresentation {
         let useRaw = final.canUseRaw && offerRaw
@@ -622,10 +648,10 @@ public struct OutcomePresentation: Equatable, Sendable {
         return switch outcome {
         case .inserted where showChanges:
             OutcomePresentation(status: "Inserted", showUseRaw: useRaw, cleaned: final.canUseRaw, keptOriginal: kept,
-                                linger: useRaw ? 5 : final.canUseRaw ? 1.8 : kept ? keptNoteLinger : 1.2)
+                                linger: useRaw ? 5 : final.canUseRaw ? 1.8 : kept ? keptNoteLinger : 0)
         case .inserted:
             OutcomePresentation(status: "Inserted", cleaned: final.canUseRaw, keptOriginal: kept,
-                                offersRawOutsideHUD: useRaw, linger: final.canUseRaw ? 0 : kept ? keptNoteLinger : 1.2)
+                                offersRawOutsideHUD: useRaw, linger: kept ? keptNoteLinger : 0)
         case .copied:
             OutcomePresentation(status: "Copied — ⌘V", indicator: .clipboard, cleaned: final.canUseRaw, keptOriginal: kept, linger: 3)
         case .insertedUnverified:

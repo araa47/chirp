@@ -194,6 +194,32 @@ private func timings(_ text: String, pace: Double = 0.3, length: Double = 0.25, 
         #expect(!m.showsWordWaveform && m.wordCells.isEmpty && m.stable == "Please move the stand-up.")
     }
 
+    @Test func theChangeHighlightNeverHoldsUpInsertion() async {
+        let m = HUDModel()
+        let cleaned = "Please move the stand-up."
+        let clock = ContinuousClock(), start = clock.now
+        let highlight = m.startChangeHighlight(raw: text, cleaned: cleaned)
+        // Back at once, with the highlight still on screen: the controller inserts now, not after it.
+        #expect(clock.now - start < .milliseconds(100))
+        #expect(m.diff != nil && m.stable != cleaned)
+        await highlight.value
+        #expect(m.diff == nil && m.stable == cleaned)
+        #expect(clock.now - start >= .seconds(OutcomePresentation.highlightDuration))
+    }
+
+    @Test func aHighlightCutShortNeverSettlesOverTheNextDictation() async {
+        let m = HUDModel()
+        let highlight = m.startChangeHighlight(raw: text, cleaned: "Please move the stand-up.")
+        m.reset()
+        m.stable = "next"
+        await highlight.value
+        #expect(m.stable == "next" && m.diff == nil)
+        let again = m.startChangeHighlight(raw: text, cleaned: "Please move the stand-up.")
+        m.settle(on: text)      // e.g. the in-place swap failed and the raw text stays
+        await again.value
+        #expect(m.stable == text)
+    }
+
     @Test func polishingWithoutTimingsKeepsMatchingLiveWordsOnly() {
         let m = HUDModel()
         m.wordWaveform = true
