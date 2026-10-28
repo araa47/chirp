@@ -38,7 +38,7 @@ final class ChirpLiveSpeakersUITests: XCTestCase {
         let forget = app.buttons["chirp.notes.voices.forgetAll"]
         if forget.exists { forget.tap(); app.buttons["Forget"].firstMatch.tap() }
         XCTAssertTrue(ChirpNotesUITests.element("chirp.notes.voices.empty", in: app).waitForExistence(timeout: 15))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.tapBack()
     }
 
     /// The Notes settings form builds only the rows on screen, and kept audio from earlier notes adds rows above the
@@ -164,9 +164,9 @@ final class ChirpLiveSpeakersUITests: XCTestCase {
         XCTAssertTrue(saved.isHittable); saved.tap()
         XCTAssertTrue(app.staticTexts["Samantha"].waitForExistence(timeout: 20))
         screenshot("Saved voice on the throwaway server", app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.tapBack()
         app.buttons["Done"].firstMatch.tap()
-        if UIDevice.current.userInterfaceIdiom != .pad { app.navigationBars.buttons.element(boundBy: 0).tap() }
+        if UIDevice.current.userInterfaceIdiom != .pad { app.tapBack() }
 
         // Note two: a new server speaker session, with no manual naming.
         let newRecord = app.buttons["chirp.notes.record"].firstMatch

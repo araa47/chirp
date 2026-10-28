@@ -56,10 +56,7 @@ final class ChirpNotesUITests: XCTestCase {
         return app
     }
     @MainActor private func backToLibrary(_ app: XCUIApplication) {
-        if UIDevice.current.userInterfaceIdiom != .pad {
-            let back = app.navigationBars.buttons.element(boundBy: 0)
-            XCTAssertTrue(back.waitForExistence(timeout: 5)); back.tap()
-        }
+        if UIDevice.current.userInterfaceIdiom != .pad { app.tapBack() }
     }
     @MainActor private func menu(_ app: XCUIApplication, action: String) {
         app.buttons["chirp.notes.more"].tap()

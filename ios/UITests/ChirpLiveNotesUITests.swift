@@ -93,7 +93,7 @@ final class ChirpLiveNotesUITests: XCTestCase {
         XCTAssertTrue(transcriptSays("WRONG TEXT"))
         XCTAssertEqual(app.buttons["chirp.notes.speaker.chip.1.0"].label, "Maya")
         closeTranscript()
-        if !pad { app.navigationBars.buttons.element(boundBy: 0).tap() }
+        if !pad { app.tapBack() }
 
         // The gap: Try again sends its one clip.
         open("Retranscribe gap")
