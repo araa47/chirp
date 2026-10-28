@@ -123,6 +123,10 @@
     <string name="fix_settings_description">Open Chirp settings</string>
     <string name="fix_try_again">Try again</string>
     <string name="fix_try_again_description">Dictate again</string>
+    <!-- The keyboard options menu: where clean-up runs. %1$s is the clean-up host's name, or options_cleanup_host_unavailable. -->
+    <string name="options_cleanup_host">Sends text to %1$s</string>
+    <string name="options_cleanup_host_unavailable">external host (unavailable)</string>
+    <string name="options_cleanup_local">On your computer</string>
     <!-- The phone's own recogniser when the computer is unavailable. %1$s is its provider, such as Android System Intelligence, or phone_generic. -->
     <string name="phone_chip">on phone</string>
     <string name="phone_disclosure">Recognised on this phone by %1$s, not your computer</string>

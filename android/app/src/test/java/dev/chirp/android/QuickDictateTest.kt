@@ -69,7 +69,7 @@ class QuickDictateTest {
         val clip = app.getSystemService(android.content.ClipboardManager::class.java).primaryClip!!
         assertEquals("Synthetic words.", clip.getItemAt(0).text)
         assertTrue(clip.description.extras!!.getBoolean("android.content.extra.IS_SENSITIVE"))
-        assertEquals("Copied — paste anywhere", activity.model.status)
+        assertEquals("Copied — paste anywhere", activity.model.status.english())
         activity.model.useRaw()
         assertEquals("synthetic words", app.getSystemService(android.content.ClipboardManager::class.java).primaryClip!!.getItemAt(0).text)
         assertNull(activity.model.raw)

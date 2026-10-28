@@ -26,6 +26,7 @@ class OnboardingCopyTest {
     }
 }
 
+@RunWith(RobolectricTestRunner::class)
 class SetupFlowTest {
     @Test fun `every requirement combination respects the chosen mode and skip`() {
         for (mode in InputMode.entries) for (enabled in listOf(false, true)) for (selected in listOf(false, true))

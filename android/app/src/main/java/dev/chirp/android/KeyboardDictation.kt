@@ -251,7 +251,7 @@ internal class KeyboardDictation(
         val anchor = strip?.mic ?: return
         StripMenu(anchor).apply {
             if (store.health.cleanupAvailable()) {
-                toggle(host.getString(R.string.options_cleanup), correctionLabel(store.health), store.correction) { store.correction = it }
+                toggle(host.getString(R.string.options_cleanup), correctionLabel(store.health).resolve(host.resources), store.correction) { store.correction = it }
                 section(host.getString(R.string.options_style))
                 val selected = styleOverride ?: store.style(targetPackage).id
                 CleanupStyles.profiles(store.health).forEach { profile ->

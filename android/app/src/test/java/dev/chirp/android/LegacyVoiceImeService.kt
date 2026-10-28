@@ -366,7 +366,7 @@ internal open class LegacyVoiceImeService : InputMethodService() {
         panel.show(status, partial, stable, phase != Phase.IDLE, phase == Phase.FINALIZING)
         if (partial.isEmpty()) strip.text = status
         banner.retention(retained || store.health?.debugRetention == true)
-        correction.text = correctionLabel(store.health)
+        correction.text = correctionLabel(store.health).resolve(resources)
         correction.isEnabled = phase == Phase.IDLE && store.health?.let {
             it.correctionAvailable && (!it.correctionLeavesMachine || it.correctionHost != null)
         } == true

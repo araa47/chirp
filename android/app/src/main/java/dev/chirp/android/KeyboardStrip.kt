@@ -181,11 +181,11 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
             stage = nextStage
         }
         // The shown form drops the final's "tap mic to dictate again" hint: the chips are the actions that matter.
-        // A fix that isn't a prompt replaces the line with its label; the debug banner keeps the full line.
+        // A fix that isn't a prompt replaces the line with its label unless the reason is named; the debug banner keeps the full line.
         val fix = recovery?.takeUnless { it.prompt }?.let { context.getString(it.label) }
-        status.text = if (retention) context.getString(R.string.strip_debug_retention, decorate(message.resolve(resources)).let { line ->
-            if (fix != null) context.getString(R.string.status_with_action, line, fix) else line })
-            else fix ?: decorate(message.shown(resources))
+        fun withFix(line: String) = if (fix != null) context.getString(R.string.status_with_action, line, fix) else line
+        status.text = if (retention) context.getString(R.string.strip_debug_retention, withFix(decorate(message.resolve(resources))))
+            else if (fix == null || message.named) withFix(decorate(message.shown(resources))) else fix
         status.visibility = if (full) VISIBLE else GONE
         val ink = if (retention) tints.solidError.text else tint?.text ?: palette.ink
         status.setTextColor(ink)

@@ -132,7 +132,7 @@ class OfflineStateTest {
         tap()
         await { strip.status.text.toString().startsWith("Can't find your computer") }
         assertFalse(voice.active)
-        assertEquals(DictationAction.NETWORK.label, strip.status.contentDescription.toString().substringAfterLast(". "))
+        assertEquals(english.getString(DictationAction.NETWORK.label), strip.status.contentDescription.toString().substringAfterLast(". "))
         assertBadge(true)
         advance(5000); assertBadge(true)
     }
@@ -156,8 +156,8 @@ class OfflineStateTest {
         keyboard(); tap(); assertTrue(voice.active)
         fails(ConnectionFailure.Kind.DNS)
         assertFalse(voice.active)
-        assertEquals("${ConnectionFailure.Kind.DNS.english()} · ${DictationAction.NETWORK.label}", strip.status.text.toString())
-        assertEquals(DictationAction.NETWORK.label, strip.status.contentDescription.toString().substringAfterLast(". "))
+        assertEquals("${ConnectionFailure.Kind.DNS.english()} · ${english.getString(DictationAction.NETWORK.label)}", strip.status.text.toString())
+        assertEquals(english.getString(DictationAction.NETWORK.label), strip.status.contentDescription.toString().substringAfterLast(". "))
         assertBadge(true)
         advance(5000); assertBadge(true)
     }

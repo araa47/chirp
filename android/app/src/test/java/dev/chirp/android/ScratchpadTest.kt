@@ -387,7 +387,7 @@ class ScratchpadActivityTest {
         val clip = app.getSystemService(ClipboardManager::class.java).primaryClip!!
         assertEquals("Synthetic copy text", clip.getItemAt(0).text.toString())
         assertTrue(clip.description.extras!!.getBoolean("android.content.extra.IS_SENSITIVE"))
-        assertEquals("Copied", activity.model.status)
+        assertEquals("Copied", activity.model.status.english())
     }
 
     @Test fun `mic asks for the microphone first and then dictates once it is granted`() {
@@ -410,7 +410,7 @@ class ScratchpadActivityTest {
         activity.act(DictationAction.MICROPHONE)
         assertEquals(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, shadowOf(activity).nextStartedActivity.action)
         activity.act(DictationAction.TAILSCALE_ON)
-        assertEquals(1, activity.fakeTailscale.connects); assertEquals("Connecting Tailscale…", activity.model.status)
+        assertEquals(1, activity.fakeTailscale.connects); assertEquals("Connecting Tailscale…", activity.model.status.english())
         activity.act(DictationAction.NETWORK)
         assertEquals(1, activity.fakeTailscale.opens)
         activity.fakeTailscale.installed = false

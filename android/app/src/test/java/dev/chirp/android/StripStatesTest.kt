@@ -171,7 +171,7 @@ class StripStatesTest {
     @Test fun `near the limit the timer is a warning chip but the one live region is unchanged`() {
         noMotion()
         val strip = strip()
-        strip.show(statusOf("Listening… · 15 s left"), "", true, false, false, false, countdown = true)
+        strip.show(StatusLine.LISTENING, "", true, false, false, false, countdown = true, decorate = { "$it · 15 s left" })
         assertNotNull(strip.timer.compoundDrawablesRelative[0])
         assertEquals(1, descendants(strip).count { it.accessibilityLiveRegion != View.ACCESSIBILITY_LIVE_REGION_NONE })
         strip.show(statusOf("Listening…"), "", true, false, false, false)

@@ -17,6 +17,8 @@ internal sealed interface DictationStatus : UiText {
     val error: Boolean get() = false
     /** A success notice: the strip's check mark and success tint. */
     val positive: Boolean get() = false
+    /** The strip keeps the reason in front of its fix ("… · Check Tailscale") instead of showing the fix alone. */
+    val named: Boolean get() = false
 }
 
 internal enum class StatusLine(

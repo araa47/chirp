@@ -20,6 +20,8 @@ internal object ConnectionFailure {
         // TLS has no Tailscale fix; the status text alone explains it.
         override val action get() = DictationAction.NETWORK.takeUnless { this == TLS }
         override val error get() = true
+        // "Can't find…" and "asleep" say more than the fix does; "unreachable" says nothing the fix doesn't.
+        override val named get() = offline
     }
 
     internal fun classify(failure: Throwable?): Kind {

@@ -19,8 +19,6 @@ internal sealed interface EnterPress {
 }
 
 internal object AutoEnter {
-    const val SENT = "↵ sent"
-
     /**
      * What to press for [info] in [mode], or null for nothing. [chatApp] is the app's rule being the Chat style.
      * Never in a password field. A Send/Go/Done action is performed as an editor action; NEXT/PREVIOUS (they move focus)
