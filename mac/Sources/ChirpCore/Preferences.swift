@@ -250,6 +250,21 @@ public final class Preferences: @unchecked Sendable {
         get { defaults.string(forKey: "notesTab") ?? "notes" }
         set { defaults.set(newValue, forKey: "notesTab") }
     }
+    /// The Notes window's text size as a factor, 1 (100%) to 2 (200%). Nothing stored, or a value that is not a
+    /// number, means 100%; one outside the range clamps to it.
+    public var notesTextSize: Double {
+        get { Self.textSize(defaults.object(forKey: "notesTextSize")) }
+        set { defaults.set(Self.textSize(newValue), forKey: "notesTextSize") }
+    }
+    /// The Dictation History window's text size, stored like `notesTextSize`.
+    public var historyTextSize: Double {
+        get { Self.textSize(defaults.object(forKey: "historyTextSize")) }
+        set { defaults.set(Self.textSize(newValue), forKey: "historyTextSize") }
+    }
+    private static func textSize(_ stored: Any?) -> Double {
+        guard let v = stored as? Double, v.isFinite else { return 1 }
+        return min(max(v, 1), 2)
+    }
     /// Live Notes' "Auto-reorganize" toggle (on by default). A preference, never notes content.
     public var notesAutoReorganize: Bool {
         get { defaults.object(forKey: "notesAutoReorganize") as? Bool ?? true }

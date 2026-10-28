@@ -520,7 +520,7 @@ final class NotesHarness {
          voiceClient: VoiceLibraryClient = .unavailable, profiles: VoiceProfileStore? = nil,
          library: NotesLibrary? = nil, journalDirectory: URL? = nil, keptAudio: TimeInterval = NotesRecorder.maxKeptAudio,
          silencePause: TimeInterval = NotesCaptureSink.pauseAfter, callTap: SystemAudioTap? = nil,
-         finalText: @escaping @Sendable (Int) -> String = { "Segment \($0)." }) {
+         finalText: @escaping @Sendable (Int) -> String = { "Segment \($0)." }, storedTextSize: Double? = nil) {
         let clock = self.clock, edges = self.edges
         let streams = ScriptedStreams(sleep: { await clock.sleep($0) }, finalText: finalText)
         self.streams = streams
@@ -532,6 +532,7 @@ final class NotesHarness {
         prefs.serverURL = "http://127.0.0.1:9"   // never contacted: the sockets and HTTP are scripted
         prefs.correction = true
         prefs.soundsEnabled = true
+        if let storedTextSize { prefs.notesTextSize = storedTextSize }
         // Labels are on by default; a harness without a speaker model turns them off (nothing to download).
         if speakers == nil { prefs.notesSpeakerLabels = false }
         self.health = health

@@ -10,6 +10,8 @@ import SwiftUI
 final class HistoryWindowController: NSObject, NSWindowDelegate {
     let history: DictationHistory
     let model = HistoryModel()
+    /// The window's text size, opened at the remembered one.
+    private let textSize = ChirpTextSize()
     private var window: NSWindow?
     static let frameName = "ChirpHistory"
     /// The last app other than Chirp that was frontmost: Insert Again goes back to it.
@@ -23,6 +25,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     init(history: DictationHistory) {
         self.history = history
         super.init()
+        textSize.restore(settings.historyTextSize)
+        textSize.onChange = { settings.historyTextSize = Double($0) }
         model.onCopy = { text in
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
@@ -80,7 +84,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         w.title = HistoryText.windowTitle
         w.toolbarStyle = .unified
-        w.contentViewController = NSHostingController(rootView: HistoryView(model: model))
+        w.contentViewController = NSHostingController(rootView: HistoryView(model: model, textSize: textSize))
         w.setContentSize(size)
         w.contentMinSize = HistoryViewMetrics.minimumSize
         w.isReleasedWhenClosed = false

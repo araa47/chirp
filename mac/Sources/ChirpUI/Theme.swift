@@ -181,13 +181,26 @@ public enum ChirpBrand {
 public final class ChirpTextSize {
     public static let steps: [CGFloat] = [1, 1.15, 1.3, 1.5, 1.75, 2]
     public private(set) var factor: CGFloat
-    public init(factor: CGFloat = 1) { self.factor = Self.steps.min(by: { abs($0 - factor) < abs($1 - factor) }) ?? 1 }
+    /// Called with the new factor after each change the user makes (never for `restore`): the owner stores it.
+    @ObservationIgnored public var onChange: ((CGFloat) -> Void)?
+    public init(factor: CGFloat = 1) { self.factor = Self.nearestStep(factor) }
+    private static func nearestStep(_ factor: CGFloat) -> CGFloat {
+        guard factor.isFinite else { return 1 }
+        return steps.min(by: { abs($0 - factor) < abs($1 - factor) }) ?? 1
+    }
     public var percent: String { "\(Int((factor * 100).rounded()))%" }
     public var canIncrease: Bool { factor < 2 }
     public var canDecrease: Bool { factor > 1 }
-    public func increase() { factor = Self.steps.first(where: { $0 > factor }) ?? 2 }
-    public func decrease() { factor = Self.steps.last(where: { $0 < factor }) ?? 1 }
-    public func reset() { factor = 1 }
+    public func increase() { change(Self.steps.first(where: { $0 > factor }) ?? 2) }
+    public func decrease() { change(Self.steps.last(where: { $0 < factor }) ?? 1) }
+    public func reset() { change(1) }
+    /// Opens at a remembered size without reporting it back as a change.
+    public func restore(_ factor: CGFloat) { self.factor = Self.nearestStep(factor) }
+    private func change(_ new: CGFloat) {
+        guard new != factor else { return }
+        factor = new
+        onChange?(new)
+    }
 }
 
 private struct ChirpTextScaleKey: EnvironmentKey { static let defaultValue: CGFloat = 1 }
