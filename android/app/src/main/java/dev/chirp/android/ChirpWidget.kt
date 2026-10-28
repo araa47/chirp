@@ -14,6 +14,7 @@ import android.widget.RemoteViews
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import dev.chirp.android.ui.ActionRow
 import dev.chirp.android.ui.SettingsItem
 
@@ -43,21 +44,22 @@ class ChirpWidgetProvider : AppWidgetProvider() {
 
 internal class DictationEntryRequests(private val context: Context) {
     fun tile(notes: Boolean): String {
-        if (Build.VERSION.SDK_INT < 33) return "Swipe down twice → Edit, then drag ${if (notes) "Notes" else "Dictate"} into Quick Settings."
+        val name = context.getString(if (notes) R.string.notes_short else R.string.dictate_short)
+        if (Build.VERSION.SDK_INT < 33) return context.getString(R.string.widget_tile_manual, name)
         return try {
             context.getSystemService(StatusBarManager::class.java).requestAddTileService(
                 ComponentName(context, if (notes) NotesTileService::class.java else DictateTileService::class.java),
-                if (notes) "Notes" else "Dictate", Icon.createWithResource(context, if (notes) R.drawable.ic_notes else R.drawable.ic_mic),
+                name, Icon.createWithResource(context, if (notes) R.drawable.ic_notes else R.drawable.ic_mic),
                 context.mainExecutor) { }
-            "Choose Add in the system prompt."
-        } catch (_: RuntimeException) { "Swipe down twice → Edit to add the tile." }
+            context.getString(R.string.widget_tile_prompt)
+        } catch (_: RuntimeException) { context.getString(R.string.widget_tile_fallback) }
     }
     fun widget(): String {
         val manager = context.getSystemService(AppWidgetManager::class.java)
         return if (manager.isRequestPinAppWidgetSupported) {
             manager.requestPinAppWidget(ComponentName(context, ChirpWidgetProvider::class.java), null, null)
-            "Choose Add in the launcher prompt."
-        } else "Long-press your home screen → Widgets → Chirp."
+            context.getString(R.string.widget_pin_prompt)
+        } else context.getString(R.string.widget_pin_manual)
     }
 }
 
@@ -66,10 +68,10 @@ internal fun OtherDictationEntries() {
     val context = LocalContext.current
     val requests = remember(context) { DictationEntryRequests(context) }
     var message by remember { mutableStateOf<String?>(null) }
-    SettingsItem { Text("Quick dictate copies your final so you can paste anywhere. Copies are marked sensitive; Samsung’s clipboard history may still keep them.") }
-    ActionRow("Add Dictate tile", { message = requests.tile(false) })
-    ActionRow("Add Notes tile", { message = requests.tile(true) })
-    ActionRow("Add Widget", { message = requests.widget() })
+    SettingsItem { Text(stringResource(R.string.widget_quick_dictate_body)) }
+    ActionRow(stringResource(R.string.widget_add_dictate_tile), { message = requests.tile(false) })
+    ActionRow(stringResource(R.string.widget_add_notes_tile), { message = requests.tile(true) })
+    ActionRow(stringResource(R.string.widget_add_widget), { message = requests.widget() })
     message?.let { SettingsItem { Text(it) } }
-    SettingsItem { Text("In apps with a Speak button, Android may ask you to choose Chirp or another recognizer. Choose Just once or Always.") }
+    SettingsItem { Text(stringResource(R.string.widget_recognizer_body)) }
 }

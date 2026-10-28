@@ -2,7 +2,7 @@
 # Own one read-only AVD. Never reuse an adb serial or signal an unrelated QEMU.
 set -euo pipefail
 if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
-    echo 'Usage: android/scripts/e2e-all.sh [--only dictation cleanup notes speakers history learn stop device bubble quickdictate visual keepkb release]'
+    echo 'Usage: android/scripts/e2e-all.sh [--only dictation cleanup notes speakers history learn stop device bubble quickdictate visual wallpaper keepkb release]'
     echo 'Runs one owned read-only chirp-fold AVD, queued behind the host-wide emulator lease.'
     exit 0
 fi

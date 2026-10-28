@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
@@ -38,12 +39,12 @@ internal fun openAccessibilitySettings(context: Context) {
 @Composable
 internal fun InputModeCards(state: SetupState, choose: (InputMode) -> Unit) {
     Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ModeCard("Use Chirp Keyboard", "Replaces your keyboard. Type as usual and tap the mic above the keys — your words appear as you speak.",
-            "Works in almost every app", state.inputMode == InputMode.KEYBOARD) { choose(InputMode.KEYBOARD) }
-        ModeCard(state.keyboardLabel?.let { "Keep $it" } ?: "Keep my keyboard",
-            "Keep typing on your keyboard. A small Chirp mic appears beside text fields when you need it.",
-            "Needs an Accessibility permission", state.inputMode == InputMode.OWN_KEYBOARD) { choose(InputMode.OWN_KEYBOARD) }
-        Text("Notes and Scratchpad work either way. You can change this later in Settings.",
+        ModeCard(stringResource(R.string.setup_mode_keyboard), stringResource(R.string.setup_mode_keyboard_body),
+            stringResource(R.string.setup_mode_keyboard_meta), state.inputMode == InputMode.KEYBOARD) { choose(InputMode.KEYBOARD) }
+        ModeCard(state.keyboardLabel?.let { stringResource(R.string.setup_mode_keep_named, it) } ?: stringResource(R.string.setup_mode_keep),
+            stringResource(R.string.setup_mode_keep_body),
+            stringResource(R.string.setup_mode_keep_meta), state.inputMode == InputMode.OWN_KEYBOARD) { choose(InputMode.OWN_KEYBOARD) }
+        Text(stringResource(R.string.setup_mode_either_way),
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -72,23 +73,23 @@ private fun ModeCard(title: String, body: String, meta: String, selected: Boolea
 @Composable
 internal fun FloatingMicGuide(state: SetupState, accessibility: () -> Unit, appInfo: () -> Unit, useKeyboard: () -> Unit) {
     if (state.advancedProtection) {
-        StatusBanner(StatusKind.Warning, "Advanced Protection is on",
-            body = "Android only allows verified accessibility tools, so the floating mic can’t be turned on.")
-        OutlinedButton(useKeyboard, Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("Use Chirp Keyboard instead") }
+        StatusBanner(StatusKind.Warning, stringResource(R.string.setup_advanced_protection),
+            body = stringResource(R.string.setup_advanced_protection_body))
+        OutlinedButton(useKeyboard, Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(stringResource(R.string.setup_use_keyboard_instead)) }
         return
     }
-    Text("Android calls this an Accessibility permission. Chirp uses it only to show a mic next to the field you’re typing in and to put your words there.",
+    Text(stringResource(R.string.setup_bubble_permission),
         style = MaterialTheme.typography.bodyLarge)
-    SettingsGroup("What Chirp can see") {
-        SettingsItem { Text("The text field you’re typing in — on this phone only") }
-        SettingsItem { Text("Never passwords, the rest of the screen or other apps’ content") }
-        SettingsItem { Text("Only your voice is sent, to your own computer") }
+    SettingsGroup(stringResource(R.string.setup_bubble_sees)) {
+        SettingsItem { Text(stringResource(R.string.setup_bubble_sees_field)) }
+        SettingsItem { Text(stringResource(R.string.setup_bubble_sees_never)) }
+        SettingsItem { Text(stringResource(R.string.setup_bubble_sees_voice)) }
     }
-    Text("No battery use while idle — the mic, network and timers start only when you tap it.",
+    Text(stringResource(R.string.setup_bubble_battery),
         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    SettingsGroup { CheckRow("Floating mic on", state.bubbleEnabled) }
+    SettingsGroup { CheckRow(stringResource(R.string.setup_bubble_on), state.bubbleEnabled) }
     if (!state.bubbleEnabled) {
-        Text("Turn on Chirp floating mic, then tap Allow.", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.setup_bubble_turn_on), style = MaterialTheme.typography.bodyMedium)
         if (state.accessibilityReturns > 0) RestrictedSettingsHelp(state.accessibilityReturns, appInfo, accessibility)
     }
 }
@@ -98,14 +99,15 @@ private fun RestrictedSettingsHelp(returns: Int, appInfo: () -> Unit, accessibil
     var expanded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(returns) { if (returns >= 2) expanded = true }
     SettingsGroup {
-        ActionRow("Did Android say “Restricted setting”?", { expanded = !expanded }, summary = if (expanded) "Hide help" else "Show help")
+        ActionRow(stringResource(R.string.setup_restricted_question), { expanded = !expanded },
+            summary = stringResource(if (expanded) R.string.setup_restricted_hide else R.string.setup_restricted_show))
         if (expanded) {
-            SettingsItem { Text("1. Open Chirp app info.\n2. Tap ⋮ (top right), then Allow restricted settings, and confirm with your screen lock.\n3. Come back and open Accessibility settings again.") }
-            ActionRow("Open Chirp app info", appInfo)
-            ActionRow("Open Accessibility settings again", accessibility)
+            SettingsItem { Text(stringResource(R.string.setup_restricted_steps)) }
+            ActionRow(stringResource(R.string.setup_open_app_info), appInfo)
+            ActionRow(stringResource(R.string.setup_open_accessibility_again), accessibility)
             SettingsItem {
-                Text("The ⋮ option appears only after Android has blocked the setting once. Menus differ between phones.", style = MaterialTheme.typography.bodySmall)
-                Text("If your organisation manages this phone, it may block this.", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.setup_restricted_menu_note), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.setup_restricted_managed), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -116,26 +118,25 @@ internal fun HowYouDictate(state: SetupState, choose: (InputMode) -> Unit, acces
                            picker: () -> Unit, keyboardSettings: () -> Unit) {
     InputModeCards(state, choose)
     when (state.inputMode) {
-        InputMode.KEYBOARD -> SettingsGroup("Chirp Keyboard") {
-            CheckRow("Enabled", state.inputEnabled)
-            CheckRow("Selected", state.inputSelected)
-            if (!state.inputEnabled) ActionRow("Enable Chirp Keyboard", keyboardSettings)
-            ActionRow("Choose keyboard", picker)
+        InputMode.KEYBOARD -> SettingsGroup(stringResource(R.string.ime_name)) {
+            CheckRow(stringResource(R.string.setup_keyboard_enabled), state.inputEnabled)
+            CheckRow(stringResource(R.string.setup_keyboard_selected), state.inputSelected)
+            if (!state.inputEnabled) ActionRow(stringResource(R.string.setup_enable_keyboard), keyboardSettings)
+            ActionRow(stringResource(R.string.setup_choose_keyboard), picker)
         }
         InputMode.OWN_KEYBOARD -> {
-            if (state.inputSelected) SettingsGroup { ActionRow("Switch back to your keyboard", picker) }
+            if (state.inputSelected) SettingsGroup { ActionRow(stringResource(R.string.setup_switch_back), picker) }
             FloatingMicGuide(state, accessibility, appInfo, useKeyboard = { choose(InputMode.KEYBOARD) })
-            if (state.advancedProtection && !state.bubbleEnabled) Text("Turned off by Advanced Protection", style = MaterialTheme.typography.bodyMedium)
-            if (!state.advancedProtection && !state.bubbleEnabled) Button(accessibility, Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("Open Accessibility settings") }
+            if (state.advancedProtection && !state.bubbleEnabled) Text(stringResource(R.string.setup_bubble_blocked), style = MaterialTheme.typography.bodyMedium)
+            if (!state.advancedProtection && !state.bubbleEnabled) Button(accessibility, Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(stringResource(R.string.setup_open_accessibility)) }
             // #167: the clipboard is the floating mic's fallback, never automatic.
-            if (state.bubbleEnabled) Text("If a field can’t take your words, they wait in the floating mic’s panel until you tap Copy. " +
-                "Chirp never copies on its own and marks copies as sensitive, but Samsung’s clipboard history may still keep them.",
+            if (state.bubbleEnabled) Text(stringResource(R.string.setup_bubble_clipboard),
                 Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         null -> Unit
     }
-    SettingsGroup("Other ways to dictate") {
-        Text("Notes and Scratchpad work with any keyboard.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+    SettingsGroup(stringResource(R.string.setup_other_ways)) {
+        Text(stringResource(R.string.setup_other_ways_body), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
         OtherDictationEntries()
     }
 }

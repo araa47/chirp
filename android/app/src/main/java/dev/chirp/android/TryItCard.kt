@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -27,17 +28,18 @@ internal fun TryItCard(store: SettingsStore, onDismiss: () -> Unit) {
     val context = LocalContext.current
     Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Try it", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-            Text(if (store.inputMode == InputMode.OWN_KEYBOARD) "Tap a text field, then the floating Chirp mic" else "Tap the field, type on Chirp Keyboard, then tap its mic to dictate. Tap ✓ to finish (or pause, if you chose When I pause); hold the mic to talk, or tap ⋯ for quick options.",
+            Text(stringResource(R.string.try_it_title), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(if (store.inputMode == InputMode.OWN_KEYBOARD) R.string.try_it_body_bubble else R.string.try_it_body_keyboard),
                 style = MaterialTheme.typography.bodyMedium)
             // Deliberately a real native editor: exercises the same InputConnection/accessibility path as other apps.
             val editorInk = MaterialTheme.colorScheme.onSurface.toArgb()
             val editorHint = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
             val editorAccent = MaterialTheme.colorScheme.primary.toArgb()
+            val editorPrompt = stringResource(R.string.try_it_hint)
             val bringEditor = remember { BringIntoViewRequester() }
             val editorScope = rememberCoroutineScope()
             AndroidView(factory = { editorContext -> EditText(editorContext).apply {
-                hint = "Test dictation here"; minLines = 3
+                hint = editorPrompt; minLines = 3
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
                 onFocusChangeListener = View.OnFocusChangeListener { _, focused ->
                     if (focused) postDelayed({ editorScope.launch { bringEditor.bringIntoView() } }, 350)
@@ -48,9 +50,9 @@ internal fun TryItCard(store: SettingsStore, onDismiss: () -> Unit) {
                 editor.backgroundTintList = ColorStateList.valueOf(editorAccent)
             }, modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringEditor))
             if (store.inputMode != InputMode.OWN_KEYBOARD) SettingsGroup {
-                NavRow("Choose keyboard", { context.getSystemService(android.view.inputmethod.InputMethodManager::class.java).showInputMethodPicker() })
+                NavRow(stringResource(R.string.setup_choose_keyboard), { context.getSystemService(android.view.inputmethod.InputMethodManager::class.java).showInputMethodPicker() })
             }
-            TextButton({ store.tryItDismissed = true; onDismiss() }, Modifier.align(Alignment.End)) { Text("Dismiss") }
+            TextButton({ store.tryItDismissed = true; onDismiss() }, Modifier.align(Alignment.End)) { Text(stringResource(R.string.try_it_dismiss)) }
         }
     }
 }

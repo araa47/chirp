@@ -471,7 +471,7 @@ private class TargetView(context: Context, private val palette: VoicePalette) : 
         set(value) { if (field != value) { field = value; paint() } }
     init {
         setImageResource(R.drawable.ic_close); scaleType = ScaleType.CENTER
-        contentDescription = "Hide here"
+        contentDescription = context.getString(R.string.bubble_hide_here)
         paint()
     }
     private fun paint() {

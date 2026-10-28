@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chirp Notes screens: library, editor, re-transcribe, speakers, saved voices, settings and Share to Notes. -->
+<resources>
+    <!-- Shared actions -->
+    <string name="notes_action_cancel">Cancel</string>
+    <string name="notes_action_undo">Undo</string>
+    <string name="notes_action_dismiss">Dismiss</string>
+
+    <!-- Re-transcribe sheet and banner -->
+    <!-- %1$s is the note title. -->
+    <string name="notes_retranscribe_title">Re-transcribe “%1$s”?</string>
+    <!-- %1$d:%2$s is the clip length as minutes:seconds; %3$s is the server’s address. -->
+    <string name="notes_retranscribe_send_clip">Send this %1$d:%2$s clip to your Chirp server on %3$s to transcribe it again?</string>
+    <!-- %1$d min %2$d s is the kept audio’s length; %3$d is the clip count; %4$s is the server’s address. -->
+    <plurals name="notes_retranscribe_send_note">
+        <item quantity="one">Chirp sends this note’s kept audio (%1$d min %2$d s, %3$d clip) to your Chirp server on %4$s.</item>
+        <item quantity="other">Chirp sends this note’s kept audio (%1$d min %2$d s, %3$d clips) to your Chirp server on %4$s.</item>
+    </plurals>
+    <string name="notes_retranscribe_not_kept">It is transcribed in memory there and not kept. Nothing else receives the audio.</string>
+    <!-- %1$s is the server’s speech model; %2$s is the engine this note was transcribed with. -->
+    <string name="notes_retranscribe_models">Speech model: %1$s. This note was transcribed with: %2$s.</string>
+    <string name="notes_retranscribe_model_unknown">unknown</string>
+    <string name="notes_retranscribe_same_model">Same model as before. Results change only if clean-up or context changed.</string>
+    <string name="notes_retranscribe_cleanup_on">Clean-up: On. Change the model in Chirp on your computer.</string>
+    <string name="notes_retranscribe_cleanup_off">Clean-up: Off. Change the model in Chirp on your computer.</string>
+    <!-- %1$s is the host that clean-up sends text to. -->
+    <string name="notes_retranscribe_cleanup_host">Clean-up sends text to %1$s. Audio stays on your computer.</string>
+    <string name="notes_retranscribe_debug_retention">Your server is keeping debug recordings. This audio will be saved there for up to 3 days.</string>
+    <!-- %1$d segments of %2$d have no kept audio. -->
+    <plurals name="notes_retranscribe_missing_audio">
+        <item quantity="one">%1$d of %2$d segments has no kept audio and keeps its current text.</item>
+        <item quantity="other">%1$d of %2$d segments have no kept audio and keep their current text.</item>
+    </plurals>
+    <string name="notes_retranscribe_rebuild">Also rebuild the notes from the new transcript.</string>
+    <string name="notes_retranscribe_rebuild_detail">This replaces the notes text, including your edits. You can undo it.</string>
+    <string name="notes_retranscribe_rebuild_needs_cleanup">Needs clean-up on your server</string>
+    <string name="notes_retranscribe_update_chirp">Update Chirp on your computer to re-transcribe</string>
+    <string name="notes_retranscribe_action">Re-transcribe</string>
+    <string name="notes_retranscribe_action_anyway">Re-transcribe anyway</string>
+    <string name="notes_retranscribe_replace_title">Replace your edits?</string>
+    <string name="notes_retranscribe_replace_message">You edited the notes during re-transcription. Replace them with these rebuilt notes? You can undo it.</string>
+    <string name="notes_retranscribe_replace">Replace</string>
+    <string name="notes_retranscribe_keep_edits">Keep my edits</string>
+    <string name="notes_retranscribe_apply_done">Apply what’s done</string>
+
+    <!-- Rendered notes -->
+    <string name="notes_block_edit">Edit</string>
+    <string name="notes_task_tick">Tick</string>
+    <string name="notes_task_untick">Untick</string>
+    <!-- %1$s is the words heard but not yet in the notes. -->
+    <string name="notes_hearing_description">Hearing: %1$s</string>
+    <string name="notes_empty_type">Type notes</string>
+    <string name="notes_empty_recording_title">Notes appear as you talk</string>
+    <string name="notes_empty_title">Your notes appear here</string>
+    <string name="notes_empty_recording_detail">Headings, lists and to-dos land here a moment after each pause.</string>
+    <string name="notes_empty_detail">Tap Record and talk. Chirp turns it into headings, lists and to-dos. Or tap here to type.</string>
+
+    <!-- Share to Notes -->
+    <string name="share_notes_only_text">Only text can be shared to Notes.</string>
+    <string name="share_notes_too_long">This text is too long. Share up to 100,000 characters.</string>
+    <string name="share_notes_empty">There’s no text to save.</string>
+    <string name="share_notes_stopped">That note has stopped. Save as a new note instead.</string>
+    <string name="share_notes_off">Notes are off. Turn on Keep notes on this phone in Settings → Notes.</string>
+    <string name="share_notes_save_failed">Couldn’t save the note. Try again.</string>
+    <string name="share_notes_title">Save to Notes</string>
+    <string name="share_notes_message">Keep this text on this phone. It stays local unless you choose Organize later.</string>
+    <!-- %1$s is the title of the note being recorded. -->
+    <string name="share_notes_add_to">Add to “%1$s”</string>
+    <string name="share_notes_save_new">Save as new note</string>
+
+    <!-- Saved voices -->
+    <string name="saved_voices_title">Saved voices</string>
+    <string name="saved_voices_remember">Remember voices of people I name</string>
+    <string name="saved_voices_remember_summary">Shared by all devices paired to this computer</string>
+    <string name="saved_voices_about">Chirp recognises these people in new notes on all your devices. They’re kept on your paired computer, never uploaded.</string>
+    <string name="saved_voices_updating">Updating saved voices…</string>
+    <string name="saved_voices_empty">Name a speaker in a note and Chirp will recognise them next time.</string>
+    <string name="saved_voices_incompatible">Name them again to keep recognising this voice</string>
+    <!-- %1$s is the person’s name. -->
+    <string name="saved_voices_options">Options for %1$s</string>
+    <string name="saved_voices_rename_menu">Rename…</string>
+    <string name="saved_voices_forget_menu">Forget…</string>
+    <string name="saved_voices_refresh">Refresh saved voices</string>
+    <string name="saved_voices_forget_all_menu">Forget all voices…</string>
+    <string name="saved_voices_stop_title">Stop remembering voices?</string>
+    <!-- %1$d is how many voices are saved. -->
+    <plurals name="saved_voices_stop_message">
+        <item quantity="one">Stops saving and recognising on every device. Also forget %1$d saved voice?</item>
+        <item quantity="other">Stops saving and recognising on every device. Also forget %1$d saved voices?</item>
+    </plurals>
+    <string name="saved_voices_turn_off_forget">Turn off and forget</string>
+    <string name="saved_voices_keep">Keep voices</string>
+    <string name="saved_voices_forget_all_title">Forget all voices?</string>
+    <!-- %1$s is the person’s name. -->
+    <string name="saved_voices_forget_title">Forget %1$s?</string>
+    <string name="saved_voices_forget_all_message">Removes all saved voices from your computer for every device. Names in existing notes stay. This can’t be undone.</string>
+    <!-- %1$s is the person’s name. -->
+    <string name="saved_voices_forget_message">Removes %1$s’s voice from your computer for every device. Names in existing notes stay. This can’t be undone.</string>
+    <string name="saved_voices_forget">Forget</string>
+    <string name="saved_voices_rename_title">Rename saved voice</string>
+    <string name="saved_voices_name">Name</string>
+    <string name="saved_voices_names_stay">Names in existing notes stay.</string>
+    <string name="saved_voices_rename">Rename</string>
+    <!-- Shown instead of a date the app can’t read. -->
+    <string name="saved_voices_date_earlier">earlier</string>
+    <!-- %1$s is the date saved, %2$d the seconds of voice kept. -->
+    <string name="saved_voices_detail">Saved %1$s · %2$d s</string>
+    <!-- %1$s is the date saved, %2$s the date updated, %3$d the seconds of voice kept. -->
+    <string name="saved_voices_detail_updated">Saved %1$s · updated %2$s · %3$d s</string>
+
+    <!-- Speakers -->
+    <!-- %1$d is the speaker’s number; the default name for someone not yet named. -->
+    <string name="notes_speakers_person">Person %1$d</string>
+    <!-- %1$s is the speaker’s name. -->
+    <string name="notes_speakers_chip">%1$s. Rename, merge or reassign this speaker</string>
+    <!-- %1$s is the speaker’s name; Chirp recognised their saved voice. -->
+    <string name="notes_speakers_chip_recognised">%1$s, recognised. Rename, merge or reassign this speaker</string>
+    <!-- The heading of the submenu that assigns the selected transcript turn to a person. -->
+    <string name="notes_speakers_turn_is_heading">This turn is</string>
+    <string name="notes_speakers_turn_is">This turn is…</string>
+    <string name="notes_speakers_new_person">New person</string>
+    <!-- %1$s is the speaker’s name. -->
+    <string name="notes_speakers_rename_menu">Rename “%1$s”…</string>
+    <!-- %1$s is the name Chirp recognised; choosing this says the voice isn’t theirs. -->
+    <string name="notes_speakers_not">Not %1$s</string>
+    <!-- %1$s is the speaker’s name. -->
+    <string name="notes_speakers_update_voice">Update %1$s’s voice</string>
+    <string name="notes_speakers_name_all_menu">Name speakers…</string>
+    <string name="notes_speakers_same_person_as">Same person as</string>
+    <!-- %1$s is the merged person’s name. -->
+    <string name="notes_speakers_separate">Separate %1$s</string>
+    <!-- %1$s is the speaker’s current name. -->
+    <string name="notes_speakers_rename_title">Rename “%1$s”</string>
+    <string name="notes_speakers_name">Name</string>
+    <string name="notes_speakers_rename_detail">Used everywhere in this note: the transcript, the notes Chirp writes and exports.</string>
+    <string name="notes_speakers_remember_voice">Remember voice</string>
+    <!-- %1$s is the old name, %2$s the new one, %3$d how many places in the notes use it. -->
+    <plurals name="notes_speakers_replace_one">
+        <item quantity="one">Also replace “%1$s” with “%2$s” in the notes (%3$d place)</item>
+        <item quantity="other">Also replace “%1$s” with “%2$s” in the notes (%3$d places)</item>
+    </plurals>
+    <string name="notes_speakers_rename">Rename</string>
+    <string name="notes_speakers_retry">Retry</string>
+    <string name="notes_speakers_turn_off">Turn off</string>
+    <string name="notes_speakers_name_all_title">Name speakers</string>
+    <string name="notes_speakers_done">Done</string>
+    <string name="notes_speakers_name_all_detail">Names are used everywhere in this note: the transcript, the notes Chirp writes and exports.</string>
+    <!-- %1$d is how many places in the notes use the names. -->
+    <plurals name="notes_speakers_replace_all">
+        <item quantity="one">Also replace names in the notes (%1$d place)</item>
+        <item quantity="other">Also replace names in the notes (%1$d places)</item>
+    </plurals>
+    <!-- %1$d is the speaker’s number. -->
+    <string name="notes_speakers_name_for">Name for Person %1$d</string>
+    <string name="notes_speakers_stop_sample">Stop sample</string>
+    <!-- %1$d is the speaker’s number. -->
+    <string name="notes_speakers_play_sample">Play a sample of Person %1$d</string>
+    <!-- %1$s is the first thing the person said, quoted. -->
+    <string name="notes_speakers_sample">“%1$s”</string>
+    <string name="notes_speakers_same_as">Same as ▸</string>
+
+    <!-- Notes settings -->
+    <string name="notes_settings_on">On</string>
+    <string name="notes_settings_off">Off</string>
+    <string name="notes_settings_saver">Save battery while the screen is off</string>
+    <string name="notes_settings_saver_info">With the screen off the phone stops drawing live text and the level meter; recording, the transcript and the notes on your computer keep going, so everything is up to date the moment you look.</string>
+    <string name="notes_settings_recovery">Keep a recovery copy until notes are saved</string>
+    <string name="notes_settings_recovery_info">If Android closes Chirp or the phone restarts during a recording, Notes reopens with what you had. Encrypted on this phone, never backed up or sent anywhere, and deleted when you save, discard or start new notes.</string>
+    <string name="notes_settings_enable_library">Enable notes library</string>
+    <string name="notes_settings_keep">Keep notes on this phone</string>
+    <string name="notes_settings_keep_on">On · encrypted on this phone only</string>
+    <string name="notes_settings_keep_info">Every note keeps itself, encrypted on this phone only. Never sent to your computer, backed up or logged. Turning this off keeps the notes you already have; \"Delete all notes\" removes them.</string>
+    <string name="notes_settings_retention">Delete notes older than</string>
+    <!-- %1$d is how many days deleted notes stay in Recently Deleted. -->
+    <plurals name="notes_settings_retention_detail">
+        <item quantity="one">Never by default. Deleted notes stay in Recently Deleted for %1$d day.</item>
+        <item quantity="other">Never by default. Deleted notes stay in Recently Deleted for %1$d days.</item>
+    </plurals>
+    <string name="notes_settings_keep_audio">Keep audio with notes</string>
+    <string name="notes_settings_off_by_default">Off by default</string>
+    <string name="notes_settings_keep_audio_info">Keeps each spoken segment next to its transcript, compressed and encrypted on this phone only, so you can replay it. Re-transcribe can send kept audio to your paired Chirp server when you choose it and confirm.</string>
+    <string name="notes_settings_retranscribe">Allow re-transcribing</string>
+    <string name="notes_settings_retranscribe_on">On · asks before sending audio</string>
+    <string name="notes_settings_retranscribe_info">Send kept audio to your paired Chirp server only when you choose Re-transcribe and confirm. Turning this off cancels a running re-transcription.</string>
+    <string name="notes_settings_speakers">Label speakers</string>
+    <string name="notes_settings_speakers_update">Update Chirp on your computer to label speakers</string>
+    <string name="notes_settings_speakers_on">On · who said what</string>
+    <string name="notes_settings_speakers_off">Off · who said what</string>
+    <string name="notes_settings_speakers_info">Shows who said what in the transcript (Person 1, Person 2…; tap a name to rename it) and lets the notes say who owns a to-do. Names and turns stay in the sealed note; saved voices stay on your computer. The speaker model downloads automatically when needed. Recording starts straight away.</string>
+    <string name="notes_settings_speaker_model_ready">Speaker model on your computer: ready</string>
+    <string name="notes_settings_speaker_model_downloading">Speaker model on your computer: downloading</string>
+    <string name="notes_settings_speaker_model_failed">Speaker model on your computer: couldn’t download</string>
+    <string name="notes_settings_speaker_model_missing">Speaker model on your computer: not downloaded</string>
+    <string name="notes_settings_remove_speaker_model">Remove speaker model</string>
+    <string name="notes_settings_voices_update">Update Chirp on your computer to save voices</string>
+    <!-- %1$s is the size of the kept audio, such as 1.5 MB. -->
+    <string name="notes_settings_delete_audio">Delete kept audio (%1$s)</string>
+    <string name="notes_settings_delete_all">Delete all notes</string>
+    <string name="notes_settings_delete_audio_title">Delete kept audio?</string>
+    <string name="notes_settings_delete_audio_message">This deletes the audio of every note. The text and transcripts stay.</string>
+    <string name="notes_settings_delete_audio_confirm">Delete audio</string>
+    <string name="notes_settings_delete_all_title">Delete all notes?</string>
+    <string name="notes_settings_delete_all_message">This deletes every note on this phone, including Recently Deleted and kept audio. Notes you saved as files stay where you saved them.</string>
+    <string name="notes_settings_delete_all_confirm">Delete everything</string>
+    <!-- Parts of the Notes summary line in Settings, joined with " · " and capitalised. -->
+    <string name="notes_summary_saver">battery saver</string>
+    <string name="notes_summary_recovery">recovery copy</string>
+    <string name="notes_summary_keeps">keeps notes</string>
+    <!-- %1$s is the retention period, such as 30 days. -->
+    <string name="notes_summary_deletes_after">deletes after %1$s</string>
+
+    <!-- Notes library -->
+    <!-- A short length in seconds, abbreviated. -->
+    <plurals name="notes_duration_seconds">
+        <item quantity="one">%1$d sec</item>
+        <item quantity="other">%1$d sec</item>
+    </plurals>
+    <!-- A short length in minutes, abbreviated. -->
+    <plurals name="notes_duration_minutes">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d min</item>
+    </plurals>
+    <!-- Snackbar after deleting notes; %1$d is how many. -->
+    <plurals name="notes_library_deleted">
+        <item quantity="one">Note deleted</item>
+        <item quantity="other">%1$d notes deleted</item>
+    </plurals>
+    <string name="notes_library_new_recording_title">Start a new recording?</string>
+    <string name="notes_library_continue_title">Continue this note?</string>
+    <string name="notes_library_another_recording">Another note is recording. Stop it before starting here.</string>
+    <string name="notes_library_stop_and_record">Stop current and record</string>
+    <string name="notes_library_stop_and_continue">Stop current and continue here</string>
+    <string name="notes_library_empty_trash_title">Empty Recently Deleted?</string>
+    <string name="notes_library_empty_trash_message">These notes and their audio will be deleted for good. This can’t be undone.</string>
+    <string name="notes_library_delete_permanently">Delete permanently</string>
+    <!-- The group heading over notes in Recently Deleted. -->
+    <string name="notes_library_group_deleted">Deleted</string>
+    <!-- The title while notes are selected; %1$d is how many. -->
+    <plurals name="notes_library_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <string name="notes_library_title">Notes</string>
+    <string name="notes_library_trash">Recently Deleted</string>
+    <string name="notes_library_clear_selection">Clear selection</string>
+    <string name="notes_library_back">Back to notes</string>
+    <string name="notes_library_restore">Restore</string>
+    <string name="notes_library_delete_selected">Delete selected notes</string>
+    <string name="notes_library_new_note">New note</string>
+    <string name="notes_library_options">Library options</string>
+    <string name="notes_library_record_new">Record new note</string>
+    <string name="notes_library_record_new_detail">Stops the current recording first</string>
+    <string name="notes_library_empty_trash">Empty Recently Deleted</string>
+    <string name="notes_library_search_trash">Search Recently Deleted</string>
+    <string name="notes_library_search">Search notes</string>
+    <string name="notes_library_clear_search">Clear search</string>
+    <string name="notes_library_dictate">Dictate</string>
+    <string name="notes_library_record">Record</string>
+    <string name="notes_library_open_paused">Open paused note</string>
+    <string name="notes_library_open_recording">Open recording</string>
+    <string name="notes_library_open_paused_recording">Open the paused recording</string>
+    <string name="notes_library_open_current_recording">Open the current recording</string>
+    <string name="notes_library_open_the_recording">Open the recording</string>
+    <!-- Section heading above the note that holds the microphone. -->
+    <string name="notes_library_section_paused">Paused</string>
+    <string name="notes_library_section_recording">Recording</string>
+    <string name="notes_library_enable_detail">Keep your notes on this phone, automatically.</string>
+    <string name="notes_library_trash_info">Notes are kept here for 30 days. Restore them any time before then.</string>
+    <string name="notes_library_trash_empty_title">Nothing recently deleted</string>
+    <string name="notes_library_trash_empty_detail">Deleted notes appear here for 30 days.</string>
+    <string name="notes_library_blank_title">Your notes will live here</string>
+    <string name="notes_library_blank_detail">Tap New note to type, or Record to turn a conversation into notes.</string>
+    <string name="notes_library_blank_footer">Notes stay on this phone.</string>
+    <!-- %1$s is what was searched for. -->
+    <string name="notes_library_no_results_title">No results for “%1$s”</string>
+    <string name="notes_library_no_results_detail">Try another word from your notes or transcript.</string>
+    <string name="notes_library_open_failed_title">Couldn’t open this note</string>
+    <string name="notes_library_open_failed_detail">Try again, or return to the library. Your other notes are still here.</string>
+    <string name="notes_library_try_again">Try again</string>
+    <string name="notes_library_detail_empty_title">A little room to think</string>
+    <string name="notes_library_detail_empty_detail">Choose a note, type a new one, or start recording.</string>
+    <!-- %1$s is the connection status, such as Connected. -->
+    <string name="notes_library_connection">Connection: %1$s. Open connection settings</string>
+    <string name="notes_library_setup_title">Finish setting up</string>
+    <!-- %1$s is the next setup step. -->
+    <string name="notes_library_setup_next">Next: %1$s</string>
+    <string name="notes_library_setup_dismiss">Dismiss setup</string>
+    <!-- %1$s is the capture state (Recording, Paused…), %2$s the elapsed time. -->
+    <string name="notes_library_recording_state">%1$s · %2$s</string>
+    <string name="notes_library_preview_paused">Resume when you’re ready.</string>
+    <string name="notes_library_preview_recording">Your notes are taking shape.</string>
+    <string name="notes_library_row_selected">Selected</string>
+    <string name="notes_library_row_not_selected">Not selected</string>
+    <string name="notes_library_row_delete">Delete</string>
+    <string name="notes_library_row_select">Select</string>
+    <string name="notes_library_delete_note">Delete note</string>
+    <!-- %1$d is how many unticked to-dos the note has. -->
+    <plurals name="notes_library_open_tasks">
+        <item quantity="one">%1$d open task</item>
+        <item quantity="other">%1$d open tasks</item>
+    </plurals>
+    <string name="notes_library_recovered">Recovered</string>
+    <string name="notes_library_kept_audio">Kept audio</string>
+
+    <!-- Note editor -->
+    <string name="notes_editor_settings">Notes settings</string>
+    <string name="notes_editor_voice_notice_title">Remembering voices</string>
+    <!-- %1$s is the person’s name. -->
+    <string name="notes_editor_voice_notice_message">Chirp will recognise %1$s’s voice in later notes on your devices. Saved voices stay on your computer. Settings → Notes → Saved voices.</string>
+    <string name="notes_editor_ok">OK</string>
+    <string name="notes_editor_voice_notice_off">Don’t remember voices</string>
+    <!-- A chip back to another note that is recording: %1$s is its title, %2$s the elapsed time. -->
+    <string name="notes_editor_recording_elsewhere">Recording · %1$s · %2$s</string>
+    <string name="notes_editor_transcript">Transcript</string>
+    <!-- Capture states, spoken and shown beside the running time. -->
+    <string name="notes_capture_connecting">Connecting</string>
+    <string name="notes_capture_paused">Paused</string>
+    <string name="notes_capture_finishing">Finishing</string>
+    <string name="notes_capture_recording">Recording</string>
+    <string name="notes_capture_stopped">Stopped</string>
+    <string name="notes_editor_recovered_title">Recovered note</string>
+    <string name="notes_editor_recovered_body">Your note was recovered and kept on this phone.</string>
+    <string name="notes_editor_who_spoke">Who was speaking?</string>
+    <string name="notes_editor_title_field">Note title</string>
+    <!-- %1$s is the note title. -->
+    <string name="notes_editor_rename_title">Rename notes: %1$s</string>
+    <string name="notes_editor_save_title">Save title</string>
+    <!-- %1$s is the elapsed recording time. -->
+    <string name="notes_editor_elapsed">· %1$s</string>
+    <string name="notes_editor_done_editing">Done editing</string>
+    <string name="notes_editor_edit">Edit notes</string>
+    <string name="notes_editor_field">Notes (Markdown)</string>
+    <string name="notes_editor_placeholder">Type your notes. # for a heading, - for a list, - [ ] for a to-do</string>
+    <string name="notes_editor_heading">Heading</string>
+    <string name="notes_editor_bullets">Bulleted list</string>
+    <string name="notes_editor_checklist">Checklist</string>
+
+    <!-- Note menu -->
+    <string name="notes_menu_more">More options</string>
+    <string name="notes_menu_organize">Organize</string>
+    <string name="notes_menu_undo_organize">Undo organize</string>
+    <string name="notes_menu_structure">Structure notes</string>
+    <!-- %1$s is the host that structuring sends text to. -->
+    <string name="notes_menu_structure_host">Sends text to %1$s</string>
+    <string name="notes_menu_organize_auto">Organize automatically</string>
+    <string name="notes_menu_speakers_summary">Who said what · voices compared on your computer</string>
+    <string name="notes_menu_copy">Copy</string>
+    <string name="notes_menu_share">Share</string>
+    <string name="notes_menu_export">Export Markdown</string>
+    <string name="notes_menu_rename">Rename</string>
+    <string name="notes_menu_retranscribe">Re-transcribe…</string>
+    <string name="notes_menu_restore_transcript">Restore previous transcript</string>
+    <string name="notes_menu_undo_rebuild">Undo rebuild</string>
+    <!-- %1$s is the size of this note’s audio, such as 1.5 MB. -->
+    <string name="notes_menu_audio_size">%1$s on this phone</string>
+    <string name="notes_menu_delete_audio_title">Delete audio?</string>
+    <!-- %1$s is the size of this note’s audio, such as 1.5 MB. -->
+    <string name="notes_menu_delete_audio_message">This deletes this note’s audio (%1$s). The text and transcript stay.</string>
+
+    <!-- Recording dock and Edit by voice -->
+    <string name="notes_dock_continue">Continue recording</string>
+    <string name="notes_dock_record_notes">Record notes</string>
+    <string name="notes_dock_resume">Resume recording notes</string>
+    <string name="notes_dock_pause">Pause recording notes</string>
+    <!-- %1$s is the note title, %2$s the elapsed time. -->
+    <string name="notes_dock_description">%1$s, %2$s</string>
+    <string name="notes_dock_stop">Stop recording notes</string>
+    <string name="notes_command_send_description">Send the spoken edit</string>
+    <string name="notes_command_description">Edit notes by voice. Hold, say the change, let go.</string>
+    <string name="notes_command_start">Start</string>
+    <string name="notes_command_hold">Hold to edit</string>
+    <string name="notes_command_release">Release to send</string>
+    <string name="notes_command_tap">Tap to send</string>
+    <string name="notes_command_undo_description">Undo the spoken edit</string>
+
+    <!-- Transcript -->
+    <string name="notes_transcript_show_raw">Show raw</string>
+    <string name="notes_transcript_close">Close transcript</string>
+    <!-- %1$s is the speech engine, or unknown or mixed. -->
+    <string name="notes_transcript_engine">Transcribed with %1$s</string>
+    <string name="notes_transcript_playback_failed">Couldn’t play kept audio. Try another segment.</string>
+    <string name="notes_transcript_playing">Playing</string>
+    <!-- %1$s is the date and time the recording continued. -->
+    <string name="notes_transcript_continued">Continued · %1$s</string>
+    <string name="notes_transcript_stop_playback">Stop playback</string>
+    <!-- %1$d is the segment number. -->
+    <string name="notes_transcript_play_segment">Play segment %1$d</string>
+    <!-- %1$s is why the audio wasn’t transcribed. -->
+    <string name="notes_transcript_failed">⚠︎ audio not transcribed (%1$s)</string>
+    <!-- %1$s is the transcript text; re-transcription kept the original. -->
+    <string name="notes_transcript_kept_original">%1$s (kept original)</string>
+    <string name="notes_transcript_empty">What is said appears here, a line per segment.</string>
+</resources>

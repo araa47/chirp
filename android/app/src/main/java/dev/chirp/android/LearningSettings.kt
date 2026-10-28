@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -22,12 +23,10 @@ internal fun LearningSettings() {
     val store = remember { LearnedStore(context) }
     var enabled by remember { mutableStateOf(store.enabled) }
     var show by remember { mutableStateOf(false) }
-    SettingsGroup("Learning") {
-        SwitchRow("Learn from my edits", enabled, { enabled = it; store.enabled = it }, summary = "On while dictation history is on",
-            infoTitle = "Learn from my edits", infoBody = "After dictating, fix a word in the same field within 60 seconds. " +
-                "The same correction seen twice teaches Chirp your vocabulary or that app's style. Password, incognito and private sessions are excluded. " +
-                "Learned items are encrypted on this phone. Active items go only to your own server with dictation, including its configured clean-up host.")
-        NavRow("Learned", { show = true }, summary = "Review, approve or undo corrections")
+    SettingsGroup(stringResource(R.string.learning_title)) {
+        SwitchRow(stringResource(R.string.learning_from_edits), enabled, { enabled = it; store.enabled = it }, summary = stringResource(R.string.learning_from_edits_summary),
+            infoTitle = stringResource(R.string.learning_from_edits), infoBody = stringResource(R.string.learning_from_edits_info))
+        NavRow(stringResource(R.string.learning_learned), { show = true }, summary = stringResource(R.string.learning_learned_summary))
     }
     if (show) ModalBottomSheet({ show = false }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp)) { LearnedList(store) }
@@ -49,26 +48,27 @@ internal fun LearnedList(store: LearnedStore) {
         failed = runCatching { withContext(Dispatchers.IO) { work() } }.isFailure
         revision++
     } }
-    Text("Learned", Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
-    Text("Your terms work everywhere. Style belongs to the app where you edited.", style = MaterialTheme.typography.bodyMedium)
+    Text(stringResource(R.string.learning_learned), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
+    Text(stringResource(R.string.learning_learned_body), style = MaterialTheme.typography.bodyMedium)
     Spacer(Modifier.height(16.dp))
-    if (failed) Text("Couldn't open learned items. Unlock your phone and try again.")
-    else if (items.isEmpty()) Text("Nothing learned yet. Correct the same dictation word twice, or use Teach Chirp in History.")
+    if (failed) Text(stringResource(R.string.learning_open_failed))
+    else if (items.isEmpty()) Text(stringResource(R.string.learning_empty))
+    val allApps = stringResource(R.string.learning_all_apps)
     items.groupBy { it.app }.forEach { (app, group) ->
         val appTitle = remember(app) { app?.let { pkg -> runCatching {
             context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString()
-        }.getOrDefault(pkg) } ?: "All apps" }
+        }.getOrDefault(pkg) } ?: allApps }
         SettingsGroup(appTitle) {
-            ActionRow("Reset app", { change { store.reset(app) } }, destructive = true)
+            ActionRow(stringResource(R.string.learning_reset_app), { change { store.reset(app) } }, destructive = true)
             group.sortedByDescending { it.time }.forEach { item -> SettingsItem {
                 Text(item.correction.title, style = MaterialTheme.typography.titleMedium)
-                Text(if (item.state == LearnedState.LEARNING) "Learning · ${item.count} of 2" else item.state.title,
+                Text(if (item.state == LearnedState.LEARNING) stringResource(R.string.learning_progress, item.count, 2) else item.state.title,
                     style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Text("${item.inserted} → ${item.edited}", style = MaterialTheme.typography.bodyMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (item.state != LearnedState.ACTIVE) TextButton({ change { store.set(item.id, LearnedState.ACTIVE) } }) { Text("Approve") }
-                    if (item.state != LearnedState.OFF) TextButton({ change { store.set(item.id, LearnedState.OFF) } }) { Text("Undo") }
-                    TextButton({ change { store.delete(item.id) } }) { Text("Delete") }
+                    if (item.state != LearnedState.ACTIVE) TextButton({ change { store.set(item.id, LearnedState.ACTIVE) } }) { Text(stringResource(R.string.learning_approve)) }
+                    if (item.state != LearnedState.OFF) TextButton({ change { store.set(item.id, LearnedState.OFF) } }) { Text(stringResource(R.string.learning_undo)) }
+                    TextButton({ change { store.delete(item.id) } }) { Text(stringResource(R.string.learning_delete)) }
                 }
             } }
         }
@@ -84,10 +84,13 @@ internal fun TeachChirp(entry: HistoryEntry, close: () -> Unit) {
     var wanted by remember(entry.id) { mutableStateOf(entry.text) }
     var message by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
-    AlertDialog(onDismissRequest = close, title = { Text("Teach Chirp") }, text = {
+    val notAllowed = stringResource(R.string.learning_teach_not_allowed)
+    val saveFailed = stringResource(R.string.learning_teach_failed)
+    val nothingNew = stringResource(R.string.learning_teach_nothing_new)
+    AlertDialog(onDismissRequest = close, title = { Text(stringResource(R.string.learning_teach)) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Correct a name or technical word, or adjust this app's capitalization and final period.")
-            OutlinedTextField(wanted, { if (it.length <= 20000) wanted = it }, label = { Text("What you wanted") }, modifier = Modifier.fillMaxWidth())
+            Text(stringResource(R.string.learning_teach_body))
+            OutlinedTextField(wanted, { if (it.length <= 20000) wanted = it }, label = { Text(stringResource(R.string.learning_teach_wanted)) }, modifier = Modifier.fillMaxWidth())
             message?.let { Text(it) }
         }
     }, confirmButton = { TextButton({
@@ -96,9 +99,8 @@ internal fun TeachChirp(entry: HistoryEntry, close: () -> Unit) {
             val result = runCatching { withContext(Dispatchers.IO) { store.observe(entry.text, wanted, entry.raw ?: entry.text, entry.packageName, explicit = true) } }
             saving = false
             if (result.getOrNull()?.isNotEmpty() == true) close()
-            else message = if (!store.allowed) "Turn on history and learning, and end Private session to teach Chirp."
-                else if (result.isFailure) "Couldn't save. Try again." else "No new correction found. An item turned off stays off until you approve it in Learned."
+            else message = if (!store.allowed) notAllowed else if (result.isFailure) saveFailed else nothingNew
         }
-    }, enabled = !saving && wanted != entry.text) { Text("Teach Chirp") } },
-        dismissButton = { TextButton(close) { Text("Cancel") } })
+    }, enabled = !saving && wanted != entry.text) { Text(stringResource(R.string.learning_teach)) } },
+        dismissButton = { TextButton(close) { Text(stringResource(R.string.settings_cancel)) } })
 }

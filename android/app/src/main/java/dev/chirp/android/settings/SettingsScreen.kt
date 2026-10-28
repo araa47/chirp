@@ -1,6 +1,7 @@
 package dev.chirp.android.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
@@ -12,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -21,9 +23,10 @@ import dev.chirp.android.SetupState
 import dev.chirp.android.UpdateController
 
 /** The seven categories (spec §D): each row opens one detail page. */
-internal enum class SettingsPage(val title: String) {
-    Connection("Connection"), HowYouDictate("How you dictate"), Dictation("Dictation"), Keyboard("Keyboard"), Feedback("Feedback & look"),
-    Notes("Notes"), History("Privacy & history"), About("About"),
+internal enum class SettingsPage(@StringRes val title: Int) {
+    Connection(R.string.settings_page_connection), HowYouDictate(R.string.settings_page_how_you_dictate), Dictation(R.string.settings_page_dictation),
+    Keyboard(R.string.settings_page_keyboard), Feedback(R.string.settings_page_feedback), Notes(R.string.notes_short),
+    History(R.string.settings_page_history), About(R.string.settings_page_about),
 }
 
 internal class SettingsActions(
@@ -59,19 +62,19 @@ internal fun SettingsScreen(state: SetupState, actions: SettingsActions = Settin
                 Column(Modifier.widthIn(min = 320.dp, max = 400.dp).width(400.dp).fillMaxHeight().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical))
                     .verticalScroll(rememberScrollState())
                     .padding(start = 24.dp, end = 16.dp, top = 32.dp, bottom = 24.dp)) {
-                    Text("Settings", Modifier.padding(bottom = 16.dp).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.settings_title), Modifier.padding(bottom = 16.dp).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
                     // Keyed on the open page so the summaries re-read the store after something changes beside them.
                     CompositionLocalProvider(dev.chirp.android.ui.LocalNavSummaryLines provides
                         if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.5f) 2 else 1) {
                         key(page) { SettingsList(state, actions, history) { page = it } }
                     }
                 }
-                PageScaffold(shown!!.title, back = null, scroll, Modifier.weight(1f).fillMaxHeight()) {
+                PageScaffold(stringResource(shown!!.title), back = null, scroll, Modifier.weight(1f).fillMaxHeight()) {
                     SettingsDetail(shown, state, actions, history, updates)
                 }
-            } else if (shown == null) PageScaffold("Settings", back = null, scroll, Modifier.widthIn(max = 600.dp).fillMaxSize()) {
+            } else if (shown == null) PageScaffold(stringResource(R.string.settings_title), back = null, scroll, Modifier.widthIn(max = 600.dp).fillMaxSize()) {
                 SettingsList(state, actions, history) { page = it }
-            } else PageScaffold(shown.title, back = { page = null }, scroll, Modifier.widthIn(max = 600.dp).fillMaxSize()) {
+            } else PageScaffold(stringResource(shown.title), back = { page = null }, scroll, Modifier.widthIn(max = 600.dp).fillMaxSize()) {
                 SettingsDetail(shown, state, actions, history, updates)
             }
         }
@@ -87,7 +90,7 @@ internal fun PageScaffold(title: String, back: (() -> Unit)?, scroll: ScrollStat
     Scaffold(modifier, topBar = {
         MediumTopAppBar(
             title = { Text(title, Modifier.semantics { heading() }) },
-            navigationIcon = { if (back != null) IconButton(back) { Icon(painterResource(R.drawable.ic_arrow_back), "Back") } },
+            navigationIcon = { if (back != null) IconButton(back) { Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.settings_back)) } },
             scrollBehavior = behaviour,
         )
     }) { padding ->

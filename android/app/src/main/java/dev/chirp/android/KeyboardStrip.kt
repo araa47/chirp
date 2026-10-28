@@ -29,7 +29,7 @@ import dev.chirp.android.ui.chirpRoles
 import dev.chirp.android.ui.ripplePeriod
 
 /** Shares HeliBoard's suggestion row: idle mic at the end, status replaces suggestions. */
-@SuppressLint("SetTextI18n", "ViewConstructor")
+@SuppressLint("ViewConstructor")
 internal class KeyboardStrip(context: Context, private val now: () -> Long = SystemClock::elapsedRealtime) : LinearLayout(context) {
     private val palette = StripColors.of(context)
     private val tints = palette.tints
@@ -42,24 +42,24 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
     }
     private val large = SettingsStore(context).largerMic && context.resources.configuration.smallestScreenWidthDp >= 600
     private val micWidth = context.dp(if (large) 56 else 48)
-    val history = control("Dictation history").apply { setIconResource(R.drawable.ic_history) }
+    val history = control(context.getString(R.string.history_title)).apply { setIconResource(R.drawable.ic_history) }
     /** The ⋯ beside the mic: dictation options now that press-and-hold on the mic is push-to-talk. */
-    val options = control("Dictation options").apply { setIconResource(R.drawable.ic_more_vert) }
-    val mic = control(MIC_IDLE).apply { setIconResource(R.drawable.ic_mic) }
-    val cancel = control("Cancel dictation").apply { text = "✕" }
-    val raw = control("Use raw dictation").apply { textSize = 12f; text = "Use raw"; visibility = GONE }
-    val revert = control("Undo last dictation").apply { textSize = 12f; text = "Undo"; visibility = GONE }
+    val options = control(context.getString(R.string.strip_options)).apply { setIconResource(R.drawable.ic_more_vert) }
+    val mic = control(context.getString(R.string.strip_mic_idle)).apply { setIconResource(R.drawable.ic_mic) }
+    val cancel = control(context.getString(R.string.strip_cancel)).apply { text = "✕" }
+    val raw = control(context.getString(R.string.strip_use_raw_description)).apply { textSize = 12f; text = context.getString(R.string.strip_use_raw); visibility = GONE }
+    val revert = control(context.getString(R.string.strip_undo_description)).apply { textSize = 12f; text = context.getString(R.string.strip_undo); visibility = GONE }
     /** The button for prompt actions such as turning on Tailscale; the status keeps the explanation. */
-    private val rawCountdown = ActionCountdown(raw, "Use raw", now)
-    private val undoCountdown = ActionCountdown(revert, "Undo", now)
-    val privateChip = context.label("Private", 11f).apply {
+    private val rawCountdown = ActionCountdown(raw, context.getString(R.string.strip_use_raw), now)
+    private val undoCountdown = ActionCountdown(revert, context.getString(R.string.strip_undo), now)
+    val privateChip = context.label(context.getString(R.string.strip_private), 11f).apply {
         val lock = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_lock)?.mutate()?.apply {
             setBounds(0, 0, context.dp(12), context.dp(12)); setTint(palette.muted)
         }
         setCompoundDrawablesRelative(lock, null, null, null)
         compoundDrawablePadding = context.dp(3)
         setPadding(context.dp(4), 0, context.dp(4), 0)
-        contentDescription = "Private session · exclude history"
+        contentDescription = context.getString(R.string.strip_private_description)
     }
     val action = control("").apply { visibility = GONE; setPadding(context.dp(12), 0, context.dp(12), 0); minWidth = context.dp(48); minimumWidth = context.dp(48) }
     val style = context.label("", 12f).apply {
@@ -93,10 +93,13 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
     private var morph: ValueAnimator? = null
     private var morphGoal = 0f to 0
     private var listenStart = -1L
+    /** When Stop was tapped: while the final arrives the timer holds the time the mic was open. */
+    private var listenEnd = -1L
     private var segment = 1
     private var suggestions: View? = null
     private var expanded = false
-    private val tick = object : Runnable { override fun run() { if (listenStart >= 0) { updateTimer(); handler.postDelayed(this, 1000) } } }
+    private val tick = object : Runnable { override fun run() { if (counting) { updateTimer(); scheduleTick() } } }
+    private val counting get() = listenStart >= 0 && listenEnd < 0
     init {
         gravity = Gravity.CENTER_VERTICAL
         // Transparent when idle: HeliBoard's own suggestion-row background (colour or image) shows through; states tint over it.
@@ -177,7 +180,7 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
             stage = nextStage
         }
         // The final's "tap mic to dictate again" hint is gone: the chips are the actions that matter.
-        status.text = if (retention) "Debug retention on · $message" else dictationDisplayStatus(recovery?.takeUnless { it.prompt }?.label ?: message.replace(HINT, ""))
+        status.text = if (retention) context.getString(R.string.strip_debug_retention, message) else dictationDisplayStatus(recovery?.takeUnless { it.prompt }?.label ?: message.replace(HINT, ""))
         status.visibility = if (full) VISIBLE else GONE
         val ink = if (retention) tints.solidError.text else tint?.text ?: palette.ink
         status.setTextColor(ink)
@@ -209,7 +212,7 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
         action.contentDescription = recovery?.label ?: ""
         // The same chip names a phone-recognised dictation; [phone] is its provider disclosure.
         this.style.text = if (phone != null) PhoneFallback.CHIP else style
-        this.style.contentDescription = phone ?: "Clean-up style: $style"
+        this.style.contentDescription = phone ?: context.getString(R.string.strip_style_description, style)
         this.style.visibility = if (polishing || phone != null) VISIBLE else GONE
         colourChips(tint, kind == StripKind.ERROR)
         elapsed(kind, countdown, tint)
@@ -246,7 +249,8 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
             else -> mic.setIconResource(R.drawable.ic_mic)
         }
         mic.isEnabled = !finishing
-        mic.contentDescription = if (polishing) "Polishing dictation" else if (active) "Stop dictation" else if (offline) ConnectionFailure.OFFLINE_DESCRIPTION else MIC_IDLE
+        mic.contentDescription = if (polishing) context.getString(R.string.strip_polishing) else if (active) context.getString(R.string.strip_stop)
+            else if (offline) ConnectionFailure.OFFLINE_DESCRIPTION else context.getString(R.string.strip_mic_idle)
         // Stop is a filled record pill while it stops something; polishing keeps the accent (it isn't a stop control).
         transition(if (active) 1f else 0f, tint, offline && !active, active && !polishing)
         if (!active || finishing) level(0.0)
@@ -310,9 +314,13 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
         val live = kind == StripKind.LISTENING || kind == StripKind.FINISHING
         if (kind != StripKind.LISTENING && kind != StripKind.FINISHING && kind != StripKind.CONNECTING && kind != StripKind.POLISHING) {
             segment = 1
-            listenStart = -1; handler.removeCallbacks(tick)
+            listenStart = -1; listenEnd = -1; handler.removeCallbacks(tick)
         }
-        if (live && listenStart < 0) { listenStart = now(); handler.removeCallbacks(tick); handler.postDelayed(tick, 1000) }
+        if (live && listenStart < 0) listenStart = now()
+        // Finishing holds the time; listening again (the next segment, a reconnect) carries on from the same start.
+        if (kind == StripKind.FINISHING && listenStart >= 0 && listenEnd < 0) { listenEnd = now(); handler.removeCallbacks(tick) }
+        if (kind == StripKind.LISTENING) listenEnd = -1
+        if (counting && !handler.hasCallbacks(tick)) scheduleTick()
         timer.visibility = if (live) VISIBLE else GONE
         val warn = countdown && live
         (timer.background as GradientDrawable).setColor(if (warn) tints.warning.fill else Color.TRANSPARENT)
@@ -326,10 +334,18 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
     }
     /** A long dictation moved on to its next segment: the timer shows which one. */
     fun nextSegment() { segment++; if (listenStart >= 0) updateTimer() }
+    /** HeliBoard rebuilds the strip on rotation or a fold mid-dictation; the new one keeps counting from the same start. */
+    fun continueTimer(from: KeyboardStrip) { listenStart = from.listenStart; listenEnd = from.listenEnd; segment = from.segment }
+    /** Ticks on the second boundary, so a long dictation never skips a second. */
+    private fun scheduleTick() {
+        handler.removeCallbacks(tick)
+        handler.postDelayed(tick, 1000 - (now() - listenStart).mod(1000L))
+    }
     private fun updateTimer() {
-        val millis = now() - listenStart
-        timer.text = elapsedLabel(millis) + if (segment > 1) " · #$segment" else ""
-        timer.contentDescription = elapsedSpoken(millis) + if (segment > 1) ", part $segment" else ""
+        val millis = (if (listenEnd >= 0) listenEnd else now()) - listenStart
+        val label = elapsedLabel(millis); val spoken = elapsedSpoken(resources, millis)
+        timer.text = if (segment > 1) context.getString(R.string.strip_timer_segment, label, segment) else label
+        timer.contentDescription = if (segment > 1) context.getString(R.string.strip_timer_segment_spoken, spoken, segment) else spoken
     }
     private fun motionAllowed() = ValueAnimator.areAnimatorsEnabled() &&
         android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
@@ -337,6 +353,10 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
     internal val animating get() = morph != null || pulse != null || busyShape.running || micShape.running
     internal val tintColor get() = rowFill
     internal val stripKind get() = kind
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (counting) { updateTimer(); scheduleTick() }
+    }
     override fun onDetachedFromWindow() {
         pulse?.cancel(); pulse = null; status.alpha = 1f; mic.alpha = 1f; status.paint.shader = null
         morph?.cancel(); morph = null; busyShape.running = false; micShape.running = false; handler.removeCallbacks(tick)
@@ -349,14 +369,13 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
         val fill = if (open) ColorUtils.blendARGB(palette.background, palette.accent, .30f) else Color.TRANSPARENT
         history.backgroundTintList = ColorStateList.valueOf(fill)
         history.iconTint = ColorStateList.valueOf(if (open) StripTints.readableOn(fill, palette.ink) else palette.highlight)
-        history.contentDescription = if (open) "Close dictation history" else "Dictation history"
+        history.contentDescription = context.getString(if (open) R.string.strip_history_close else R.string.history_title)
         options.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
         options.iconTint = ColorStateList.valueOf(palette.highlight)
     }
     private fun idleWidth() = context.dp(48 + OPTIONS_WIDTH + if (PrivateSession.enabled) 76 else 0) + micWidth
     private companion object {
         const val OPTIONS_WIDTH = 36
-        const val MIC_IDLE = "Microphone: tap to dictate, hold to talk"
         const val CONNECTING = "Connecting"
         const val HINT = " · tap mic to dictate again"
         val POSITIVE = listOf("Inserted", "cleaned", "Used raw", "Dictation removed", "Tailscale connected")
@@ -380,7 +399,7 @@ private class RippleArcs(context: Context) : View(context) {
     var level = 0f
         set(value) { field = value.coerceIn(0f, 1f); invalidate() }
 
-    init { contentDescription = "Microphone level"; importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
+    init { contentDescription = context.getString(R.string.strip_level); importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
 
     fun push(value: Double) {
         animate = android.provider.Settings.Global.getFloat(context.contentResolver,

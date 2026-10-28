@@ -41,7 +41,6 @@ import androidx.core.view.isVisible
  * The bubble shows only on a focused, enabled, non-password editable field; a final that can't be inserted
  * waits in the panel (Ready to copy) instead of being dropped. Text lives in memory only.
  */
-@SuppressLint("SetTextI18n")
 open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverlay.Host {
     private enum class Surface { BUBBLE, HOLD, PANEL }
     private val handler = Handler(Looper.getMainLooper())
@@ -239,7 +238,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
         hiddenIn = app
         cancel(); clearKept()
         overlay?.hideBubble(animated = false)
-        Toast.makeText(this, "Floating mic hidden in this app", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.bubble_hidden), Toast.LENGTH_SHORT).show()
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -323,13 +322,13 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
         if (intent?.action != START || !pendingStart) { cancel(); return START_NOT_STICKY }
         try {
             val notifications = getSystemService(NotificationManager::class.java)
-            notifications.createNotificationChannel(NotificationChannel(CHANNEL, "Dictation microphone", NotificationManager.IMPORTANCE_LOW))
+            notifications.createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.bubble_channel), NotificationManager.IMPORTANCE_LOW))
             val cancel = PendingIntent.getService(this, 0, Intent(this, ChirpAccessibilityService::class.java).setAction(CANCEL),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             // Never any dictated text; removed when the utterance ends.
             val notification = Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_chirp_notification)
-                .setContentTitle("Chirp is listening").setContentText("Tap Cancel to discard")
-                .setOngoing(true).addAction(Notification.Action.Builder(null, "Cancel", cancel).build()).build()
+                .setContentTitle(getString(R.string.bubble_listening_title)).setContentText(getString(R.string.bubble_listening_text))
+                .setOngoing(true).addAction(Notification.Action.Builder(null, getString(R.string.panel_cancel), cancel).build()).build()
             startForeground(12, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
             val paired = loadPairing() ?: error("Pairing required")
             val network = ChirpNetwork.client(this); client = network
@@ -474,7 +473,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
             putBoolean(if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE else "android.content.extra.IS_SENSITIVE", true)
         }
         getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip)
-        Toast.makeText(this, "Copied — long-press the field to paste", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.bubble_copied), Toast.LENGTH_SHORT).show()
         clearKept(); collapse()
     }
     private fun fix() {
@@ -521,10 +520,10 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
             }
             Surface.HOLD -> overlay?.hold(
                 when (state) {
-                    FloatingState.CONNECTING -> "Connecting…"
-                    FloatingState.LISTENING -> partial.ifEmpty { "Listening…" }
-                    FloatingState.FINISHING -> if (polishing) "Polishing…" else "Finishing…"
-                    FloatingState.INSERTED -> "Inserted"
+                    FloatingState.CONNECTING -> getString(R.string.bubble_connecting)
+                    FloatingState.LISTENING -> partial.ifEmpty { getString(R.string.panel_listening) }
+                    FloatingState.FINISHING -> getString(if (polishing) R.string.panel_polishing else R.string.panel_finishing)
+                    FloatingState.INSERTED -> getString(R.string.bubble_inserted)
                     else -> ""
                 },
                 when (state) {

@@ -29,6 +29,7 @@ public final class UiHierarchy {
             if (args.length > 0 && (args[0].equals("dictation-cycle") || args[0].equals("click") || args[0].equals("click-if-present") || args[0].equals("long-click") || args[0].equals("tap") || args[0].equals("append-notes") || args[0].equals("click-and-await-action"))) {
                 try { automation.waitForIdle(200, 2000); } catch (java.util.concurrent.TimeoutException ignored) { }
             }
+            if (args.length == 2 && args[0].equals("set-wallpaper")) { setWallpaper(args[1]); return; }
             if (args.length == 2 && args[0].equals("shortcut-helper")) {
                 Runtime.getRuntime().exec(new String[]{"input", "keycombination", "117", "76"}).waitFor();
                 android.os.SystemClock.sleep(2500);
@@ -264,6 +265,39 @@ public final class UiHierarchy {
             if (automation != null) UiAutomation.class.getMethod("disconnect").invoke(automation);
             thread.quitSafely();
         }
+    }
+    /**
+     * Sets the home and lock wallpaper as the shell user through IWallpaperManager.setWallpaper, the call
+     * WallpaperManager.setStream makes, so the system extracts its colours exactly as for a user's own photo.
+     * Arguments are filled by type because the AIDL signature changes between releases.
+     */
+    private static void setWallpaper(String path) throws Exception {
+        Object binder = Class.forName("android.os.ServiceManager").getMethod("getService", String.class).invoke(null, "wallpaper");
+        Object service = Class.forName("android.app.IWallpaperManager$Stub").getMethod("asInterface", android.os.IBinder.class).invoke(null, binder);
+        java.lang.reflect.Method set = null;
+        for (java.lang.reflect.Method method : service.getClass().getMethods()) if (method.getName().equals("setWallpaper")) set = method;
+        if (set == null) throw new IllegalStateException("IWallpaperManager.setWallpaper is missing");
+        Class<?>[] types = set.getParameterTypes();
+        Object[] values = new Object[types.length];
+        int strings = 0, ints = 0;
+        for (int i = 0; i < types.length; i++) {
+            Class<?> type = types[i];
+            if (type == String.class) values[i] = strings++ == 0 ? "chirp-e2e" : "com.android.shell";
+            else if (type == int.class) values[i] = ints++ == 0 ? 3 : 0; // FLAG_SYSTEM | FLAG_LOCK, then user 0
+            else if (type == boolean.class) values[i] = false;
+            else if (type == int[].class) values[i] = new int[0];
+            else if (type == android.os.Bundle.class) values[i] = new android.os.Bundle();
+            else if (java.util.List.class.isAssignableFrom(type)) values[i] = new java.util.ArrayList<>();
+            else if (type == Rect.class) values[i] = new Rect();
+        }
+        android.os.ParcelFileDescriptor fd = (android.os.ParcelFileDescriptor) set.invoke(service, values);
+        if (fd == null) throw new IllegalStateException("Wallpaper service refused " + java.util.Arrays.toString(types));
+        try (java.io.InputStream in = new java.io.FileInputStream(path);
+             java.io.OutputStream out = new android.os.ParcelFileDescriptor.AutoCloseOutputStream(fd)) {
+            byte[] buffer = new byte[65536];
+            for (int read; (read = in.read(buffer)) > 0; ) out.write(buffer, 0, read);
+        }
+        System.out.println("PASS: wallpaper set from " + new java.io.File(path).getName());
     }
     /**
      * Tight-polls (20 ms, no hierarchy dump) for a transient action such as "Use raw", whose window is only 5 s, and

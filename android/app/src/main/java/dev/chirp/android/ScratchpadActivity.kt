@@ -138,8 +138,9 @@ internal fun ScratchpadScreen(model: ScratchpadModel, mic: () -> Unit, copy: () 
         AppCommand.Escape to { if (model.active) { model.cancel(); true } else false },
     )
     val view = androidx.compose.ui.platform.LocalView.current
+    val rawAvailable = stringResource(R.string.scratchpad_raw_available)
     LaunchedEffect(model.rawUntil) {
-        if (model.rawAvailable) view.announceForAccessibility("Use raw, available for 5 seconds")
+        if (model.rawAvailable) view.announceForAccessibility(rawAvailable)
     }
     val rawSeconds by androidx.compose.runtime.produceState(5, model.rawUntil) {
         val deadline = model.rawUntil
@@ -157,14 +158,14 @@ internal fun ScratchpadScreen(model: ScratchpadModel, mic: () -> Unit, copy: () 
                     // Copy/Share in the top bar (spec §D); Save as note and Clear sit in the overflow.
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Spacer(Modifier.weight(1f))
-                        IconButton(copy, enabled = model.hasText) { Icon(painterResource(R.drawable.ic_copy), "Copy") }
-                        IconButton(share, enabled = model.hasText) { Icon(painterResource(R.drawable.ic_share), "Share") }
+                        IconButton(copy, enabled = model.hasText) { Icon(painterResource(R.drawable.ic_copy), stringResource(R.string.scratchpad_copy)) }
+                        IconButton(share, enabled = model.hasText) { Icon(painterResource(R.drawable.ic_share), stringResource(R.string.scratchpad_share)) }
                         OverflowMenu(model)
                     }
                     if (model.retained) StatusBanner(StatusKind.Error, stringResource(R.string.debug_retention))
                     // The borderless blank page: no label, no outline, just text.
                     TextField(model.field, { if (!model.active) model.field = it }, Modifier.fillMaxWidth().weight(1f).heightIn(min = 120.dp),
-                        placeholder = { Text("Dictate, then edit here") }, readOnly = model.active,
+                        placeholder = { Text(stringResource(R.string.scratchpad_placeholder)) }, readOnly = model.active,
                         textStyle = MaterialTheme.typography.bodyLarge,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, disabledContainerColor = Color.Transparent,
@@ -175,8 +176,8 @@ internal fun ScratchpadScreen(model: ScratchpadModel, mic: () -> Unit, copy: () 
                     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(dictationDisplayStatus(model.status), Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
                         if (model.rawAvailable && rawSeconds > 0) TextButton(model::useRaw, Modifier.semantics {
-                            contentDescription = "Use raw, available for 5 seconds"
-                        }) { Text("Use raw (${rawSeconds}s)", Modifier.clearAndSetSemantics { },
+                            contentDescription = rawAvailable
+                        }) { Text(stringResource(R.string.quick_dictate_use_raw_seconds, rawSeconds), Modifier.clearAndSetSemantics { },
                             style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum")) }
                         if (action != null) TextButton({ act(action) }) { Text(action.label) }
                     }
@@ -184,8 +185,7 @@ internal fun ScratchpadScreen(model: ScratchpadModel, mic: () -> Unit, copy: () 
                     MicButton(model, mic)
                     // The one privacy line (spec §D: a blank page): said while the page is blank, gone once there is text.
                     if (!model.hasText && !model.active) Text(
-                        if (model.historyOn) "Each dictation is also saved to history, encrypted on this phone. The text above is not."
-                        else "Nothing is saved. This text is gone when you leave.",
+                        stringResource(if (model.historyOn) R.string.scratchpad_privacy_history else R.string.scratchpad_privacy_none),
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
@@ -198,11 +198,11 @@ private fun OverflowMenu(model: ScratchpadModel) {
     var menu by remember { mutableStateOf(false) }
     AppShortcutActions(AppCommand.Escape to { if (menu && !model.active) { menu = false; true } else false })
     Box {
-        IconButton({ menu = true }) { Icon(painterResource(R.drawable.ic_more_vert), "More options") }
+        IconButton({ menu = true }) { Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.history_more_options)) }
         DropdownMenu(menu, { menu = false }) {
-            DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_notes), null) }, text = { Text("Save as note") },
+            DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_notes), null) }, text = { Text(stringResource(R.string.scratchpad_save_as_note)) },
                 onClick = { menu = false; model.saveAsNote() }, enabled = model.hasText && !model.active)
-            DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_delete), null) }, text = { Text("Clear") },
+            DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_delete), null) }, text = { Text(stringResource(R.string.scratchpad_clear)) },
                 onClick = { menu = false; model.clear() }, enabled = model.hasText && !model.active)
         }
     }
@@ -215,8 +215,9 @@ private fun OverflowMenu(model: ScratchpadModel) {
  */
 @Composable
 internal fun StyleGroup(model: ScratchpadModel) {
+    val raw = stringResource(R.string.scratchpad_style_raw)
     val options = buildList {
-        add(Triple("Raw", null as CorrectionProfile?, !model.cleanup))
+        add(Triple(raw, null as CorrectionProfile?, !model.cleanup))
         model.profiles.forEach { add(Triple(it.name, it, model.cleanup && model.style.id == it.id)) }
     }
     val state = rememberLazyListState()
@@ -241,11 +242,12 @@ private fun MicButton(model: ScratchpadModel, onClick: () -> Unit) {
     val listening = model.active && !model.stopping
     // The record red stays fixed under dynamic colour; its content flips to pond ink when the red runs light.
     val onRecord = if (androidx.core.graphics.ColorUtils.calculateLuminance(roles.record.toArgb()) > 0.35f) Color(0xFF0D1526) else Color.White
+    val micLabel = stringResource(if (model.active) R.string.scratchpad_mic_stop else R.string.scratchpad_mic_start)
     Box(Modifier.fillMaxWidth().height(168.dp), contentAlignment = Alignment.Center) {
         if (listening) Ripple(model.level.coerceIn(0.0, 1.0).toFloat(), Modifier.size(160.dp), color = roles.koiDecor)
         Surface(onClick, Modifier.size(96.dp).semantics {
             role = Role.Button
-            contentDescription = if (model.active) "Microphone: stop dictation" else "Microphone: tap to dictate"
+            contentDescription = micLabel
         }, enabled = !model.stopping, shape = CircleShape,
             color = if (model.active) roles.record else MaterialTheme.colorScheme.primary,
             contentColor = if (model.active) onRecord else MaterialTheme.colorScheme.onPrimary) {

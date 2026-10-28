@@ -69,13 +69,13 @@ internal fun elapsedLabel(millis: Long): String {
 }
 
 /** Spoken form of the timer, e.g. "1 minute 5 seconds". */
-internal fun elapsedSpoken(millis: Long): String {
+internal fun elapsedSpoken(resources: android.content.res.Resources, millis: Long): String {
     val seconds = (millis / 1000).coerceAtLeast(0)
-    fun unit(count: Long, name: String) = "$count $name${if (count == 1L) "" else "s"}"
+    fun unit(count: Long, plural: Int) = resources.getQuantityString(plural, count.toInt(), count.toInt())
     return when {
-        seconds < 60 -> unit(seconds, "second")
-        seconds % 60 == 0L -> unit(seconds / 60, "minute")
-        else -> unit(seconds / 60, "minute") + " " + unit(seconds % 60, "second")
+        seconds < 60 -> unit(seconds, R.plurals.elapsed_seconds)
+        seconds % 60 == 0L -> unit(seconds / 60, R.plurals.elapsed_minutes)
+        else -> resources.getString(R.string.elapsed_minutes_seconds, unit(seconds / 60, R.plurals.elapsed_minutes), unit(seconds % 60, R.plurals.elapsed_seconds))
     }
 }
 
@@ -92,7 +92,6 @@ internal fun dictationDisplayStatus(status: String): String = when {
 internal fun actionSeconds(deadline: Long, now: Long): Int = ((deadline - now + 999) / 1000).toInt().coerceAtLeast(0)
 
 /** Text ticks silently; the stable accessible name announces the offer once. */
-@android.annotation.SuppressLint("SetTextI18n")
 internal class ActionCountdown(private val button: android.widget.TextView, private val label: String,
                                private val now: () -> Long = android.os.SystemClock::elapsedRealtime) {
     private var until: Long? = null
@@ -100,7 +99,7 @@ internal class ActionCountdown(private val button: android.widget.TextView, priv
     private val tick = object : Runnable {
         override fun run() {
             val left = until?.let { actionSeconds(it, now()) } ?: return
-            button.text = "$label (${left}s)"
+            button.text = button.resources.getString(R.string.action_countdown, label, left)
             if (left > 0) handler.postDelayed(this, 200)
         }
     }
@@ -120,7 +119,8 @@ internal class ActionCountdown(private val button: android.widget.TextView, priv
         val next = deadline ?: until ?: (now() + 5000)
         if (next == until) return
         until = next
-        button.contentDescription = "$label, available for ${actionSeconds(next, now())} seconds"
+        val seconds = actionSeconds(next, now())
+        button.contentDescription = button.resources.getQuantityString(R.plurals.action_available, seconds, label, seconds)
         if (button.isAttachedToWindow) button.announceForAccessibility(button.contentDescription)
         handler.removeCallbacks(tick); tick.run()
     }

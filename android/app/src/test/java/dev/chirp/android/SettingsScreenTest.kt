@@ -43,7 +43,7 @@ class SettingsScreenTest {
 
     private fun assertOnce(label: String) = compose.onAllNodesWithText(label).assertCountEquals(1)
 
-    private fun open(page: SettingsPage) = compose.onNodeWithText(page.title).performScrollTo().performClick()
+    private fun open(page: SettingsPage) = compose.onNodeWithText(context.getString(page.title)).performScrollTo().performClick()
 
     /** Every control reachable by the label it has, one page per category; each must exist somewhere in that page's tree. */
     private val tree = linkedMapOf<SettingsPage?, List<String>>(
@@ -66,13 +66,13 @@ class SettingsScreenTest {
         tree.getValue(null).forEach(::assertOnce)
         for (page in SettingsPage.entries) {
             open(page)
-            assertTrue(compose.onAllNodes(hasText(page.title).and(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))).fetchSemanticsNodes().isNotEmpty())
+            assertTrue(compose.onAllNodes(hasText(context.getString(page.title)).and(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))).fetchSemanticsNodes().isNotEmpty())
             for (label in tree.getValue(page)) {
-                assertTrue("$label missing on ${page.title}", compose.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty() ||
-                    run { compose.onNodeWithText(page.title).performScrollTo(); compose.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty() })
+                assertTrue("$label missing on ${context.getString(page.title)}", compose.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty() ||
+                    run { compose.onNodeWithText(context.getString(page.title)).performScrollTo(); compose.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty() })
             }
             compose.onNodeWithContentDescription("Back").performClick()
-            assertTrue("back from ${page.title} shows the list", compose.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty())
+            assertTrue("back from ${context.getString(page.title)} shows the list", compose.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty())
             assertOnce("About")
         }
     }

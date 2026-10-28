@@ -1,9 +1,11 @@
 package dev.chirp.android.settings
 
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.chirp.android.*
 import dev.chirp.android.R
@@ -28,20 +30,23 @@ internal fun SettingsList(state: SetupState, actions: SettingsActions, history: 
     val dictationHistory = history ?: remember { DictationHistory(context) }
     val connection = connectionSummary(state.paired, state.host, state.reachable, state.checking, state.health)
     Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        if (state.health?.debugRetention == true) StatusBanner(StatusKind.Error, "DEBUG RETENTION IS ON — the Chirp server may retain audio and text")
+        if (state.health?.debugRetention == true) StatusBanner(StatusKind.Error, stringResource(R.string.settings_debug_retention_on))
         // One grouped card, System-Settings style: seven rows with an icon and a live one-line summary each.
         // The list stays composed beside its detail page on a Fold: preference changes must refresh its summaries.
         key(revision) { SettingsGroup {
-            NavRow(SettingsPage.Connection.title, { open(SettingsPage.Connection) },
-                summary = if (state.paired) connection.title else "Pair your computer to dictate", icon = R.drawable.ic_devices)
-            NavRow(SettingsPage.HowYouDictate.title, { open(SettingsPage.HowYouDictate) }, summary = inputModeSummary(state), icon = R.drawable.ic_mic)
-            NavRow(SettingsPage.Dictation.title, { open(SettingsPage.Dictation) }, summary = dictationSummary(context, state), icon = R.drawable.ic_tune)
-            NavRow(SettingsPage.Keyboard.title, { open(SettingsPage.Keyboard) }, summary = if (state.inputMode == InputMode.OWN_KEYBOARD) "Not in use — you’re keeping ${state.keyboardLabel ?: "your keyboard"}" else keyboardSummary(context, prefs), icon = R.drawable.ic_keyboard)
-            NavRow(SettingsPage.Feedback.title, { open(SettingsPage.Feedback) }, summary = feedbackSummary(context), icon = R.drawable.ic_palette)
-            NavRow(SettingsPage.Notes.title, { open(SettingsPage.Notes) }, summary = notesSummary(context), icon = R.drawable.ic_note)
-            NavRow(SettingsPage.History.title, { open(SettingsPage.History) },
-                summary = if (dictationHistory.enabled) "History on · keeps ${dictationHistory.retention.label}" else "Dictation history off", icon = R.drawable.ic_shield)
-            NavRow(SettingsPage.About.title, { open(SettingsPage.About) }, summary = "Chirp ${BuildConfig.VERSION_NAME}", icon = R.drawable.ic_info)
+            NavRow(stringResource(SettingsPage.Connection.title), { open(SettingsPage.Connection) },
+                summary = if (state.paired) connection.title else stringResource(R.string.settings_summary_pair), icon = R.drawable.ic_devices)
+            NavRow(stringResource(SettingsPage.HowYouDictate.title), { open(SettingsPage.HowYouDictate) }, summary = inputModeSummary(state), icon = R.drawable.ic_mic)
+            NavRow(stringResource(SettingsPage.Dictation.title), { open(SettingsPage.Dictation) }, summary = dictationSummary(context, state), icon = R.drawable.ic_tune)
+            NavRow(stringResource(SettingsPage.Keyboard.title), { open(SettingsPage.Keyboard) }, summary = if (state.inputMode == InputMode.OWN_KEYBOARD)
+                stringResource(R.string.settings_summary_keyboard_unused, state.keyboardLabel ?: stringResource(R.string.settings_your_keyboard_lower))
+                else keyboardSummary(context, prefs), icon = R.drawable.ic_keyboard)
+            NavRow(stringResource(SettingsPage.Feedback.title), { open(SettingsPage.Feedback) }, summary = feedbackSummary(context), icon = R.drawable.ic_palette)
+            NavRow(stringResource(SettingsPage.Notes.title), { open(SettingsPage.Notes) }, summary = notesSummary(context), icon = R.drawable.ic_note)
+            NavRow(stringResource(SettingsPage.History.title), { open(SettingsPage.History) },
+                summary = if (dictationHistory.enabled) stringResource(R.string.settings_summary_history_on, dictationHistory.retention.label(LocalResources.current))
+                    else stringResource(R.string.settings_summary_history_off), icon = R.drawable.ic_shield)
+            NavRow(stringResource(SettingsPage.About.title), { open(SettingsPage.About) }, summary = stringResource(R.string.settings_summary_version, BuildConfig.VERSION_NAME), icon = R.drawable.ic_info)
         } }
     }
 }
@@ -51,12 +56,12 @@ internal fun SettingsList(state: SetupState, actions: SettingsActions, history: 
 internal fun dictationSummary(context: android.content.Context, state: SetupState): String {
     val store = remember(context) { SettingsStore(context) }
     val cleanup = state.health.cleanupAvailable()
-    val stop = if (store.stopOnPause) "stops on pause" else "stops on tap"
+    val stop = stringResource(if (store.stopOnPause) R.string.settings_summary_stops_on_pause else R.string.settings_summary_stops_on_tap)
     return when {
         !state.paired -> stop
-        cleanup && store.correction -> "Clean-up on · $stop"
-        cleanup -> "Clean-up off · $stop"
-        else -> "No clean-up from your computer · $stop"
+        cleanup && store.correction -> stringResource(R.string.settings_summary_cleanup_on, stop)
+        cleanup -> stringResource(R.string.settings_summary_cleanup_off, stop)
+        else -> stringResource(R.string.settings_summary_cleanup_none, stop)
     }
 }
 
@@ -64,20 +69,22 @@ internal fun dictationSummary(context: android.content.Context, state: SetupStat
 @Composable
 internal fun keyboardSummary(context: android.content.Context, prefs: android.content.SharedPreferences): String {
     val swipe = remember(context) { GestureLibrary.status(context).let { it == GestureLibrary.Status.ACTIVE || it == GestureLibrary.Status.BUILT_IN } }
-    val look = currentKeyboardLook(prefs)?.label ?: "Custom"
-    return "$look · swipe ${if (swipe) "on" else "off"}"
+    val look = currentKeyboardLook(prefs)?.label ?: stringResource(R.string.settings_summary_look_custom)
+    return stringResource(if (swipe) R.string.settings_summary_swipe_on else R.string.settings_summary_swipe_off, look)
 }
 
 /** "Pond · haptic cues on": the app's colours and its feedback cues. */
 @Composable
 internal fun feedbackSummary(context: android.content.Context): String {
     val store = remember(context) { SettingsStore(context) }
-    val colour = if (store.appColour == AppColour.DYNAMIC) "Match wallpaper" else "Pond"
-    return "$colour · haptic cues ${if (store.haptics) "on" else "off"}"
+    val colour = stringResource(if (store.appColour == AppColour.DYNAMIC) R.string.settings_colour_dynamic else R.string.settings_colour_pond)
+    return stringResource(if (store.haptics) R.string.settings_summary_haptics_on else R.string.settings_summary_haptics_off, colour)
 }
 
+@Composable
 internal fun inputModeSummary(state: SetupState): String = when (state.inputMode) {
-    InputMode.KEYBOARD -> "Chirp Keyboard"
-    InputMode.OWN_KEYBOARD -> "${state.keyboardLabel ?: "Your keyboard"}${if (state.bubbleEnabled) " + floating mic" else " · floating mic off"}"
-    null -> "Choose how you dictate"
+    InputMode.KEYBOARD -> stringResource(R.string.ime_name)
+    InputMode.OWN_KEYBOARD -> stringResource(if (state.bubbleEnabled) R.string.settings_summary_own_bubble_on else R.string.settings_summary_own_bubble_off,
+        state.keyboardLabel ?: stringResource(R.string.settings_your_keyboard))
+    null -> stringResource(R.string.settings_summary_choose_mode)
 }

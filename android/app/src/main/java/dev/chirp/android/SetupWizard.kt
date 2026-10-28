@@ -1,6 +1,7 @@
 package dev.chirp.android
 
 import android.provider.Settings
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -67,8 +68,9 @@ internal fun Onboarding(state: SetupState, actions: OnboardingActions = Onboardi
 
 @Composable
 private fun PageIndicator(page: Int) {
+    val step = stringResource(R.string.setup_step, page + 1, 5)
     Row(Modifier.fillMaxWidth().padding(vertical = 16.dp).semantics(mergeDescendants = true) {
-        contentDescription = "Step ${page + 1} of 5"; progressBarRangeInfo = ProgressBarRangeInfo((page + 1).toFloat(), 1f..5f, 3)
+        contentDescription = step; progressBarRangeInfo = ProgressBarRangeInfo((page + 1).toFloat(), 1f..5f, 3)
     }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         repeat(5) { index ->
             val color by animateColorAsState(if (index <= page) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, label = "segment")

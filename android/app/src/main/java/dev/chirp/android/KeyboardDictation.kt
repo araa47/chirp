@@ -145,7 +145,7 @@ internal class KeyboardDictation(
         }
         // Options moved off the mic's long press to the ⋯ beside it; TalkBack also gets them as an action on the mic.
         view.options.setOnClickListener { if (!active) quickOptions() }
-        androidx.core.view.ViewCompat.addAccessibilityAction(view.mic, "Dictation options") { _, _ -> if (!active) { quickOptions(); true } else false }
+        androidx.core.view.ViewCompat.addAccessibilityAction(view.mic, host.getString(R.string.strip_options)) { _, _ -> if (!active) { quickOptions(); true } else false }
         view.status.setOnClickListener { val next = action(); if (next != null) openAction(next) else if (message == ConnectionFailure.OFFLINE) start() }
         view.action.setOnClickListener { action()?.let(::openAction) }
         view.cancel.setOnClickListener {
@@ -251,15 +251,15 @@ internal class KeyboardDictation(
         val anchor = strip?.mic ?: return
         StripMenu(anchor).apply {
             if (store.health.cleanupAvailable()) {
-                toggle("Clean-up", correctionLabel(store.health), store.correction) { store.correction = it }
-                section("Style")
+                toggle(host.getString(R.string.options_cleanup), correctionLabel(store.health), store.correction) { store.correction = it }
+                section(host.getString(R.string.options_style))
                 val selected = styleOverride ?: store.style(targetPackage).id
                 CleanupStyles.profiles(store.health).forEach { profile ->
-                    radio(profile.name, if (profile.rewrites) "rewrites" else null, selected == profile.id) { styleOverride = profile.id; currentStyle = profile; render() }
+                    radio(profile.name, host.getString(R.string.options_rewrites).takeIf { profile.rewrites }, selected == profile.id) { styleOverride = profile.id; currentStyle = profile; render() }
                 }
-            } else note("Clean-up is off on your computer")
-            section("Chirp")
-            item(R.drawable.ic_settings, "Chirp settings") { setup() }
+            } else note(host.getString(R.string.options_cleanup_off))
+            section(host.getString(R.string.options_chirp))
+            item(R.drawable.ic_settings, host.getString(R.string.options_settings)) { setup() }
             show()
         }
     }

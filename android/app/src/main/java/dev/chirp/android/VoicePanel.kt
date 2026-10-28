@@ -77,7 +77,7 @@ private fun readableOn(fill: Int): Int {
  * 16 dp card with the one overlay shadow, Koi for the primary action, `record` for Stop, `moon` for Polished.
  * [render] draws a [PanelModel]; the service owns every transition.
  */
-@SuppressLint("SetTextI18n", "ViewConstructor")
+@SuppressLint("ViewConstructor")
 internal class VoicePanel(context: Context) : LinearLayout(context) {
     private val largeText = context.resources.configuration.fontScale >= 1.5f
     private val palette = VoicePalette.of(context)
@@ -88,7 +88,7 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
         accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE; maxLines = 2; ellipsize = TextUtils.TruncateAt.END
     }
     val polished = TextView(context).apply {
-        text = "Polished"; textSize = 12f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        text = context.getString(R.string.panel_polished); textSize = 12f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         setTextColor(0xFF402D00.toInt()) // Pond's on-moon ink: the golden fill is the same in light and dark.
         setPadding(context.dp(10), context.dp(3), context.dp(10), context.dp(3))
         background = GradientDrawable().apply { setColor(palette.moonFill); cornerRadius = context.dp(12).toFloat() }
@@ -97,7 +97,7 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
     private val spacer = View(context).apply { visibility = GONE }
     val hide = ImageButton(context).apply {
         setImageResource(R.drawable.ic_close); imageTintList = ColorStateList.valueOf(palette.muted)
-        contentDescription = "Hide panel"; background = null
+        contentDescription = context.getString(R.string.panel_hide); background = null
         setPadding(context.dp(10), context.dp(10), context.dp(10), context.dp(10))
     }
     /** One tonal line with exactly one fix (#167). */
@@ -117,34 +117,34 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
     private val ripple = RippleView(context).apply { color = palette.koiDecor }
     /** The panel's mic keeps [MicGesture]: start on down, a short release toggles, a long release stops. */
     val mic = MaterialButton(context).apply {
-        text = "Dictate"; setIconResource(R.drawable.ic_mic); iconPadding = context.dp(8)
+        text = context.getString(R.string.panel_dictate); setIconResource(R.drawable.ic_mic); iconPadding = context.dp(8)
         minHeight = context.dp(56); minWidth = context.dp(148); cornerRadius = context.dp(28)
         insetTop = 0; insetBottom = 0; textSize = 16f
-        contentDescription = "Microphone: tap to toggle, hold to talk"
+        contentDescription = context.getString(R.string.panel_mic)
     }
-    val cancel = flat(palette.accent, "Cancel").apply { contentDescription = "Cancel dictation and discard text" }
+    val cancel = flat(palette.accent, context.getString(R.string.panel_cancel)).apply { contentDescription = context.getString(R.string.panel_cancel_description) }
     private val micRow = FrameLayout(context).apply { clipChildren = false; clipToPadding = false }
     val countdown = Countdown(context, palette.accent, palette.outline)
-    val raw = tonal("Use raw").apply { contentDescription = "Use raw: replace the polished text with what you said" }
-    val done = flat(palette.accent, "Done").apply { contentDescription = "Done: discard this text" }
-    val scratchpad = tonal("Open in Scratchpad")
+    val raw = tonal(context.getString(R.string.strip_use_raw)).apply { contentDescription = context.getString(R.string.panel_use_raw_description) }
+    val done = flat(palette.accent, context.getString(R.string.panel_done)).apply { contentDescription = context.getString(R.string.panel_done_description) }
+    val scratchpad = tonal(context.getString(R.string.panel_scratchpad))
     val copy = MaterialButton(context).apply {
-        text = "Copy"; setIconResource(R.drawable.ic_copy); iconPadding = context.dp(6); insetTop = 0; insetBottom = 0
+        text = context.getString(R.string.panel_copy); setIconResource(R.drawable.ic_copy); iconPadding = context.dp(6); insetTop = 0; insetBottom = 0
         minHeight = context.dp(44); cornerRadius = context.dp(22); accent(palette, filled = true)
     }
-    private val rawCountdown = ActionCountdown(raw, "Use raw")
-    val privateChip = context.label("Private", 12f).apply {
+    private val rawCountdown = ActionCountdown(raw, context.getString(R.string.strip_use_raw))
+    val privateChip = context.label(context.getString(R.string.strip_private), 12f).apply {
         val lock = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_lock)?.mutate()?.apply {
             setBounds(0, 0, context.dp(12), context.dp(12)); setTint(palette.muted)
         }
         setCompoundDrawables(lock, null, null, null)
         compoundDrawablePadding = context.dp(4)
         setTextColor(palette.muted)
-        contentDescription = "Private session · exclude history"
+        contentDescription = context.getString(R.string.strip_private_description)
     }
     val options = ImageButton(context).apply {
         setImageResource(R.drawable.ic_more_vert); imageTintList = ColorStateList.valueOf(palette.muted)
-        contentDescription = "Dictation options"; background = null
+        contentDescription = context.getString(R.string.strip_options); background = null
         setOnClickListener { StripMenu(this).apply { show() } }
     }
     private val actions = LinearLayout(context)
@@ -207,10 +207,10 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
         val state = model.state
         banner.retention(model.retention)
         headline.text = when (state) {
-            FloatingState.ERROR -> "Couldn't dictate"
-            FloatingState.IDLE -> if (model.copyMode) model.headline else "Ready"
-            FloatingState.LISTENING -> "Listening…"
-            FloatingState.INSERTED, FloatingState.POLISHED -> "Finished"
+            FloatingState.ERROR -> context.getString(R.string.panel_error)
+            FloatingState.IDLE -> if (model.copyMode) model.headline else context.getString(R.string.panel_ready)
+            FloatingState.LISTENING -> context.getString(R.string.panel_listening)
+            FloatingState.INSERTED, FloatingState.POLISHED -> context.getString(R.string.panel_finished)
             else -> model.headline
         }
         val chip = state == FloatingState.POLISHED
@@ -242,8 +242,8 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
                 val boundary = if (!keeps && text.startsWith(model.stable)) model.stable.length else if (keeps) length else 0
                 if (boundary < length) setSpan(ForegroundColorSpan(palette.muted), boundary, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
-            model.copyMode && state == FloatingState.IDLE -> "Your words will be ready to copy"
-            state == FloatingState.CONNECTING || state == FloatingState.LISTENING -> "Start speaking…"
+            model.copyMode && state == FloatingState.IDLE -> context.getString(R.string.panel_copy_hint)
+            state == FloatingState.CONNECTING || state == FloatingState.LISTENING -> context.getString(R.string.panel_start_speaking)
             else -> ""
         }
         transcript.setTextColor(if (text.isEmpty()) palette.muted else palette.ink)
@@ -252,10 +252,10 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
         micRow.visibility = if (micShown) VISIBLE else GONE
         cancel.visibility = if (state == FloatingState.CONNECTING || state == FloatingState.LISTENING) VISIBLE else GONE
         val stopping = state == FloatingState.CONNECTING || state == FloatingState.LISTENING
-        mic.text = when { state == FloatingState.FINISHING -> if (model.polishing) "Polishing…" else "Finishing…"; stopping -> "Stop"; else -> "Dictate" }
+        mic.text = context.getString(when { state == FloatingState.FINISHING -> if (model.polishing) R.string.panel_polishing else R.string.panel_finishing; stopping -> R.string.panel_stop; else -> R.string.panel_dictate })
         mic.setIconResource(if (stopping) R.drawable.ic_stop else R.drawable.ic_mic)
         mic.isEnabled = state != FloatingState.FINISHING
-        mic.contentDescription = if (stopping) "Stop dictation" else if (state == FloatingState.FINISHING) mic.text else "Microphone: tap to toggle, hold to talk"
+        mic.contentDescription = if (stopping) context.getString(R.string.strip_stop) else if (state == FloatingState.FINISHING) mic.text else context.getString(R.string.panel_mic)
         if (stopping) {
             mic.backgroundTintList = ColorStateList.valueOf(palette.record)
             val on = readableOn(palette.record); mic.setTextColor(on); mic.iconTint = ColorStateList.valueOf(on)
@@ -270,7 +270,7 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
         if (state != FloatingState.POLISHED) countdown.stop()
         rawCountdown.show(state == FloatingState.POLISHED, actionUntil)
         raw.visibility = if (state == FloatingState.POLISHED) VISIBLE else GONE
-        copy.contentDescription = "Copy your words"
+        copy.contentDescription = context.getString(R.string.panel_copy_description)
         arrange(state, keeps && text.isNotEmpty())
         requestLayout()
     }

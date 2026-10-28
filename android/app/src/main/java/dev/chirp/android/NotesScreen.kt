@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.TextLayoutResult
@@ -113,7 +114,7 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
     BackHandler(enabled = handleBack) { model.keepSession(); leave(false) }
     BackHandler(enabled = editing) { read() }
     if (settings) ModalBottomSheet({ settings = false }) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 24.dp)) { NotesSettings(title = "Notes settings") }
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 24.dp)) { NotesSettings(title = stringResource(R.string.notes_editor_settings)) }
     }
     if (transcript && !externalTranscript) ModalBottomSheet({ transcript = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         TranscriptPane(model, Modifier.fillMaxWidth().fillMaxHeight(.85f).padding(horizontal = 24.dp), close = { transcript = false })
@@ -121,10 +122,10 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
     RetranscribeSheet(model)
     if (model.nameSpeakersOpen) NameSpeakersSheet(model) { model.nameSpeakersOpen = false }
     model.voiceNotice?.let { name ->
-        AlertDialog(onDismissRequest = model::acknowledgeVoiceNotice, title = { Text("Remembering voices") },
-            text = { Text("Chirp will recognise $name’s voice in later notes on your devices. Saved voices stay on your computer. Settings → Notes → Saved voices.") },
-            confirmButton = { TextButton(model::acknowledgeVoiceNotice) { Text("OK") } },
-            dismissButton = { TextButton(model::disableRememberVoices) { Text("Don’t remember voices") } })
+        AlertDialog(onDismissRequest = model::acknowledgeVoiceNotice, title = { Text(stringResource(R.string.notes_editor_voice_notice_title)) },
+            text = { Text(stringResource(R.string.notes_editor_voice_notice_message, name)) },
+            confirmButton = { TextButton(model::acknowledgeVoiceNotice) { Text(stringResource(R.string.notes_editor_ok)) } },
+            dismissButton = { TextButton(model::disableRememberVoices) { Text(stringResource(R.string.notes_editor_voice_notice_off)) } })
     }
     val menu = NotesMenuActions(copy = copy, share = share, save = save, rename = { renaming = true }, settings = { settings = true }, delete = deleteNote)
     /** Into the editor at the block tapped (or the first one on screen), at the height it had on the page. */
@@ -155,12 +156,12 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
                     renaming = renaming, rename = { renaming = it }, back = back)
                 RetranscribeBanner(model)
                 if (recordingElsewhere != null) AssistChip(jumpToRecording, modifier = Modifier.padding(horizontal = gutter),
-                    label = { Text("Recording · ${recordingElsewhere.displayTitle} · ${recordingElsewhere.elapsedText}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    label = { Text(stringResource(R.string.notes_editor_recording_elsewhere, recordingElsewhere.displayTitle, recordingElsewhere.elapsedText), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = { Ripple(recordingElsewhere.level.toFloat(), Modifier.size(20.dp)) })
                 // Independent recovery, connection and speaker notices coexist; cap the stack so notes stay usable.
                 NotesStatusStack(model, act, Modifier.padding(horizontal = gutter).heightIn(max = statusMaxHeight))
                 if (!editing && !wide && !externalTranscript) Row(Modifier.padding(horizontal = gutter)) {
-                    AssistChip({ transcript = true }, label = { Text("Transcript") }, leadingIcon = { Icon(painterResource(R.drawable.ic_transcript), null, Modifier.size(18.dp)) })
+                    AssistChip({ transcript = true }, label = { Text(stringResource(R.string.notes_editor_transcript)) }, leadingIcon = { Icon(painterResource(R.drawable.ic_transcript), null, Modifier.size(18.dp)) })
                 }
                 Row(Modifier.fillMaxWidth().weight(1f)) {
                     Box(Modifier.weight(1.5f).fillMaxHeight()) {
@@ -185,13 +186,14 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
 private class NotesMenuActions(val copy: () -> Unit, val share: () -> Unit, val save: () -> Unit, val rename: () -> Unit, val settings: () -> Unit, val delete: () -> Unit)
 
 /** Capture state is independent of structuring, connection and action feedback. */
-internal fun captureState(model: NotesModel): String = when (model.state) {
-    NotesRecorder.State.STARTING -> "Connecting"
-    NotesRecorder.State.PAUSED -> "Paused"
-    NotesRecorder.State.STOPPING -> "Finishing"
-    NotesRecorder.State.RECORDING -> "Recording"
-    else -> "Stopped"
-}
+@Composable
+internal fun captureState(model: NotesModel): String = stringResource(when (model.state) {
+    NotesRecorder.State.STARTING -> R.string.notes_capture_connecting
+    NotesRecorder.State.PAUSED -> R.string.notes_capture_paused
+    NotesRecorder.State.STOPPING -> R.string.notes_capture_finishing
+    NotesRecorder.State.RECORDING -> R.string.notes_capture_recording
+    else -> R.string.notes_capture_stopped
+})
 
 @Composable
 internal fun NotesStatusStack(model: NotesModel, act: (DictationAction) -> Unit, modifier: Modifier = Modifier) {
@@ -199,10 +201,10 @@ internal fun NotesStatusStack(model: NotesModel, act: (DictationAction) -> Unit,
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (model.retained) StatusBanner(StatusKind.Error, stringResource(R.string.debug_retention))
         if (action != null) StatusBanner(StatusKind.Warning, model.status, action = action.label, onAction = { act(action) })
-        if (model.recovered != null) StatusBanner(StatusKind.Info, "Recovered note", body = "Your note was recovered and kept on this phone.")
+        if (model.recovered != null) StatusBanner(StatusKind.Info, stringResource(R.string.notes_editor_recovered_title), body = stringResource(R.string.notes_editor_recovered_body))
         if (model.speakerModelControl.status != null) SpeakerModelStatus(model.speakerModelControl)
         // Naming is premature while the model is still preparing. Keep the actionable model status instead.
-        else if (model.askToNameSpeakers) StatusBanner(StatusKind.Info, "Who was speaking?", action = "Name speakers",
+        else if (model.askToNameSpeakers) StatusBanner(StatusKind.Info, stringResource(R.string.notes_editor_who_spoke), action = stringResource(R.string.notes_speakers_name_all_title),
             onAction = { model.nameSpeakersOpen = true })
         if (!model.retained && action == null) model.explanation?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -215,38 +217,40 @@ internal fun NotesStatusStack(model: NotesModel, act: (DictationAction) -> Unit,
 private fun NotesTopBar(model: NotesModel, editing: Boolean, gutter: androidx.compose.ui.unit.Dp, edit: () -> Unit, menu: NotesMenuActions, renaming: Boolean, rename: (Boolean) -> Unit, back: (() -> Unit)?) {
     val scheme = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth().padding(start = gutter - 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (back != null) IconButton(back) { Icon(painterResource(R.drawable.ic_arrow_back), "Back to notes") }
+        if (back != null) IconButton(back) { Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.notes_library_back)) }
         Column(Modifier.weight(1f)) {
             val title = model.displayTitle
+            val titleDescription = stringResource(R.string.notes_editor_title_field)
+            val renameDescription = stringResource(R.string.notes_editor_rename_title, title)
             if (renaming) {
                 var name by remember { mutableStateOf(title) }
                 val titleFocus = remember { FocusRequester() }
                 LaunchedEffect(Unit) { titleFocus.requestFocus() }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    BasicTextField(name, { name = it.take(NotesModel.MAX_NAME) }, Modifier.weight(1f).focusRequester(titleFocus).semantics { contentDescription = "Note title" },
+                    BasicTextField(name, { name = it.take(NotesModel.MAX_NAME) }, Modifier.weight(1f).focusRequester(titleFocus).semantics { contentDescription = titleDescription },
                         singleLine = true, textStyle = ChirpTokens.noteTitle.copy(color = scheme.onSurface), cursorBrush = SolidColor(scheme.primary),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { model.rename(name); rename(false) }))
-                    IconButton({ model.rename(name); rename(false) }) { Icon(painterResource(R.drawable.ic_check), "Save title") }
+                    IconButton({ model.rename(name); rename(false) }) { Icon(painterResource(R.drawable.ic_check), stringResource(R.string.notes_editor_save_title)) }
                 }
             } else {
-                Text(title, Modifier.clip(MaterialTheme.shapes.small).clickable(onClickLabel = "Rename", onClick = { rename(true) }).padding(horizontal = 4.dp)
-                .semantics { contentDescription = "Rename notes: $title"; heading() },
+                Text(title, Modifier.clip(MaterialTheme.shapes.small).clickable(onClickLabel = stringResource(R.string.notes_menu_rename), onClick = { rename(true) }).padding(horizontal = 4.dp)
+                .semantics { contentDescription = renameDescription; heading() },
                 style = ChirpTokens.noteTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (model.state.active) LiveDot(model.recording)
                 Text(model.status, Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.labelLarge,
                     color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (editing && (model.state.active || model.elapsed > 0)) Text("· " + model.elapsedText, style = dev.chirp.android.ui.ChirpTokens.timerSmall,
+                if (editing && (model.state.active || model.elapsed > 0)) Text(stringResource(R.string.notes_editor_elapsed, model.elapsedText), style = dev.chirp.android.ui.ChirpTokens.timerSmall,
                     color = scheme.onSurfaceVariant)
             }
         }
         if (model.reorganizing !is Reorganizing.Unavailable) IconButton(model::organize, enabled = model.canOrganize,
             modifier = Modifier.size(48.dp), colors = IconButtonDefaults.iconButtonColors(contentColor = LocalChirpRoles.current.moon)) {
-            Icon(painterResource(R.drawable.ic_sparkle), "Organize")
+            Icon(painterResource(R.drawable.ic_sparkle), stringResource(R.string.notes_menu_organize))
         }
-        IconButton(edit) { Icon(painterResource(if (editing) R.drawable.ic_check else R.drawable.ic_edit), if (editing) "Done editing" else "Edit notes") }
+        IconButton(edit) { Icon(painterResource(if (editing) R.drawable.ic_check else R.drawable.ic_edit), stringResource(if (editing) R.string.notes_editor_done_editing else R.string.notes_editor_edit)) }
         NotesMenu(model, menu)
     }
 }
@@ -264,46 +268,48 @@ private fun NotesMenu(model: NotesModel, actions: NotesMenuActions) {
     var confirmAudio by remember { mutableStateOf(false) }
     val bytes = model.document.audio.sumOf { it.bytes }
     Box {
-        IconButton({ open = true }) { Icon(painterResource(R.drawable.ic_more_vert), "More options") }
+        IconButton({ open = true }) { Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.notes_menu_more)) }
         DropdownMenu(open, { open = false }) {
             @Composable fun item(label: String, icon: Int, enabled: Boolean = true, summary: String? = null, destructive: Boolean = false, run: () -> Unit) =
                 DropdownMenuItem({ Column { Text(label); summary?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) } } },
                     { open = false; run() }, leadingIcon = { Icon(painterResource(icon), null) }, enabled = enabled,
                     colors = if (destructive) MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.error, leadingIconColor = MaterialTheme.colorScheme.error) else MenuDefaults.itemColors())
-            @Composable fun toggle(label: String, on: Boolean, summary: String? = null, set: (Boolean) -> Unit) =
+            @Composable fun toggle(label: String, on: Boolean, summary: String? = null, set: (Boolean) -> Unit) {
+                val state = stringResource(if (on) R.string.notes_settings_on else R.string.notes_settings_off)
                 DropdownMenuItem({ Column { Text(label); summary?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } } },
-                    { set(!on) }, Modifier.semantics { role = Role.Switch; stateDescription = if (on) "On" else "Off" },
+                    { set(!on) }, Modifier.semantics { role = Role.Switch; stateDescription = state },
                     trailingIcon = { Switch(on, null, Modifier.clearAndSetSemantics { }) })
+            }
             if (model.reorganizing !is Reorganizing.Unavailable) {
-                item("Organize", R.drawable.ic_sparkle, model.canOrganize) { model.organize() }
-                if (model.canUndo && !model.canUndoRebuild) item("Undo organize", R.drawable.ic_undo) { model.undo() }
+                item(stringResource(R.string.notes_menu_organize), R.drawable.ic_sparkle, model.canOrganize) { model.organize() }
+                if (model.canUndo && !model.canUndoRebuild) item(stringResource(R.string.notes_menu_undo_organize), R.drawable.ic_undo) { model.undo() }
             }
-            if (model.structureAvailable) toggle("Structure notes", model.structureEnabled, model.structureHost?.let { "Sends text to $it" }) { model.setStructure(it) }
-            if (model.reorganizing !is Reorganizing.Unavailable) toggle("Organize automatically", model.auto) { model.setAuto(it) }
-            if (model.speakersAvailable) toggle("Label speakers", model.labelSpeakers, "Who said what · voices compared on your computer") { model.setSpeakerLabels(it) }
+            if (model.structureAvailable) toggle(stringResource(R.string.notes_menu_structure), model.structureEnabled, model.structureHost?.let { stringResource(R.string.notes_menu_structure_host, it) }) { model.setStructure(it) }
+            if (model.reorganizing !is Reorganizing.Unavailable) toggle(stringResource(R.string.notes_menu_organize_auto), model.auto) { model.setAuto(it) }
+            if (model.speakersAvailable) toggle(stringResource(R.string.notes_settings_speakers), model.labelSpeakers, stringResource(R.string.notes_menu_speakers_summary)) { model.setSpeakerLabels(it) }
             if (model.reorganizing !is Reorganizing.Unavailable || model.structureAvailable || model.speakersAvailable) HorizontalDivider()
-            item("Copy", R.drawable.ic_copy, model.hasContent, run = actions.copy)
-            item("Share", R.drawable.ic_share, model.hasContent, run = actions.share)
-            item("Export Markdown", R.drawable.ic_download, model.hasContent, run = actions.save)
+            item(stringResource(R.string.notes_menu_copy), R.drawable.ic_copy, model.hasContent, run = actions.copy)
+            item(stringResource(R.string.notes_menu_share), R.drawable.ic_share, model.hasContent, run = actions.share)
+            item(stringResource(R.string.notes_menu_export), R.drawable.ic_download, model.hasContent, run = actions.save)
             HorizontalDivider()
-            item("Rename", R.drawable.ic_edit, run = actions.rename)
-            if (model.canRetranscribe) item("Re-transcribe…", R.drawable.ic_mic) { model.askRetranscribe() }
-            if (model.document.previousTranscript != null && !model.retranscribing && !model.state.active) item("Restore previous transcript", R.drawable.ic_undo) { model.restoreTranscript() }
-            if (model.canUndoRebuild) item("Undo rebuild", R.drawable.ic_undo) { model.undo() }
+            item(stringResource(R.string.notes_menu_rename), R.drawable.ic_edit, run = actions.rename)
+            if (model.canRetranscribe) item(stringResource(R.string.notes_menu_retranscribe), R.drawable.ic_mic) { model.askRetranscribe() }
+            if (model.document.previousTranscript != null && !model.retranscribing && !model.state.active) item(stringResource(R.string.notes_menu_restore_transcript), R.drawable.ic_undo) { model.restoreTranscript() }
+            if (model.canUndoRebuild) item(stringResource(R.string.notes_menu_undo_rebuild), R.drawable.ic_undo) { model.undo() }
             if (bytes > 0) {
-                item("Delete audio", R.drawable.ic_delete, enabled = !model.retranscribing, summary = "${megabytes(bytes)} on this phone", destructive = true) { confirmAudio = true }
+                item(stringResource(R.string.notes_settings_delete_audio_confirm), R.drawable.ic_delete, enabled = !model.retranscribing, summary = stringResource(R.string.notes_menu_audio_size, megabytes(bytes)), destructive = true) { confirmAudio = true }
             }
-            item("Notes settings", R.drawable.ic_settings, run = actions.settings)
+            item(stringResource(R.string.notes_editor_settings), R.drawable.ic_settings, run = actions.settings)
             // Into Recently Deleted. The library shows Undo. A recording stays until it is stopped.
-            item("Delete", R.drawable.ic_delete, enabled = !model.state.active, destructive = true, run = actions.delete)
+            item(stringResource(R.string.notes_library_row_delete), R.drawable.ic_delete, enabled = !model.state.active, destructive = true, run = actions.delete)
         }
     }
     if (confirmAudio) AlertDialog(onDismissRequest = { confirmAudio = false },
-        title = { Text("Delete audio?") },
-        text = { Text("This deletes this note’s audio (${megabytes(bytes)}). The text and transcript stay.") },
+        title = { Text(stringResource(R.string.notes_menu_delete_audio_title)) },
+        text = { Text(stringResource(R.string.notes_menu_delete_audio_message, megabytes(bytes))) },
         confirmButton = { TextButton({ confirmAudio = false; model.deleteAudio() },
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Delete audio") } },
-        dismissButton = { TextButton({ confirmAudio = false }) { Text("Cancel") } })
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.notes_settings_delete_audio_confirm)) } },
+        dismissButton = { TextButton({ confirmAudio = false }) { Text(stringResource(R.string.notes_action_cancel)) } })
 }
 
 /**
@@ -354,6 +360,7 @@ private fun NotesEditor(model: NotesModel, scroll: androidx.compose.foundation.S
     val focus = remember { FocusRequester() }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val syntax = remember(scheme) { NotesSyntax(scheme.outline, scheme.primary) }
+    val fieldDescription = stringResource(R.string.notes_editor_field)
     fun change(value: TextFieldValue) { undo.record(model.field, value.text); model.edit(value) }
     LaunchedEffect(Unit) { focus.requestFocus() }
     LaunchedEffect(layout != null, anchor) {
@@ -363,14 +370,14 @@ private fun NotesEditor(model: NotesModel, scroll: androidx.compose.foundation.S
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll), contentAlignment = Alignment.TopCenter) {
             BasicTextField(model.field, ::change, Modifier.widthIn(max = NOTES_READING_WIDTH).fillMaxWidth().padding(horizontal = gutter, vertical = 8.dp)
-                .focusRequester(focus).onFocusChanged { model.focused = it.isFocused }.semantics { contentDescription = "Notes (Markdown)" },
+                .focusRequester(focus).onFocusChanged { model.focused = it.isFocused }.semantics { contentDescription = fieldDescription },
                 textStyle = NotesType.body.copy(color = scheme.onSurface), cursorBrush = SolidColor(scheme.primary), visualTransformation = syntax,
                 // No autocorrect or suggestions rewriting what was said.
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, autoCorrectEnabled = false),
                 onTextLayout = { layout = it; laidOut(it) },
                 decorationBox = { inner ->
                     Box {
-                        if (model.field.text.isEmpty()) Text("Type your notes. # for a heading, - for a list, - [ ] for a to-do",
+                        if (model.field.text.isEmpty()) Text(stringResource(R.string.notes_editor_placeholder),
                             style = NotesType.body, color = scheme.onSurfaceVariant)
                         inner()
                     }
@@ -378,14 +385,14 @@ private fun NotesEditor(model: NotesModel, scroll: androidx.compose.foundation.S
         }
         Surface(color = scheme.surfaceContainer) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                listOf(Triple(NotesLineKind.HEADING, R.drawable.ic_format_heading, "Heading"), Triple(NotesLineKind.BULLET, R.drawable.ic_format_bullets, "Bulleted list"),
-                    Triple(NotesLineKind.TASK, R.drawable.ic_checklist, "Checklist")).forEach { (kind, icon, label) ->
-                    IconButton({ change(NotesFormat.toggle(model.field, kind)) }) { Icon(painterResource(icon), label) }
+                listOf(Triple(NotesLineKind.HEADING, R.drawable.ic_format_heading, R.string.notes_editor_heading), Triple(NotesLineKind.BULLET, R.drawable.ic_format_bullets, R.string.notes_editor_bullets),
+                    Triple(NotesLineKind.TASK, R.drawable.ic_checklist, R.string.notes_editor_checklist)).forEach { (kind, icon, label) ->
+                    IconButton({ change(NotesFormat.toggle(model.field, kind)) }) { Icon(painterResource(icon), stringResource(label)) }
                 }
                 VerticalDivider(Modifier.height(24.dp).padding(horizontal = 4.dp))
-                IconButton({ undo.undo(model.field.text)?.let(model::edit) }, enabled = undo.canUndo(model.field.text)) { Icon(painterResource(R.drawable.ic_undo), "Undo") }
+                IconButton({ undo.undo(model.field.text)?.let(model::edit) }, enabled = undo.canUndo(model.field.text)) { Icon(painterResource(R.drawable.ic_undo), stringResource(R.string.notes_action_undo)) }
                 Spacer(Modifier.weight(1f))
-                TextButton(done) { Text("Done") }
+                TextButton(done) { Text(stringResource(R.string.notes_speakers_done)) }
             }
         }
     }
@@ -417,7 +424,7 @@ private fun Notices(model: NotesModel) {
     LaunchedEffect(organized) { shown = organized; if (organized != null) { delay(NOTICE_MS); shown = null } }
     LaunchedEffect(model.voiceEditDone) { if (model.voiceEditNote != null) { delay(NotesVoiceEdit.NOTE_MS); model.dismissVoiceEdit() } }
     when {
-        model.listeningForCommand -> TextButton(model::cancelCommand) { Text("Cancel") }
+        model.listeningForCommand -> TextButton(model::cancelCommand) { Text(stringResource(R.string.notes_action_cancel)) }
         model.showEditedChip -> EditedChip(model)
         model.voiceEditNote != null -> Notice(model.voiceEditNote!!)
         shown != null -> Notice(shown!!)
@@ -437,11 +444,13 @@ private fun Notice(text: String) {
 @Composable
 private fun RecordButton(model: NotesModel, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    Surface(onClick, Modifier.heightIn(min = 64.dp).semantics { contentDescription = if (model.hasContent || model.elapsed > 0) "Continue recording" else "Record notes" }, enabled = !model.busy && !model.retranscribing, shape = CircleShape,
+    val resume = model.hasContent || model.elapsed > 0
+    val description = stringResource(if (resume) R.string.notes_dock_continue else R.string.notes_dock_record_notes)
+    Surface(onClick, Modifier.heightIn(min = 64.dp).semantics { contentDescription = description }, enabled = !model.busy && !model.retranscribing, shape = CircleShape,
         color = scheme.primary, contentColor = scheme.onPrimary, shadowElevation = 6.dp) {
         Row(Modifier.padding(start = 22.dp, end = 26.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(painterResource(R.drawable.ic_record), null, Modifier.size(22.dp), tint = scheme.onPrimary)
-            Text(if (model.hasContent || model.elapsed > 0) "Continue recording" else "Record", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(if (resume) R.string.notes_dock_continue else R.string.notes_library_record), style = MaterialTheme.typography.titleMedium)
         }
     }
 }
@@ -450,15 +459,18 @@ private fun RecordButton(model: NotesModel, onClick: () -> Unit) {
 private fun RecordingPill(model: NotesModel, stop: () -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     val state = captureState(model)
+    val pauseDescription = stringResource(if (model.paused) R.string.notes_dock_resume else R.string.notes_dock_pause)
+    val pillDescription = stringResource(R.string.notes_dock_description, model.displayTitle, model.elapsedText)
+    val stopDescription = stringResource(R.string.notes_dock_stop)
     Surface(modifier.testTag("notes-recording-dock"), shape = CircleShape, color = scheme.surfaceContainerHighest, shadowElevation = 6.dp) {
         Row(Modifier.heightIn(min = 64.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             val canPause = model.state == NotesRecorder.State.RECORDING || model.paused
-            FilledTonalIconButton(model::togglePause, Modifier.size(48.dp).semantics { contentDescription = if (model.paused) "Resume recording notes" else "Pause recording notes" },
+            FilledTonalIconButton(model::togglePause, Modifier.size(48.dp).semantics { contentDescription = pauseDescription },
                 enabled = canPause) {
                 Icon(painterResource(if (model.paused) R.drawable.ic_play else R.drawable.ic_pause), null)
             }
             // One quiet node: the note, its truthful state and the running time are read on focus, never announced as the clock ticks.
-            Row(Modifier.padding(horizontal = 12.dp).clearAndSetSemantics { contentDescription = "${model.displayTitle}, ${model.elapsedText}"; stateDescription = state },
+            Row(Modifier.padding(horizontal = 12.dp).clearAndSetSemantics { contentDescription = pillDescription; stateDescription = state },
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // The ripple is the listening sign; paused shows no ripple, only its word.
                 if (model.busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -468,7 +480,7 @@ private fun RecordingPill(model: NotesModel, stop: () -> Unit, modifier: Modifie
                     Text(model.elapsedText, style = dev.chirp.android.ui.ChirpTokens.timer)
                 }
             }
-            FilledIconButton(stop, Modifier.size(48.dp).semantics { contentDescription = "Stop recording notes" }, enabled = !model.busy,
+            FilledIconButton(stop, Modifier.size(48.dp).semantics { contentDescription = stopDescription }, enabled = !model.busy,
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = dev.chirp.android.ui.LocalChirpRoles.current.record, contentColor = scheme.onError)) {
                 Icon(painterResource(R.drawable.ic_stop), null)
             }
@@ -487,6 +499,8 @@ private fun CommandButton(model: NotesModel, modifier: Modifier) {
     var pressed by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val (container, content) = if (listening) colors.errorContainer to colors.onErrorContainer else colors.tertiaryContainer to colors.onTertiaryContainer
+    val description = stringResource(if (listening) R.string.notes_command_send_description else R.string.notes_command_description)
+    val clickLabel = stringResource(if (listening) R.string.notes_command_send else R.string.notes_command_start)
     Surface(modifier.heightIn(min = 56.dp).alpha(if (enabled) 1f else 0.38f)
         .pointerInput(enabled) {
             if (enabled) awaitEachGesture {
@@ -499,14 +513,14 @@ private fun CommandButton(model: NotesModel, modifier: Modifier) {
         }
         .semantics(mergeDescendants = true) {
             role = Role.Button
-            contentDescription = if (listening) "Send the spoken edit" else "Edit notes by voice. Hold, say the change, let go."
-            onClick(if (listening) "Send" else "Start") { model.command(); true }
+            contentDescription = description
+            onClick(clickLabel) { model.command(); true }
             if (!enabled) disabled()
         }, shape = CircleShape, color = container, contentColor = content, shadowElevation = 3.dp) {
         Row(Modifier.padding(horizontal = 18.dp), Arrangement.Center, Alignment.CenterVertically) {
             Icon(painterResource(if (listening) R.drawable.ic_mic else R.drawable.ic_sparkle), null, Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text(when { !listening -> "Hold to edit"; pressed -> "Release to send"; else -> "Tap to send" }, style = MaterialTheme.typography.labelLarge,
+            Text(stringResource(when { !listening -> R.string.notes_command_hold; pressed -> R.string.notes_command_release; else -> R.string.notes_command_tap }), style = MaterialTheme.typography.labelLarge,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -517,8 +531,9 @@ private fun CommandButton(model: NotesModel, modifier: Modifier) {
 private fun EditedChip(model: NotesModel) {
     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer, shadowElevation = 2.dp) {
         Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            val undoDescription = stringResource(R.string.notes_command_undo_description)
             Text(NotesVoiceEditText.EDITED, style = MaterialTheme.typography.labelLarge)
-            TextButton(model::undoVoiceEdit, Modifier.semantics { contentDescription = "Undo the spoken edit" }) { Text("Undo") }
+            TextButton(model::undoVoiceEdit, Modifier.semantics { contentDescription = undoDescription }) { Text(stringResource(R.string.notes_action_undo)) }
         }
     }
     LaunchedEffect(model.voiceEditDone) { delay(NotesVoiceEdit.CHIP_MS); model.dismissVoiceEdit() }
@@ -535,16 +550,16 @@ internal fun TranscriptPane(model: NotesModel, modifier: Modifier, titled: Boole
     LifecycleStartEffect(player) { onStopOrDispose { player?.stop() } }
     Column(modifier) {
         androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            if (titled) Text("Transcript", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall, color = scheme.onSurfaceVariant)
+            if (titled) Text(stringResource(R.string.notes_editor_transcript), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall, color = scheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
-            if (model.canRetranscribe) TextButton({ model.askRetranscribe() }) { Text("Re-transcribe…") }
-            if (model.document.previousTranscript != null && !model.retranscribing && !model.state.active) TextButton(model::restoreTranscript) { Text("Restore previous transcript") }
-            if (model.document.labelled && !model.retranscribing) TextButton({ model.nameSpeakersOpen = true }) { Text("Name speakers") }
-            FilterChip(model.raw, { model.raw = !model.raw }, label = { Text("Show raw") })
-            if (close != null) IconButton(close) { Icon(painterResource(R.drawable.ic_close), "Close transcript") }
+            if (model.canRetranscribe) TextButton({ model.askRetranscribe() }) { Text(stringResource(R.string.notes_menu_retranscribe)) }
+            if (model.document.previousTranscript != null && !model.retranscribing && !model.state.active) TextButton(model::restoreTranscript) { Text(stringResource(R.string.notes_menu_restore_transcript)) }
+            if (model.document.labelled && !model.retranscribing) TextButton({ model.nameSpeakersOpen = true }) { Text(stringResource(R.string.notes_speakers_name_all_title)) }
+            FilterChip(model.raw, { model.raw = !model.raw }, label = { Text(stringResource(R.string.notes_transcript_show_raw)) })
+            if (close != null) IconButton(close) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.notes_transcript_close)) }
         }
-        Text("Transcribed with ${model.document.transcriptEngine}", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-        if (playbackFailed) Text("Couldn’t play kept audio. Try another segment.", Modifier.padding(vertical = 8.dp), color = scheme.error, style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.notes_transcript_engine, model.document.transcriptEngine), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        if (playbackFailed) Text(stringResource(R.string.notes_transcript_playback_failed), Modifier.padding(vertical = 8.dp), color = scheme.error, style = MaterialTheme.typography.bodyMedium)
         val document = model.document
         val roster = document.roster
         var renaming by remember { mutableStateOf<Int?>(null) }
@@ -561,26 +576,27 @@ internal fun TranscriptPane(model: NotesModel, modifier: Modifier, titled: Boole
         LazyColumn(Modifier.fillMaxWidth().weight(1f), list, contentPadding = PaddingValues(top = 4.dp, bottom = 128.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(rows, key = { it.id }) { segment ->
                 val active = playing == NotesClipRef(document.uid, segment.id)
+                val playingState = stringResource(R.string.notes_transcript_playing)
                 val clip = document.audio.firstOrNull { it.segment == segment.id }
                 val boundary = document.boundaries.firstOrNull { it.offset == segment.offset }
-                if (boundary != null) Text("Continued · " + java.text.SimpleDateFormat("MMM d, h:mm a", locale).format(java.util.Date(boundary.time)),
+                if (boundary != null) Text(stringResource(R.string.notes_transcript_continued, java.text.SimpleDateFormat("MMM d, h:mm a", locale).format(java.util.Date(boundary.time))),
                     Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
                 Column {
-                if (clip != null && model.canRetranscribe && segment.isGap) TextButton({ model.askRetranscribe(segment.id) }) { Text("Try again") }
+                if (clip != null && model.canRetranscribe && segment.isGap) TextButton({ model.askRetranscribe(segment.id) }) { Text(stringResource(R.string.notes_library_try_again)) }
                 var segmentMenu by remember { mutableStateOf(false) }
                 Box {
-                DropdownMenu(segmentMenu && model.canRetranscribe, { segmentMenu = false }) { DropdownMenuItem({ Text("Re-transcribe…") }, { segmentMenu = false; model.askRetranscribe(segment.id) }) }
+                DropdownMenu(segmentMenu && model.canRetranscribe, { segmentMenu = false }) { DropdownMenuItem({ Text(stringResource(R.string.notes_menu_retranscribe)) }, { segmentMenu = false; model.askRetranscribe(segment.id) }) }
                 Row(Modifier.combinedClickable(onClick = {}, onLongClick = { if (clip != null && model.canRetranscribe) segmentMenu = true }).animateItem(fadeInSpec = tween(300), placementSpec = null).clip(MaterialTheme.shapes.medium)
                     .background(if (active) scheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent).padding(8.dp)
-                    .semantics { if (active) stateDescription = "Playing" }, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    .semantics { if (active) stateDescription = playingState }, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (clip != null) IconButton({ if (active) player?.stop() else player?.play(document.uid, segment.id) }, Modifier.size(48.dp)) {
-                        Icon(painterResource(if (active) R.drawable.ic_stop else R.drawable.ic_play), if (active) "Stop playback" else "Play segment ${segment.id + 1}", tint = scheme.primary)
+                        Icon(painterResource(if (active) R.drawable.ic_stop else R.drawable.ic_play), if (active) stringResource(R.string.notes_transcript_stop_playback) else stringResource(R.string.notes_transcript_play_segment, segment.id + 1), tint = scheme.primary)
                     }
                     Text(NotesDocument.timestamp(segment.offset), Modifier.padding(top = 2.dp), style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace,
                         color = scheme.outline)
                     val failure = segment.failure
                     val turns = segment.turns
-                    if (failure != null) Text("⚠︎ audio not transcribed ($failure)", color = scheme.error, style = MaterialTheme.typography.bodyMedium)
+                    if (failure != null) Text(stringResource(R.string.notes_transcript_failed, failure), color = scheme.error, style = MaterialTheme.typography.bodyMedium)
                     else if (!turns.isNullOrEmpty()) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         turns.forEachIndexed { i, turn ->
                             if ((if (model.raw) turn.raw else turn.text).isBlank()) return@forEachIndexed
@@ -594,11 +610,12 @@ internal fun TranscriptPane(model: NotesModel, modifier: Modifier, titled: Boole
                                     update = if (model.rememberVoices) ({ model.updateVoice(turn.effectivePerson) }) else null,
                                     reassign = { person -> model.reassignTurn(segment.id, i, person) })
                             }
-                            Text((if (model.raw) turn.raw else turn.text) + if ((turn.keptOriginal || segment.keptOriginal) && !model.raw) " (kept original)" else "",
+                            val words = if (model.raw) turn.raw else turn.text
+                            Text(if ((turn.keptOriginal || segment.keptOriginal) && !model.raw) stringResource(R.string.notes_transcript_kept_original, words) else words,
                                 style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                    else Text((if (model.raw) segment.raw else segment.text) + if (segment.keptOriginal && !model.raw) " (kept original)" else "",
+                    else Text(if (segment.keptOriginal && !model.raw) stringResource(R.string.notes_transcript_kept_original, segment.text) else if (model.raw) segment.raw else segment.text,
                         modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 }
                 }
@@ -608,7 +625,7 @@ internal fun TranscriptPane(model: NotesModel, modifier: Modifier, titled: Boole
                 Text(document.livePartial, Modifier.padding(start = 76.dp), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
             }
             if (rows.isEmpty() && document.livePartial.isBlank()) item(key = "empty") {
-                Text("What is said appears here, a line per segment.", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.notes_transcript_empty), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

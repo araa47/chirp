@@ -15,7 +15,7 @@ SERIAL = os.environ['ANDROID_SERIAL']
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--only', nargs='+', choices=('dictation', 'cleanup', 'notes', 'speakers', 'history', 'learn', 'stop', 'device', 'bubble', 'quickdictate', 'visual', 'keepkb', 'release'))
+    parser.add_argument('--only', nargs='+', choices=('dictation', 'cleanup', 'notes', 'speakers', 'history', 'learn', 'stop', 'device', 'bubble', 'quickdictate', 'visual', 'wallpaper', 'keepkb', 'release'))
     args = parser.parse_args()
     deadline = time.monotonic() + 300
     while time.monotonic() < deadline:

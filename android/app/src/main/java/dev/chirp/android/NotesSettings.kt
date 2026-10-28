@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,83 +52,78 @@ internal fun NotesSettings(sessions: NotesSessions? = null, title: String? = nul
         audioBytes = try { withContext(Dispatchers.IO) { kept.totalAudioBytes() } } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { 0L }
     }
     val rows: @Composable ColumnScope.() -> Unit = {
-        SwitchRow("Save battery while the screen is off", saver, { saver = it; store.notesBatterySaver = it },
-            summary = if (saver) "On" else "Off",
-            infoTitle = "Save battery while the screen is off", infoBody = "With the screen off the phone stops drawing live text and the level meter; recording, the transcript " +
-                "and the notes on your computer keep going, so everything is up to date the moment you look.")
-        SwitchRow("Keep a recovery copy until notes are saved", recovery, { on ->
+        val onLabel = stringResource(R.string.notes_settings_on); val offLabel = stringResource(R.string.notes_settings_off)
+        SwitchRow(stringResource(R.string.notes_settings_saver), saver, { saver = it; store.notesBatterySaver = it },
+            summary = if (saver) onLabel else offLabel,
+            infoTitle = stringResource(R.string.notes_settings_saver), infoBody = stringResource(R.string.notes_settings_saver_info))
+        SwitchRow(stringResource(R.string.notes_settings_recovery), recovery, { on ->
             recovery = on; store.notesRecovery = on
             // Off is also a delete: the copy and its key go.
             if (!on) NotesJournal(context, store = store).delete()
-        }, summary = if (recovery) "On" else "Off", infoTitle = "Keep a recovery copy until notes are saved",
-            infoBody = "If Android closes Chirp or the phone restarts during a recording, Notes reopens with what you had. " +
-                "Encrypted on this phone, never backed up or sent anywhere, and deleted when you save, discard or start new notes.")
-        if (kept.optedOut && !keep) ActionRow("Enable notes library", { kept.enable(); keep = true })
-        else SwitchRow("Keep notes on this phone", keep, { on ->
+        }, summary = if (recovery) onLabel else offLabel, infoTitle = stringResource(R.string.notes_settings_recovery),
+            infoBody = stringResource(R.string.notes_settings_recovery_info))
+        if (kept.optedOut && !keep) ActionRow(stringResource(R.string.notes_settings_enable_library), { kept.enable(); keep = true })
+        else SwitchRow(stringResource(R.string.notes_settings_keep), keep, { on ->
             // Off stops keeping new notes; it never deletes the ones already kept.
             if (on) kept.enable() else kept.disable()
             keep = on
-        }, summary = if (keep) "On · encrypted on this phone only" else "Off", infoTitle = "Keep notes on this phone",
-            infoBody = "Every note keeps itself, encrypted on this phone only. Never sent to your computer, backed up or logged. " +
-                "Turning this off keeps the notes you already have; \"Delete all notes\" removes them.")
+        }, summary = if (keep) stringResource(R.string.notes_settings_keep_on) else offLabel, infoTitle = stringResource(R.string.notes_settings_keep),
+            infoBody = stringResource(R.string.notes_settings_keep_info))
         SettingsItem {
-            Text("Delete notes older than", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.notes_settings_retention), style = MaterialTheme.typography.bodyMedium)
             ChoiceChips(NotesRetention.entries, retention, { it.label }) { option ->
                 retention = option
                 scope.launch { withContext(Dispatchers.IO) { kept.retention = option } }
             }
-            Text("Never by default. Deleted notes stay in Recently Deleted for ${NotesSessions.TRASH_DAYS} days.", style = MaterialTheme.typography.bodySmall,
+            Text(pluralStringResource(R.plurals.notes_settings_retention_detail, NotesSessions.TRASH_DAYS, NotesSessions.TRASH_DAYS), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        SwitchRow("Keep audio with notes", keepAudio, { on -> keepAudio = on; kept.keepAudio = on },
-            summary = "Off by default", infoTitle = "Keep audio with notes",
-            infoBody = "Keeps each spoken segment next to its transcript, compressed and encrypted on this phone only, so you can replay it. " +
-                "Re-transcribe can send kept audio to your paired Chirp server when you choose it and confirm.")
-        SwitchRow("Allow re-transcribing", allowRetranscribe, { allowRetranscribe = it; store.notesAllowRetranscribe = it },
-            enabled = keepAudio || audioBytes > 0, summary = if (allowRetranscribe) "On · asks before sending audio" else "Off",
-            infoTitle = "Allow re-transcribing", infoBody = "Send kept audio to your paired Chirp server only when you choose Re-transcribe and confirm. Turning this off cancels a running re-transcription.")
-        SwitchRow("Label speakers", speakers.enabled, speakers::setLabels,
-            summary = if (speakers.health != null && !speakers.available) "Update Chirp on your computer to label speakers"
-                else "${if (speakers.enabled) "On" else "Off"} · who said what",
-            enabled = speakers.available, infoTitle = "Label speakers",
-            infoBody = "Shows who said what in the transcript (Person 1, Person 2…; tap a name to rename it) and lets the notes say who " +
-                "owns a to-do. Names and turns stay in the sealed note; saved voices stay on your computer. " +
-                "The speaker model downloads automatically when needed. Recording starts straight away.")
+        SwitchRow(stringResource(R.string.notes_settings_keep_audio), keepAudio, { on -> keepAudio = on; kept.keepAudio = on },
+            summary = stringResource(R.string.notes_settings_off_by_default), infoTitle = stringResource(R.string.notes_settings_keep_audio),
+            infoBody = stringResource(R.string.notes_settings_keep_audio_info))
+        SwitchRow(stringResource(R.string.notes_settings_retranscribe), allowRetranscribe, { allowRetranscribe = it; store.notesAllowRetranscribe = it },
+            enabled = keepAudio || audioBytes > 0, summary = if (allowRetranscribe) stringResource(R.string.notes_settings_retranscribe_on) else offLabel,
+            infoTitle = stringResource(R.string.notes_settings_retranscribe), infoBody = stringResource(R.string.notes_settings_retranscribe_info))
+        SwitchRow(stringResource(R.string.notes_settings_speakers), speakers.enabled, speakers::setLabels,
+            summary = if (speakers.health != null && !speakers.available) stringResource(R.string.notes_settings_speakers_update)
+                else stringResource(if (speakers.enabled) R.string.notes_settings_speakers_on else R.string.notes_settings_speakers_off),
+            enabled = speakers.available, infoTitle = stringResource(R.string.notes_settings_speakers),
+            infoBody = stringResource(R.string.notes_settings_speakers_info))
         if (speakers.available) {
             SettingsItem {
-                Text("Speaker model on your computer: " + when (speakers.state) {
-                    "ready" -> "ready"
-                    "downloading" -> "downloading"
-                    "failed" -> "couldn’t download"
-                    else -> "not downloaded"
-                }, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(when (speakers.state) {
+                    "ready" -> R.string.notes_settings_speaker_model_ready
+                    "downloading" -> R.string.notes_settings_speaker_model_downloading
+                    "failed" -> R.string.notes_settings_speaker_model_failed
+                    else -> R.string.notes_settings_speaker_model_missing
+                }), style = MaterialTheme.typography.bodySmall)
                 SpeakerModelStatus(speakers)
             }
-            if (speakers.state == "ready") ActionRow("Remove speaker model", speakers::remove, destructive = true)
+            if (speakers.state == "ready") ActionRow(stringResource(R.string.notes_settings_remove_speaker_model), speakers::remove, destructive = true)
         }
-        if (speakers.health?.speakerVoices == true) ActionRow("Saved voices", { savedVoicesOpen = true })
-        else SettingsItem { Text("Update Chirp on your computer to save voices", style = MaterialTheme.typography.bodySmall) }
-        if (audioBytes > 0) ActionRow("Delete kept audio (${megabytes(audioBytes)})", { confirmDeleteAudio = true }, destructive = true, enabled = RetranscribeGate.owner == null)
-        ActionRow("Delete all notes", { confirmDeleteAll = true }, destructive = true)
+        if (speakers.health?.speakerVoices == true) ActionRow(stringResource(R.string.saved_voices_title), { savedVoicesOpen = true })
+        else SettingsItem { Text(stringResource(R.string.notes_settings_voices_update), style = MaterialTheme.typography.bodySmall) }
+        if (audioBytes > 0) ActionRow(stringResource(R.string.notes_settings_delete_audio, megabytes(audioBytes)), { confirmDeleteAudio = true }, destructive = true, enabled = RetranscribeGate.owner == null)
+        ActionRow(stringResource(R.string.notes_settings_delete_all), { confirmDeleteAll = true }, destructive = true)
     }
     if (title != null) SettingsGroup(title, content = rows) else SettingsGroup(content = rows)
     if (confirmDeleteAudio) AlertDialog(onDismissRequest = { confirmDeleteAudio = false },
-        title = { Text("Delete kept audio?") },
-        text = { Text("This deletes the audio of every note. The text and transcripts stay.") },
+        title = { Text(stringResource(R.string.notes_settings_delete_audio_title)) },
+        text = { Text(stringResource(R.string.notes_settings_delete_audio_message)) },
         confirmButton = { TextButton({
             confirmDeleteAudio = false; audioBytes = 0
             scope.launch { withContext(Dispatchers.IO) { kept.deleteAllAudio() } }
-        }) { Text("Delete audio") } },
-        dismissButton = { TextButton({ confirmDeleteAudio = false }) { Text("Cancel") } })
+        }) { Text(stringResource(R.string.notes_settings_delete_audio_confirm)) } },
+        dismissButton = { TextButton({ confirmDeleteAudio = false }) { Text(stringResource(R.string.notes_action_cancel)) } })
     if (confirmDeleteAll) AlertDialog(onDismissRequest = { confirmDeleteAll = false },
-        title = { Text("Delete all notes?") },
-        text = { Text("This deletes every note on this phone, including Recently Deleted and kept audio. Notes you saved as files stay where you saved them.") },
+        title = { Text(stringResource(R.string.notes_settings_delete_all_title)) },
+        text = { Text(stringResource(R.string.notes_settings_delete_all_message)) },
         confirmButton = { TextButton({
             confirmDeleteAll = false; audioBytes = 0
             RetranscribeGate.owner?.cancelRetranscribe(); RetranscribeGate.rebuilds.clear()
             scope.launch { withContext(Dispatchers.IO) { kept.deleteAll() } }
-        }) { Text("Delete everything") } },
-        dismissButton = { TextButton({ confirmDeleteAll = false }) { Text("Cancel") } })
+        }) { Text(stringResource(R.string.notes_settings_delete_all_confirm)) } },
+        dismissButton = { TextButton({ confirmDeleteAll = false }) { Text(stringResource(R.string.notes_action_cancel)) } })
 }
 
 /** Sealed audio size for settings and the note menu. Under 0.1 MB stays a threshold; larger sizes use the phone's locale. */
@@ -135,6 +132,7 @@ internal fun megabytes(bytes: Long) = if (bytes < 100_000) "<0.1 MB" else "%.1f 
 /** The settings list's one line for Notes, e.g. "Battery saver · recovery copy · keeps 7 days". */
 internal fun notesSummary(context: android.content.Context): String {
     val store = SettingsStore(context); val kept = NotesSessions(context)
-    return listOfNotNull("battery saver".takeIf { store.notesBatterySaver }, "recovery copy".takeIf { store.notesRecovery },
-        kept.takeIf { it.enabled }?.let { if (it.retention == NotesRetention.NEVER) "keeps notes" else "deletes after ${it.retention.label}" }).joinToString(" · ").replaceFirstChar { it.uppercase() }.ifEmpty { "Off" }
+    return listOfNotNull(context.getString(R.string.notes_summary_saver).takeIf { store.notesBatterySaver }, context.getString(R.string.notes_summary_recovery).takeIf { store.notesRecovery },
+        kept.takeIf { it.enabled }?.let { if (it.retention == NotesRetention.NEVER) context.getString(R.string.notes_summary_keeps) else context.getString(R.string.notes_summary_deletes_after, it.retention.label) })
+        .joinToString(" · ").replaceFirstChar { it.uppercase() }.ifEmpty { context.getString(R.string.notes_settings_off) }
 }
