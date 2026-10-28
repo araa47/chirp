@@ -1,13 +1,14 @@
 package dev.chirp.android
 
 import android.text.InputType
+import androidx.annotation.StringRes
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 
 /** Whether Chirp presses the editor's Send/Enter after a finished dictation. Off by default. */
-enum class AutoEnterMode(val key: String, val label: String) {
-    OFF("off", "Off"), ALWAYS("always", "Always"), CHAT_APPS("chat", "In chat apps only");
+enum class AutoEnterMode(val key: String, @StringRes val label: Int) {
+    OFF("off", R.string.auto_enter_off), ALWAYS("always", R.string.auto_enter_always), CHAT_APPS("chat", R.string.auto_enter_chat);
     companion object { fun of(key: String?) = entries.firstOrNull { it.key == key } ?: OFF }
 }
 

@@ -40,13 +40,13 @@ class VoiceUiTest {
         val state = SetupState(); val calls = Calls()
         compose.setContent { ChirpTheme { Onboarding(state, calls.actions(state)) } }
         compose.onNodeWithContentDescription("Step 1 of 5").assertIsDisplayed()
-        compose.onNodeWithText(WELCOME_TITLE).assertIsDisplayed()
+        compose.onNodeWithText("Welcome to Chirp").assertIsDisplayed()
         compose.onNodeWithText("Get started").performClick()
         compose.onNodeWithText("How you’ll dictate").assertIsDisplayed()
         compose.onNodeWithText("Continue").assertIsNotEnabled()
         compose.runOnIdle { state.inputMode = InputMode.KEYBOARD }
         compose.onNodeWithText("Continue").performClick()
-        compose.onNodeWithText(KEYBOARD_TITLE).assertIsDisplayed()
+        compose.onNodeWithText("Turn on Chirp Keyboard").assertIsDisplayed()
         compose.onNodeWithContentDescription("Step 3 of 5").assertExists()
         compose.onNodeWithText("Enable Chirp Keyboard").performClick()
         compose.runOnIdle { state.inputEnabled = true }
@@ -58,11 +58,11 @@ class VoiceUiTest {
         compose.onNodeWithText("Allow microphone").performClick()
         compose.runOnIdle { state.mic = true }
         compose.onNodeWithText("Continue").performClick()
-        compose.onNodeWithText(PAIR_PAGE_TITLE).assertIsDisplayed()
+        compose.onNodeWithText("Pair your computer").assertIsDisplayed()
         compose.onNodeWithText("Pair a Phone, or run", substring = true).assertIsDisplayed()
         compose.onNodeWithText("chirp\u2011server\u00A0pair", substring = true).assertIsDisplayed()
         compose.onNodeWithText("on your server.", substring = true).assertIsDisplayed()
-        compose.onNodeWithText(ABOUT_PAIRING).assertIsDisplayed()
+        compose.onNodeWithText("About pairing").assertIsDisplayed()
         compose.onNodeWithText("Skip for now").assertIsDisplayed()
         compose.onNodeWithText("Scan code").performClick()
         assertEquals(listOf("enable", "select", "mic", "scan"), calls.seen)
@@ -116,7 +116,7 @@ class VoiceUiTest {
         compose.setContent { ChirpTheme { Onboarding(state) } }
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.runOnIdle { assertEquals(PAGE_KEYBOARD, state.step) }
-        compose.onNodeWithText(KEYBOARD_TITLE).assertIsDisplayed()
+        compose.onNodeWithText("Turn on Chirp Keyboard").assertIsDisplayed()
         assertFalse(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks())
     }
     @Test fun `onboarding points history at Privacy and history and learning at Dictation`() {

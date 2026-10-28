@@ -21,10 +21,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [37])
 class NotesGroupsTest {
     @Test fun `groups use calendar days and include older months and years`() {
         val now = Instant.parse("2026-10-24T00:10:00Z").toEpochMilli()
-        fun group(date: String) = notesGroup(now, Instant.parse(date).toEpochMilli(), ZoneOffset.UTC)
+        fun group(date: String) = notesGroup(now, Instant.parse(date).toEpochMilli(), ZoneOffset.UTC).resolve(RuntimeEnvironment.getApplication().resources)
         assertEquals("Today", group("2026-10-24T00:01:00Z"))
         assertEquals("Yesterday", group("2026-10-23T23:59:00Z"))
         assertEquals("Previous 7 days", group("2026-10-17T12:00:00Z"))

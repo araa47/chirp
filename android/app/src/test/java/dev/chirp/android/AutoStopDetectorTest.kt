@@ -45,7 +45,8 @@ class AutoStopDetectorTest {
     @Test fun `pause choices snap and settings keep the mode and pause`() {
         assertEquals(1.5, AutoStopDetector.nearest(1.4), 0.0)
         assertEquals(AutoStopDetector.DEFAULT_SILENCE, AutoStopDetector.nearest(Double.NaN), 0.0)
-        assertEquals("1.5 s", AutoStopDetector.label(1.5)); assertEquals("2 s", AutoStopDetector.label(2.0))
+        val resources = RuntimeEnvironment.getApplication().resources
+        assertEquals("1.5 s", AutoStopDetector.label(1.5).resolve(resources)); assertEquals("2 s", AutoStopDetector.label(2.0).resolve(resources))
         val store = SettingsStore(RuntimeEnvironment.getApplication())
         assertFalse(store.stopOnPause); assertNull(store.autoStopSeconds); assertEquals(2.0, store.pauseSeconds, 0.0)
         store.stopOnPause = true; store.pauseSeconds = 3.0

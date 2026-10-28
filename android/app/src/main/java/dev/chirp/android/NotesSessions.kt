@@ -1,5 +1,6 @@
 package dev.chirp.android
 
+import androidx.annotation.StringRes
 import android.content.Context
 import android.os.UserManager
 import androidx.core.content.edit
@@ -10,8 +11,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** "Delete notes older than": its own setting, apart from dictation history. Never is the default. */
-internal enum class NotesRetention(val days: Int, val label: String) {
-    NEVER(0, "Never"), YEAR(365, "1 year"), DAYS_90(90, "90 days"), DAYS_30(30, "30 days");
+internal enum class NotesRetention(val days: Int, @StringRes val label: Int) {
+    NEVER(0, R.string.retention_never), YEAR(365, R.string.retention_year), DAYS_90(90, R.string.retention_days_90), DAYS_30(30, R.string.retention_days_30);
     val millis get() = days * 86_400_000L
     companion object { fun of(days: Int) = entries.firstOrNull { it.days == days } ?: NEVER }
 }

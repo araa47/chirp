@@ -3,6 +3,7 @@ package dev.chirp.android
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import dev.chirp.android.ui.ChoiceChips
 import dev.chirp.android.ui.LearnMore
@@ -12,6 +13,7 @@ import dev.chirp.android.ui.SettingsItem
 @Composable
 internal fun StopDictationSettings() {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val store = remember { SettingsStore(context) }
     var onPause by remember { mutableStateOf(store.stopOnPause) }
     var pause by remember { mutableDoubleStateOf(store.pauseSeconds) }
@@ -22,7 +24,7 @@ internal fun StopDictationSettings() {
         ChoiceChips(listOf(false, true), onPause, { if (it) whenPause else whenTap }) { onPause = it; store.stopOnPause = it }
         if (onPause) {
             Text(stringResource(R.string.stop_pause_length), style = MaterialTheme.typography.bodyMedium)
-            ChoiceChips(AutoStopDetector.CHOICES, pause, AutoStopDetector::label) { pause = it; store.pauseSeconds = it }
+            ChoiceChips(AutoStopDetector.CHOICES, pause, { AutoStopDetector.label(it).resolve(resources) }) { pause = it; store.pauseSeconds = it }
         }
         LearnMore(stringResource(R.string.stop_title), stringResource(if (onPause) R.string.stop_info_pause else R.string.stop_info_tap))
     }

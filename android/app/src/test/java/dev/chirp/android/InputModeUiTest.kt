@@ -49,7 +49,7 @@ class InputModeUiTest {
         compose.onNodeWithText("Continue without it").performClick()
         assertEquals(1, skipped); assertEquals(0, opened)
         compose.onNodeWithText("Use Chirp Keyboard instead").performClick()
-        compose.onNodeWithText(KEYBOARD_TITLE).assertIsDisplayed()
+        compose.onNodeWithText("Turn on Chirp Keyboard").assertIsDisplayed()
     }
     @Test fun `second unsuccessful return opens help and app info action`() {
         val state = SetupState().apply { step = PAGE_KEYBOARD; inputMode = InputMode.OWN_KEYBOARD; accessibilityReturns = 2 }

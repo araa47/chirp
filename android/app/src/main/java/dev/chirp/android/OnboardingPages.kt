@@ -16,9 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -30,23 +32,14 @@ import androidx.compose.ui.unit.dp
 import dev.chirp.android.settings.connectionSummary
 import dev.chirp.android.ui.*
 
-/** Shared with iOS onboarding: the same page titles and secondary-link labels on both phones. */
-internal const val WELCOME_TITLE = "Welcome to Chirp"
-internal const val KEYBOARD_TITLE = "Turn on Chirp Keyboard"
-internal const val ABOUT_KEYBOARD = "About the keyboard"
-internal const val MICROPHONE_TITLE = "Allow the microphone"
-internal const val ABOUT_MICROPHONE = "What Chirp keeps"
-internal const val PAIR_PAGE_TITLE = "Pair your computer"
-internal const val ABOUT_PAIRING = "About pairing"
+/** Page titles and secondary-link labels are shared with iOS (strings_labels.xml, `onboarding_title_*` / `onboarding_about_*`): word for word the same on both phones. */
 internal const val PAIRING_COMMAND = "chirp-server pair"
-internal const val PAIRING_STEPS =
-    "On your computer, open Chirp → Settings → Devices → Pair a Phone, or run chirp-server pair on your server."
 
 @Composable
 internal fun OnboardingPage(page: Int, state: SetupState, actions: OnboardingActions) {
     val next = { state.step = page + 1 }
     when (page) {
-        PAGE_WELCOME -> PageFrame(WELCOME_TITLE, { PondHero() }, PrimaryAction(stringResource(R.string.onboarding_get_started)) { next() }) {
+        PAGE_WELCOME -> PageFrame(stringResource(R.string.onboarding_title_welcome), { PondHero() }, PrimaryAction(stringResource(R.string.onboarding_get_started)) { next() }) {
             Body(stringResource(R.string.onboarding_welcome_body))
             Body(stringResource(R.string.onboarding_welcome_privacy))
         }
@@ -63,7 +56,7 @@ internal fun OnboardingPage(page: Int, state: SetupState, actions: OnboardingAct
                     useKeyboard = { actions.chooseMode(InputMode.KEYBOARD) })
                 if (!state.advancedProtection) TextButton(actions.skipFloatingMic) { Text(stringResource(R.string.onboarding_skip)) }
             }
-        } else PageFrame(KEYBOARD_TITLE, { Illustration(R.drawable.ic_keyboard) }, when {
+        } else PageFrame(stringResource(R.string.onboarding_title_keyboard), { Illustration(R.drawable.ic_keyboard) }, when {
             !state.inputEnabled -> PrimaryAction(stringResource(R.string.setup_enable_keyboard), onClick = actions.keyboardSettings)
             !state.inputSelected -> PrimaryAction(stringResource(R.string.onboarding_select_keyboard), onClick = actions.picker)
             else -> PrimaryAction(stringResource(R.string.onboarding_continue)) { next() }
@@ -74,14 +67,14 @@ internal fun OnboardingPage(page: Int, state: SetupState, actions: OnboardingAct
                 CheckRow(stringResource(R.string.onboarding_selected_default), state.inputSelected)
             }
             val swipe = swipeTypingSummary(LocalContext.current)
-            Tips(ABOUT_KEYBOARD, stringResource(R.string.ime_name), stringResource(R.string.onboarding_keyboard_tips, swipe))
+            Tips(stringResource(R.string.onboarding_about_keyboard), stringResource(R.string.ime_name), stringResource(R.string.onboarding_keyboard_tips, swipe))
         }
-        PAGE_MIC -> PageFrame(MICROPHONE_TITLE, { Illustration(R.drawable.ic_mic) }, if (state.mic) PrimaryAction(stringResource(R.string.onboarding_continue)) { next() }
+        PAGE_MIC -> PageFrame(stringResource(R.string.onboarding_title_microphone), { Illustration(R.drawable.ic_mic) }, if (state.mic) PrimaryAction(stringResource(R.string.onboarding_continue)) { next() }
             else PrimaryAction(stringResource(R.string.onboarding_allow_mic), onClick = actions.grantMic)) {
             Body(stringResource(R.string.onboarding_mic_body))
             if (state.mic) SettingsGroup { CheckRow(stringResource(R.string.onboarding_mic_allowed), true) }
             else if (state.micDenied) StatusBanner(StatusKind.Warning, stringResource(R.string.onboarding_mic_denied), action = stringResource(R.string.onboarding_open_permissions), onAction = actions.appSettings, live = true)
-            Tips(ABOUT_MICROPHONE, stringResource(R.string.onboarding_mic_tips_title), stringResource(R.string.onboarding_mic_tips))
+            Tips(stringResource(R.string.onboarding_about_microphone), stringResource(R.string.onboarding_mic_tips_title), stringResource(R.string.onboarding_mic_tips))
         }
         else -> PairPage(state, actions)
     }
@@ -94,13 +87,13 @@ private fun PairPage(state: SetupState, actions: OnboardingActions) {
     if (state.connected) {
         val connection = connectionSummary(true, state.host, state.reachable, false, state.health)
         PageFrame(stringResource(R.string.onboarding_connected), { Illustration(R.drawable.ic_check_circle) }, PrimaryAction(stringResource(R.string.onboarding_finish), onClick = actions.finish)) {
-            StatusBanner(connection.kind, connection.title, body = connection.summary, live = true)
+            StatusBanner(connection.kind, connection.title.text(), body = connection.summary?.text(), live = true)
             if (state.health?.debugRetention == true) StatusBanner(StatusKind.Error, stringResource(R.string.settings_debug_retention_on))
         }
         return
     }
     val busy = state.scanning || state.checking
-    PageFrame(PAIR_PAGE_TITLE, { Illustration(R.drawable.ic_qr_scan) },
+    PageFrame(stringResource(R.string.onboarding_title_pair), { Illustration(R.drawable.ic_qr_scan) },
         PrimaryAction(stringResource(when { state.scanning -> R.string.onboarding_scanning; state.checking -> R.string.onboarding_connecting; else -> R.string.onboarding_scan }), !busy, actions.scan)) {
         PairingSteps()
         if (!state.pairFromShell) TextButton(actions.skipPairing, Modifier.align(Alignment.CenterHorizontally)) { Text(stringResource(R.string.onboarding_skip)) }
@@ -127,7 +120,7 @@ private fun PairPage(state: SetupState, actions: OnboardingActions) {
                 supportingText = { Text(stringResource(if (invalid) R.string.onboarding_link_invalid else R.string.onboarding_link_hint)) },
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
         }
-        Tips(ABOUT_PAIRING, stringResource(R.string.onboarding_pairing_tips_title), stringResource(R.string.onboarding_pairing_tips))
+        Tips(stringResource(R.string.onboarding_about_pairing), stringResource(R.string.onboarding_pairing_tips_title), stringResource(R.string.onboarding_pairing_tips))
     }
 }
 
@@ -168,15 +161,22 @@ private fun Illustration(@DrawableRes icon: Int, wide: Boolean = false) {
 private fun Body(text: String) = Text(text, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
     color = MaterialTheme.colorScheme.onSurfaceVariant)
 
+/** The pairing steps sentence; [PAIRING_COMMAND] is its one argument, so the command stays findable in any language. */
+internal fun pairingSteps(resources: android.content.res.Resources) = resources.getString(R.string.onboarding_pairing_steps, PAIRING_COMMAND)
+
 /** Pairing steps, with the server command in code font. */
-internal fun pairingStepsAnnotated() = buildAnnotatedString {
-    val start = PAIRING_STEPS.indexOf(PAIRING_COMMAND)
-    append(PAIRING_STEPS.substring(0, start))
-    // A hyphen is a line-break point, so the shown command uses a non-breaking hyphen and space.
-    withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) {
-        append(PAIRING_COMMAND.replace('-', '\u2011').replace(' ', '\u00A0'))
+@Composable
+internal fun pairingStepsAnnotated(): AnnotatedString {
+    val steps = pairingSteps(LocalResources.current)
+    val start = steps.indexOf(PAIRING_COMMAND)
+    return buildAnnotatedString {
+        append(steps.substring(0, start))
+        // A hyphen is a line-break point, so the shown command uses a non-breaking hyphen and space.
+        withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) {
+            append(PAIRING_COMMAND.replace('-', '\u2011').replace(' ', '\u00A0'))
+        }
+        append(steps.substring(start + PAIRING_COMMAND.length))
     }
-    append(PAIRING_STEPS.substring(start + PAIRING_COMMAND.length))
 }
 
 @Composable

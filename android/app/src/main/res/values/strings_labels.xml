@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Labels that enums and model classes carry as resource ids (#339): auto-enter, retention, learned state, keyboard looks. -->
+    <string name="auto_enter_off">Off</string>
+    <string name="auto_enter_always">Always</string>
+    <string name="auto_enter_chat">In chat apps only</string>
+    <string name="retention_never">Never</string>
+    <string name="retention_year">1 year</string>
+    <string name="retention_days_90">90 days</string>
+    <string name="retention_days_30">30 days</string>
+    <string name="learned_state_learning">Learning</string>
+    <string name="learned_state_active">In use</string>
+    <string name="learned_state_off">Off</string>
+    <!-- %1$s is the pause length in seconds, e.g. 1.5 or 2. -->
+    <string name="stop_pause_seconds">%1$s s</string>
+    <string name="look_gboard">Gboard-like</string>
+    <string name="look_gboard_description">Material You colours from your wallpaper, rounded keys with gaps, tinted function keys</string>
+    <string name="look_samsung">Samsung-like</string>
+    <string name="look_samsung_description">One UI-style neutral keys, grey function keys and a blue accent</string>
+    <string name="look_heliboard">HeliBoard classic</string>
+    <string name="look_heliboard_description">HeliBoard\'s original flat Material look</string>
+    <string name="look_heliboard_rounded">HeliBoard rounded</string>
+    <string name="look_heliboard_rounded_description">HeliBoard\'s rounded keys with its light and dark colours</string>
+    <string name="look_heliboard_holo">HeliBoard Holo</string>
+    <string name="look_heliboard_holo_description">HeliBoard\'s Holo style</string>
+
+    <string name="private_session_help">Exclude dictations from history until the screen locks or 1 hour passes. Clean-up and the connection to your computer work as usual.</string>
+    <!-- %1$s is the host that clean-up sends text to. -->
+    <string name="cleanup_description_host">When enabled, sends text to %1$s for clean-up</string>
+    <string name="cleanup_description_external_host">the external host</string>
+    <string name="cleanup_description_computer">Polishes punctuation and filler words on your computer; text never leaves it</string>
+
+    <!-- Notes library date groups (the month names come from the device locale). -->
+    <string name="notes_library_group_today">Today</string>
+    <string name="notes_library_group_yesterday">Yesterday</string>
+    <string name="notes_library_group_week">Previous 7 days</string>
+    <string name="notes_library_group_month">Previous 30 days</string>
+
+    <!-- The connection row (settings/ConnectionSummary.kt). %1$s is the computer host name. -->
+    <string name="connection_not_paired">Not paired</string>
+    <string name="connection_engine_missing">Engine not reported</string>
+    <string name="connection_cleanup_off">clean-up off</string>
+    <!-- %1$s is the host that clean-up sends text to. -->
+    <string name="connection_cleanup_via">clean-up via %1$s</string>
+    <string name="connection_cleanup_computer">clean-up on your computer</string>
+    <!-- %1$s is the speech engine, %2$s the clean-up part. -->
+    <string name="connection_details">%1$s · %2$s</string>
+    <string name="connection_checking">Checking · %1$s</string>
+    <string name="connection_unreachable">Computer unreachable · %1$s</string>
+    <string name="connection_unreachable_hint">Check Tailscale is connected on both devices. Wake the computer and start Chirp, then check again.</string>
+    <string name="connection_loading_model">Computer is loading its speech model</string>
+    <string name="connection_paired">Paired · %1$s</string>
+    <string name="connection_connected">Connected · %1$s</string>
+
+    <!-- What setup still needs. The "next" form follows "Next: " on the Notes setup card. -->
+    <string name="setup_next_pair">pair your computer</string>
+    <string name="setup_next_microphone">allow the microphone</string>
+    <string name="setup_next_keyboard">turn on Chirp Keyboard</string>
+    <string name="setup_next_floating_mic">turn on the floating mic</string>
+    <string name="setup_action_pair">Pair computer</string>
+    <string name="setup_action_allow">Allow</string>
+    <string name="setup_action_set_up">Set up</string>
+    <string name="setup_action_turn_on">Turn on</string>
+    <string name="setup_action_check_again">Check again</string>
+    <!-- The Notes top bar chip. -->
+    <string name="notes_connection_computer">Computer</string>
+    <string name="notes_connection_phone">Phone</string>
+    <string name="notes_connection_offline">Offline</string>
+
+    <!-- Setup status line (SetupState.status). -->
+    <string name="setup_status_initial">Pair with your computer to begin</string>
+    <string name="setup_status_wifi_allowed">Wi-Fi server access allowed — test your pairing link</string>
+    <string name="setup_status_wifi_denied">Wi-Fi server access denied. Tailscale still works; allow Wi-Fi access in app permissions if needed.</string>
+    <string name="setup_status_mic_granted">Microphone permission granted</string>
+    <string name="setup_status_mic_needed">Microphone permission is needed to dictate — open app permissions to allow it</string>
+    <string name="setup_status_mic_already">Microphone permission already granted</string>
+    <string name="setup_status_connecting_tailscale">Connecting Tailscale…</string>
+    <string name="setup_status_pairing_removed">Pairing removed</string>
+    <string name="setup_status_invalid_link">Invalid Chirp pairing link</string>
+    <string name="setup_status_scan_cancelled">Scan cancelled — scan again or paste the pairing link</string>
+    <string name="setup_status_scanner_unavailable">Scanner unavailable — check Google Play services or paste the pairing link</string>
+    <string name="setup_status_paste_valid">Paste a valid Chirp pairing link with an HTTPS server</string>
+    <string name="setup_status_checking">Checking your computer…</string>
+    <string name="setup_status_ready">Computer ready</string>
+    <string name="setup_status_loading_model">Paired · Computer is loading its speech model</string>
+    <string name="setup_status_local_network">Local network access is needed only for servers on your Wi-Fi. Tailscale works without it.</string>
+    <string name="setup_status_unreachable">Computer unreachable — is Tailscale on? Check the computer is awake, Chirp is running, and the pairing link is current.</string>
+
+    <!-- Onboarding page titles and secondary links, word for word the same as iOS (ios/App/Onboarding.swift). -->
+    <string name="onboarding_title_welcome">Welcome to Chirp</string>
+    <string name="onboarding_title_keyboard">Turn on Chirp Keyboard</string>
+    <string name="onboarding_about_keyboard">About the keyboard</string>
+    <string name="onboarding_title_microphone">Allow the microphone</string>
+    <string name="onboarding_about_microphone">What Chirp keeps</string>
+    <string name="onboarding_title_pair">Pair your computer</string>
+    <string name="onboarding_about_pairing">About pairing</string>
+    <!-- %1$s is the server command, shown in code font. -->
+    <string name="onboarding_pairing_steps">On your computer, open Chirp → Settings → Devices → Pair a Phone, or run %1$s on your server.</string>
+</resources>

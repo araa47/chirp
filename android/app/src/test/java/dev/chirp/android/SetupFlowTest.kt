@@ -2,6 +2,29 @@ package dev.chirp.android
 
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [37])
+class OnboardingCopyTest {
+    private val resources get() = RuntimeEnvironment.getApplication().resources
+    @Test fun `onboarding titles match the iOS wizard`() {
+        fun text(id: Int) = resources.getString(id)
+        assertEquals("Welcome to Chirp", text(R.string.onboarding_title_welcome))
+        assertEquals("Pair your computer", text(R.string.onboarding_title_pair))
+        assertEquals("About pairing", text(R.string.onboarding_about_pairing))
+        assertEquals("Allow the microphone", text(R.string.onboarding_title_microphone))
+        assertEquals("What Chirp keeps", text(R.string.onboarding_about_microphone))
+        assertEquals("Turn on Chirp Keyboard", text(R.string.onboarding_title_keyboard))
+        assertEquals("About the keyboard", text(R.string.onboarding_about_keyboard))
+        val steps = pairingSteps(resources)
+        assertEquals("On your computer, open Chirp → Settings → Devices → Pair a Phone, or run chirp-server pair on your server.", steps)
+        assertFalse(steps.contains("Mac"))
+    }
+}
 
 class SetupFlowTest {
     @Test fun `every requirement combination respects the chosen mode and skip`() {
@@ -23,19 +46,6 @@ class SetupFlowTest {
             val expected = when { selected || (enabled && !bubble) -> InputMode.KEYBOARD; bubble -> InputMode.OWN_KEYBOARD; else -> null }
             assertEquals(expected, migratedInputMode(enabled, selected, bubble))
         }
-    }
-    @Test fun `onboarding titles match the iOS wizard`() {
-        assertEquals("Welcome to Chirp", WELCOME_TITLE)
-        assertEquals("Pair your computer", PAIR_PAGE_TITLE)
-        assertEquals("About pairing", ABOUT_PAIRING)
-        assertEquals("Allow the microphone", MICROPHONE_TITLE)
-        assertEquals("What Chirp keeps", ABOUT_MICROPHONE)
-        assertEquals("Turn on Chirp Keyboard", KEYBOARD_TITLE)
-        assertEquals("About the keyboard", ABOUT_KEYBOARD)
-        assertEquals(
-            "On your computer, open Chirp → Settings → Devices → Pair a Phone, or run chirp-server pair on your server.",
-            PAIRING_STEPS)
-        assertFalse(PAIRING_STEPS.contains("Mac"))
     }
     @Test fun `each recoverable dictation error has a specific action`() {
         assertEquals(DictationAction.PAIR, statusOf("Pair your computer in Chirp settings").action)

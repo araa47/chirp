@@ -35,7 +35,7 @@ internal fun SettingsList(state: SetupState, actions: SettingsActions, history: 
         // The list stays composed beside its detail page on a Fold: preference changes must refresh its summaries.
         key(revision) { SettingsGroup {
             NavRow(stringResource(SettingsPage.Connection.title), { open(SettingsPage.Connection) },
-                summary = if (state.paired) connection.title else stringResource(R.string.settings_summary_pair), icon = R.drawable.ic_devices)
+                summary = if (state.paired) connection.title.text() else stringResource(R.string.settings_summary_pair), icon = R.drawable.ic_devices)
             NavRow(stringResource(SettingsPage.HowYouDictate.title), { open(SettingsPage.HowYouDictate) }, summary = inputModeSummary(state), icon = R.drawable.ic_mic)
             NavRow(stringResource(SettingsPage.Dictation.title), { open(SettingsPage.Dictation) }, summary = dictationSummary(context, state), icon = R.drawable.ic_tune)
             NavRow(stringResource(SettingsPage.Keyboard.title), { open(SettingsPage.Keyboard) }, summary = if (state.inputMode == InputMode.OWN_KEYBOARD)
@@ -69,7 +69,7 @@ internal fun dictationSummary(context: android.content.Context, state: SetupStat
 @Composable
 internal fun keyboardSummary(context: android.content.Context, prefs: android.content.SharedPreferences): String {
     val swipe = remember(context) { GestureLibrary.status(context).let { it == GestureLibrary.Status.ACTIVE || it == GestureLibrary.Status.BUILT_IN } }
-    val look = currentKeyboardLook(prefs)?.label ?: stringResource(R.string.settings_summary_look_custom)
+    val look = currentKeyboardLook(prefs)?.let { stringResource(it.label) } ?: stringResource(R.string.settings_summary_look_custom)
     return stringResource(if (swipe) R.string.settings_summary_swipe_on else R.string.settings_summary_swipe_off, look)
 }
 

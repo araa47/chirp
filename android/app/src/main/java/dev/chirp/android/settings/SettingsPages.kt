@@ -33,7 +33,7 @@ private fun ConnectionPage(state: SetupState, actions: SettingsActions) {
     val connection = connectionSummary(state.paired, state.host, state.reachable, state.checking, state.health)
     // Unreachable: the hint says to check Tailscale, so the banner opens it when it is installed.
     val tailscale = actions.openTailscale.takeIf { state.paired && state.reachable == false && !state.checking }
-    StatusBanner(connection.kind, connection.title, body = connection.hint ?: connection.summary, live = true,
+    StatusBanner(connection.kind, connection.title.text(), body = (connection.hint ?: connection.summary)?.text(), live = true,
         action = tailscale?.let { stringResource(R.string.settings_open_tailscale) }, onAction = { tailscale?.invoke() })
     Text(pairingStepsAnnotated(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     SettingsGroup {
@@ -64,7 +64,7 @@ private fun DictationPage(state: SetupState, actions: SettingsActions) {
             SwitchRow(stringResource(R.string.settings_cleanup), cleanup, { cleanup = it; store.correction = it },
                 summary = if (state.health?.correctionLeavesMachine == true) stringResource(R.string.settings_cleanup_summary_host, state.health?.correctionHost.toString())
                     else stringResource(R.string.settings_cleanup_summary_computer),
-                infoTitle = stringResource(R.string.settings_cleanup), infoBody = cleanupDescription(state.health))
+                infoTitle = stringResource(R.string.settings_cleanup), infoBody = cleanupDescription(state.health).text())
             CleanupStyleSettings(state.health)
         }
     } else if (state.paired) SettingsGroup(stringResource(R.string.settings_cleanup)) { SettingsItem { Text(stringResource(R.string.settings_cleanup_off_computer), style = MaterialTheme.typography.bodyMedium) } }
@@ -116,7 +116,7 @@ private fun HistoryPage(history: DictationHistory?) {
     val privateSession by PrivateSession.state.collectAsState()
     SettingsGroup {
         SwitchRow(stringResource(R.string.settings_private_session), privateSession, { store.privateSession = it }, summary = stringResource(R.string.settings_private_session_summary),
-            infoTitle = stringResource(R.string.settings_private_session), infoBody = PrivateSession.HELP)
+            infoTitle = stringResource(R.string.settings_private_session), infoBody = stringResource(PrivateSession.HELP))
     }
     HistorySettings(showOpen = true, store = history, title = null)   // the page already says "Privacy & history"
     SettingsGroup(stringResource(R.string.settings_what_chirp_keeps)) {

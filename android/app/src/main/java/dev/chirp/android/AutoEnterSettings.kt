@@ -16,7 +16,7 @@ internal fun AutoEnterSettings() {
     Text(stringResource(R.string.auto_enter_title), style = MaterialTheme.typography.titleSmall)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         AutoEnterMode.entries.forEach { choice ->
-            FilterChip(mode == choice, { mode = choice; store.autoEnter = choice }, label = { Text(choice.label) })
+            FilterChip(mode == choice, { mode = choice; store.autoEnter = choice }, label = { Text(stringResource(choice.label)) })
         }
     }
     Text(stringResource(R.string.auto_enter_body),

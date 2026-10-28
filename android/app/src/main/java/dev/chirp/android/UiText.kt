@@ -5,7 +5,7 @@ import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 
 /**
  * Text a model or state class hands to the UI (#339). Models keep the resource and its arguments, never the English,
@@ -36,4 +36,4 @@ internal sealed interface UiText {
 }
 
 @Composable @ReadOnlyComposable
-internal fun UiText.text(): String = resolve(LocalContext.current.resources)
+internal fun UiText.text(): String = resolve(LocalResources.current)
