@@ -50,9 +50,16 @@ def check(p, work, output):
     shot('library-search')
     click('Clear search')
     # Swipe left and undo while the transient snackbar is present.
-    target = poll(row, 'No row to delete')
-    x1, y1, x2, y2 = p['bounds'](target)
-    adb('shell', 'input', 'swipe', str(x2 - 12), str((y1+y2)//2), str(x1 + 12), str((y1+y2)//2), '300')
+    # A swipe that the list never recognised (slow, loaded emulator) shows no snackbar at all; retry it rather than
+    # reporting the missing Undo as an accessibility failure. Undo itself is only waited for once the delete is announced.
+    for attempt in range(3):
+        target = poll(row, 'No row to delete')
+        x1, y1, x2, y2 = p['bounds'](target)
+        adb('shell', 'input', 'swipe', str(x2 - 12), str((y1+y2)//2), str(x1 + 12), str((y1+y2)//2), '300')
+        try:
+            wait('Note deleted', 10); break
+        except AssertionError:
+            if attempt == 2: raise AssertionError('Swipe did not delete the note (no "Note deleted" snackbar after 3 swipes)')
     click('Undo')
     poll(row, 'Undo did not restore saved note')
     target = poll(row, 'No row for second delete')

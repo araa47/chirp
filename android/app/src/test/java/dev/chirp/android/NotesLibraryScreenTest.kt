@@ -187,6 +187,8 @@ class NotesLibraryScreenTest {
         show()
         compose.onNode(hasText("Garden plans") and hasClickAction()).performTouchInput { swipeLeft() }
         displayed("Note deleted")
+        // TalkBack and UiAutomator reach Undo as a button with a click action, not by position.
+        compose.onNode(hasText("Undo") and hasClickAction()).assertHasClickAction()
         compose.onNodeWithText("Undo").performClick()
         displayed("Garden plans")
         compose.runOnIdle { assertFalse(library.open(id)!!.entry.deleted) }

@@ -326,7 +326,7 @@ def main():
             def speakers_model():
                 speaker_gate.touch()
         assert speakers_model or not opt.speakers_check, "--speakers-check needs the speaker model (CHIRP_SPEAKER_MODEL)"
-        env = dict(os.environ, HOME=str(home), HF_HOME=str(Path.home() / ".cache/huggingface"),
+        env = dict(os.environ, HOME=str(home), HF_HOME=os.environ.get("HF_HOME") or str(Path.home() / ".cache/huggingface"),
                    HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", PYTHONPATH=str(opt.server_root / "src"))
         if opt.tls: env["SSL_CERT_FILE"] = str(cert)
         command = [opt.python, "-m", "chirp_server", "--port", str(opt.server_port), "--model-dir", opt.model_dir]
