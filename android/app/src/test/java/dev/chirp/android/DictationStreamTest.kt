@@ -25,7 +25,7 @@ class DictationStreamTest {
             deadlines = deadlines,
             transportFactory = { event, failure -> ChirpImeServiceTest.FakeTransport(event, failure, order).also { transport = it } },
             captureFactory = { frame, _, done -> ChirpImeServiceTest.FakeCapture(frame, done, order).also { capture = it } },
-            changed = { status, partial -> statuses += status; if (partial != null) partials += partial },
+            changed = { status, partial -> statuses += status.english(); if (partial != null) partials += partial },
             level = {}, retention = { retention = it }, final = { finals += it }, ended = { ended++ },
         )
         fun advance(ms: Long = 0) { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms)) }
@@ -79,7 +79,7 @@ class DictationStreamTest {
     @Test fun `startup and finalization timeouts release all resources`() {
         val startup = Harness(); startup.session.start(false); startup.advance(7000)
         assertTrue(startup.capture.released); assertTrue(startup.transport.closed)
-        assertEquals(ConnectionFailure.Kind.DOWN.status, startup.statuses.last()); assertEquals(1, startup.ended)
+        assertEquals(ConnectionFailure.Kind.DOWN.english(), startup.statuses.last()); assertEquals(1, startup.ended)
         val finish = Harness(); finish.session.start(false); finish.transport.ready(); finish.session.stop(); finish.advance()
         assertTrue(finish.capture.released); finish.advance(60000)
         assertEquals(1, finish.ended); assertTrue(finish.transport.closed)
@@ -99,11 +99,11 @@ class DictationStreamTest {
         }
     }
     @Test fun `a full pre-Ready buffer is reported as a connect timeout unless the transport knows better`() {
-        val h = Harness(); h.session.start(false); h.capture.finish("Computer unreachable — is Tailscale on?"); h.advance()
-        assertEquals(ConnectionFailure.Kind.DOWN.status, h.statuses.last())
+        val h = Harness(); h.session.start(false); h.capture.finish(statusOf("Computer unreachable — is Tailscale on?")); h.advance()
+        assertEquals(ConnectionFailure.Kind.DOWN.english(), h.statuses.last())
         val dns = Harness(); dns.session.start(false); dns.transport.failureKind = ConnectionFailure.Kind.DNS
-        dns.capture.finish("Computer unreachable — is Tailscale on?"); dns.advance()
-        assertEquals(ConnectionFailure.Kind.DNS.status, dns.statuses.last())
+        dns.capture.finish(statusOf("Computer unreachable — is Tailscale on?")); dns.advance()
+        assertEquals(ConnectionFailure.Kind.DNS.english(), dns.statuses.last())
     }
     @Test fun `debug retention changes before partials and no final is accepted before stop`() {
         val h = Harness(); h.session.start(false)

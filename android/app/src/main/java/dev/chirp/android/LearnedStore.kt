@@ -2,6 +2,7 @@ package dev.chirp.android
 
 import android.content.Context
 import android.util.AtomicFile
+import androidx.annotation.StringRes
 import androidx.core.content.edit
 import org.json.JSONArray
 import org.json.JSONObject
@@ -10,7 +11,7 @@ import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 
-internal enum class LearnedState(val title: String) { LEARNING("Learning"), ACTIVE("In use"), OFF("Off") }
+internal enum class LearnedState(@StringRes val title: Int) { LEARNING(R.string.learned_state_learning), ACTIVE(R.string.learned_state_active), OFF(R.string.learned_state_off) }
 internal class LearnedItem(val id: String, val correction: LearnedCorrection, val app: String?, val state: LearnedState,
                            val count: Int, val time: Long, val inserted: String, val edited: String, val said: String) {
     override fun toString() = "LearnedItem(<redacted>)"

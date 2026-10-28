@@ -132,7 +132,7 @@ internal class NetworkHousekeeping(
     fun cancel(call: okhttp3.Call?) { if (call != null) executor.execute { call.cancel() } }
 }
 
-interface ImeTransport {
+internal interface ImeTransport {
     /** Optional versioned preferences for this utterance, set before start. */
     fun learned(payload: LearnedPayload?) {}
     fun retranscription(context: String?) {}
@@ -152,7 +152,7 @@ interface ImeTransport {
 }
 
 /** Main-thread control; audio() is also called by the capture thread. */
-class StreamTransport(
+internal class StreamTransport(
     private val client: OkHttpClient,
     private val pairing: Pairing,
     private val dispatch: (() -> Unit) -> Unit,

@@ -138,7 +138,7 @@ class NotesVoiceEditRecorderTest {
         assertEquals(VoiceEditStatus.Done(NotesEditOutcome.Conflict), v.voice.status)
         assertEquals("$NOTES!", v.recorder.document.text)
         assertFalse(v.recorder.canUndoEdit)
-        assertEquals("Notes changed while editing — try again", NotesVoiceEditText.note(NotesEditOutcome.Conflict))
+        assertEquals("Notes changed while editing — try again", NotesVoiceEditText.note(NotesEditOutcome.Conflict)?.notesEnglish())
 
         v.voice.dismiss()
         v.command("tidy")
@@ -177,7 +177,7 @@ class NotesVoiceEditRecorderTest {
             v.command("do it")
             rig.calls.edits.single().second.complete(response); rig.idle()
             val outcome = (v.voice.status as VoiceEditStatus.Done).outcome
-            assertEquals(note, NotesVoiceEditText.note(outcome))
+            assertEquals(note, NotesVoiceEditText.note(outcome)?.notesEnglish())
             assertEquals("a refusal changes nothing", NOTES, v.recorder.document.text)
             assertFalse(v.recorder.canUndoEdit)
         }
@@ -219,7 +219,7 @@ class NotesVoiceEditRecorderTest {
         v.voice.start(); rig.wire.ready(); rig.idle()
         rig.wire.partial("remove the")
         assertEquals(VoiceEditStatus.Listening("remove the"), v.voice.status)
-        assertEquals("“remove the”", NotesVoiceEditText.status(v.voice.status))
+        assertEquals("“remove the”", NotesVoiceEditText.status(v.voice.status)?.notesEnglish())
         v.voice.cancel(); rig.idle()
         assertEquals(VoiceEditStatus.Idle, v.voice.status)
         assertTrue(rig.wires[1].closed)
@@ -238,7 +238,7 @@ class NotesVoiceEditRecorderTest {
         v.recording()
         v.command("   ")
         assertEquals(VoiceEditStatus.Done(NotesEditOutcome.Skipped("not_heard")), v.voice.status)
-        assertEquals("Didn’t catch an edit — try again", NotesVoiceEditText.note((v.voice.status as VoiceEditStatus.Done).outcome))
+        assertEquals("Didn’t catch an edit — try again", NotesVoiceEditText.note((v.voice.status as VoiceEditStatus.Done).outcome)?.notesEnglish())
         v.voice.dismiss()
 
         v.voice.start(); rig.wire.ready(); rig.idle()
@@ -305,7 +305,7 @@ class NotesVoiceEditRecorderTest {
         val v = VoiceRig(); val rig = v.rig
         v.recorder.userEdit(0, 0, NOTES)
         v.voice.start()
-        rig.captures.single().done("Microphone unavailable"); rig.idle()
+        rig.captures.single().done(statusOf("Microphone unavailable")); rig.idle()
         assertEquals(VoiceEditStatus.Done(NotesEditOutcome.Failed("microphone")), v.voice.status)
         assertTrue(rig.wires.single().closed)
     }
@@ -452,17 +452,17 @@ class NotesVoiceEditModelTest {
     @Test fun `the status line follows the command and a failed edit leaves a note`() {
         val rig = recording()
         rig.model.command(); rig.idle()
-        assertEquals("Say the edit…", rig.model.status)
+        assertEquals("Say the edit…", rig.model.status.notesEnglish())
         rig.wire.ready(); rig.wire.partial("remove the"); rig.idle()
-        assertEquals("“remove the”", rig.model.status)
+        assertEquals("“remove the”", rig.model.status.notesEnglish())
         rig.model.command(); rig.idle(); rig.wire.ready(); rig.idle()
-        assertEquals("Editing notes…", rig.model.status)
+        assertEquals("Editing notes…", rig.model.status.notesEnglish())
         rig.wires[1].final("make it a poem"); rig.idle()
-        assertEquals("the edit waits for the segment before the command", "Editing notes…", rig.model.status)
+        assertEquals("the edit waits for the segment before the command", "Editing notes…", rig.model.status.notesEnglish())
         rig.wires[0].final("earlier words"); rig.idle()
         // The server's answer was never scripted: it fails like a timeout.
-        assertEquals("Listening…", rig.model.status)
-        assertEquals("Couldn’t edit notes (timeout)", rig.model.voiceEditNote)
+        assertEquals("Listening…", rig.model.status.notesEnglish())
+        assertEquals("Couldn’t edit notes (timeout)", rig.model.voiceEditNote?.notesEnglish())
         assertEquals(NOTES, rig.model.field.text)
         rig.model.dismissVoiceEdit()
         assertNull(rig.model.voiceEditNote)
@@ -475,7 +475,7 @@ class NotesVoiceEditModelTest {
         rig.model.commandRelease(100); rig.idle()
         assertTrue("a short press latches the command", rig.model.listeningForCommand)
         rig.model.commandPress(); rig.idle()
-        assertEquals("the next press sends it", "Editing notes…", rig.model.status)
+        assertEquals("the next press sends it", "Editing notes…", rig.model.status.notesEnglish())
         rig.model.commandRelease(50); rig.idle()
         assertFalse(rig.model.listeningForCommand)
 
@@ -483,7 +483,7 @@ class NotesVoiceEditModelTest {
         rig.model.dismissVoiceEdit()
         rig.model.commandPress(); rig.idle()
         rig.model.commandRelease(NotesVoiceEdit.HOLD_MS + 1); rig.idle()
-        assertEquals("a hold sends on release", "Editing notes…", rig.model.status)
+        assertEquals("a hold sends on release", "Editing notes…", rig.model.status.notesEnglish())
     }
 
     @Test fun `Record and Resume wait while a command has the microphone`() {
@@ -492,7 +492,8 @@ class NotesVoiceEditModelTest {
         rig.model.command(); rig.idle()
         assertTrue(rig.model.listeningForCommand)
         rig.model.toggle(); rig.idle()
-        assertEquals("Finish the spoken edit first", rig.model.message)
+        assertEquals(NotesStatus.FINISH_EDIT, rig.model.message)
+        assertEquals("Finish the spoken edit first", rig.model.message!!.notesEnglish())
         assertEquals(NotesRecorder.State.IDLE, rig.model.state)
         // Leaving the screen ends a command on its own microphone: Android would silence it anyway.
         rig.model.visible(false); rig.idle()
@@ -554,7 +555,7 @@ class NotesVoiceEditScreenTest {
         compose.runOnIdle { rig.idle() }
         compose.onNodeWithText("Release to send").assertIsDisplayed()
         compose.onNodeWithText("Cancel").assertIsDisplayed()
-        assertEquals("Say the edit…", rig.model.status)
+        assertEquals("Say the edit…", rig.model.status.notesEnglish())
     }
 
     @Test fun `holding the button and letting go sends, then Edited and Undo`() {
@@ -591,7 +592,7 @@ class NotesVoiceEditScreenTest {
         compose.runOnIdle { rig.idle() }
         compose.onNodeWithContentDescription("Send the spoken edit").performClick()
         compose.runOnIdle { rig.idle() }
-        assertEquals("Editing notes…", rig.model.status)
+        assertEquals("Editing notes…", rig.model.status.notesEnglish())
     }
 
     @Test fun `the button is not offered when the Mac cannot edit by voice`() {

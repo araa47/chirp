@@ -9,7 +9,7 @@ import okhttp3.HttpUrl
 import java.io.DataInputStream
 
 internal fun allowedServer(base: HttpUrl) = base.isHttps || (base.scheme == "http" && base.host == "10.0.2.2" && base.port in 1024..65535)
-internal fun captureForBuild(context: Context, frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (String?) -> Unit): Capture =
+internal fun captureForBuild(context: Context, frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (DictationStatus?) -> Unit): Capture =
     if (context.getSharedPreferences("debug_capture", 0).getBoolean("synthetic", false))
         PcmCapture(frame, level, done, SyntheticPcmInput(context, repetitions =
             context.getSharedPreferences("debug_capture", 0).getInt("dictation_repeats", 1).coerceIn(1, 3), asset =

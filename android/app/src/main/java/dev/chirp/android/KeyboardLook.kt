@@ -1,5 +1,6 @@
 package dev.chirp.android
 
+import androidx.annotation.StringRes
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
@@ -41,17 +42,17 @@ internal const val SAMSUNG_DARK = "Samsung-like dark"
 private const val LOOK_SEEDED = "chirp_keyboard_look_v1"
 
 /** Chirp's keyboard looks, expressed purely as HeliBoard theme preferences. */
-internal enum class KeyboardLook(val label: String, val description: String, val style: String,
+internal enum class KeyboardLook(@StringRes val label: Int, @StringRes val description: Int, val style: String,
                                  val borders: Boolean, val day: String, val night: String) {
-    GBOARD("Gboard-like", "Material You colours from your wallpaper, rounded keys with gaps, tinted function keys",
+    GBOARD(R.string.look_gboard, R.string.look_gboard_description,
         KeyboardTheme.STYLE_ROUNDED, true, KeyboardTheme.THEME_DYNAMIC, KeyboardTheme.THEME_DYNAMIC),
-    SAMSUNG("Samsung-like", "One UI-style neutral keys, grey function keys and a blue accent",
+    SAMSUNG(R.string.look_samsung, R.string.look_samsung_description,
         KeyboardTheme.STYLE_ROUNDED, true, SAMSUNG_LIGHT, SAMSUNG_DARK),
-    HELIBOARD("HeliBoard classic", "HeliBoard's original flat Material look",
+    HELIBOARD(R.string.look_heliboard, R.string.look_heliboard_description,
         KeyboardTheme.STYLE_MATERIAL, false, KeyboardTheme.THEME_LIGHT, KeyboardTheme.THEME_DARK),
-    HELIBOARD_ROUNDED("HeliBoard rounded", "HeliBoard's rounded keys with its light and dark colours",
+    HELIBOARD_ROUNDED(R.string.look_heliboard_rounded, R.string.look_heliboard_rounded_description,
         KeyboardTheme.STYLE_ROUNDED, true, KeyboardTheme.THEME_LIGHT, KeyboardTheme.THEME_DARK),
-    HELIBOARD_HOLO("HeliBoard Holo", "HeliBoard's Holo style",
+    HELIBOARD_HOLO(R.string.look_heliboard_holo, R.string.look_heliboard_holo_description,
         KeyboardTheme.STYLE_HOLO, false, KeyboardTheme.THEME_HOLO_WHITE, KeyboardTheme.THEME_HOLO_WHITE);
 
     companion object {
@@ -222,8 +223,8 @@ internal fun KeyboardLookChooser() {
                 RadioButton(selected == look, onClick = null)
                 LookPreview(look, night)
                 Column(Modifier.weight(1f)) {
-                    Text(if (look == KeyboardLook.DEFAULT) stringResource(R.string.look_default, look.label) else look.label, style = MaterialTheme.typography.bodyLarge)
-                    Text(look.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (look == KeyboardLook.DEFAULT) stringResource(R.string.look_default, stringResource(look.label)) else stringResource(look.label), style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(look.description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

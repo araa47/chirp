@@ -38,12 +38,12 @@ internal fun View.systemInsets() {
     }
     ViewCompat.requestApplyInsets(this)
 }
-internal fun correctionLabel(health: Health?): String = when {
-    health?.correctionLeavesMachine == true -> "Sends text to ${health.correctionHost ?: "external host (unavailable)"}"
-    else -> "On your computer"
+internal fun correctionLabel(health: Health?): UiText = when {
+    health?.correctionLeavesMachine == true -> UiText.Res(R.string.options_cleanup_host, health.correctionHost ?: UiText.Res(R.string.options_cleanup_host_unavailable))
+    else -> UiText.Res(R.string.options_cleanup_local)
 }
 
 internal fun Health?.cleanupAvailable() = this?.let { it.correctionAvailable && (!it.correctionLeavesMachine || it.correctionHost != null) } == true
-internal fun cleanupDescription(health: Health?) = if (health?.correctionLeavesMachine == true)
-    "When enabled, sends text to ${health.correctionHost ?: "the external host"} for clean-up"
-    else "Polishes punctuation and filler words on your computer; text never leaves it"
+internal fun cleanupDescription(health: Health?): UiText = if (health?.correctionLeavesMachine == true)
+    UiText.Res(R.string.cleanup_description_host, health.correctionHost ?: UiText.Res(R.string.cleanup_description_external_host))
+    else UiText.Res(R.string.cleanup_description_computer)

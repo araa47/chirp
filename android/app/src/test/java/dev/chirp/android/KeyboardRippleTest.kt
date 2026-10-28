@@ -20,7 +20,7 @@ class KeyboardRippleTest {
         val app = RuntimeEnvironment.getApplication()
         Settings.Global.putFloat(app.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 0f)
         val strip = KeyboardStrip(ContextThemeWrapper(app, R.style.Theme_Chirp))
-        strip.show("Listening…", "", true, false, false, false)
+        strip.show(statusOf("Listening…"), "", true, false, false, false)
         strip.level(.5)
         val meter = (0 until strip.childCount).map(strip::getChildAt).single { it.contentDescription == "Microphone level" }
         meter.layout(0, 0, 72, 48)

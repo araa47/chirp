@@ -41,7 +41,7 @@ class SetupActivityTest {
     private lateinit var controller: ActivityController<TestSetup>
     private lateinit var activity: TestSetup
     private val syntheticLink = "chirp://pair?url=https%3A%2F%2Fmac.example.test%2Fchirp&token=synthetic%2Btoken%3D"
-    private fun shows(text: String) = activity.state.status.contains(text)
+    private fun shows(text: String) = activity.state.status.resolve(activity.resources).contains(text)
     private fun scan() = activity.scan()
     @Before fun setUp() {
         controller = Robolectric.buildActivity(TestSetup::class.java).setup()

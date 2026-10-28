@@ -18,7 +18,7 @@ internal class QuickDictateModel(
     context: Context,
     private val store: SettingsStore = SettingsStore(context),
     private val history: DictationHistory = DictationHistory(context),
-    private val captureFactory: (Context, (ByteArray) -> Boolean, (Double) -> Unit, (String?) -> Unit) -> Capture = ::captureForBuild,
+    private val captureFactory: (Context, (ByteArray) -> Boolean, (Double) -> Unit, (DictationStatus?) -> Unit) -> Capture = ::captureForBuild,
     private val transportFactory: (OkHttpClient, Pairing, (ServerEvent) -> Unit, () -> Unit) -> ImeTransport = { client, pairing, event, failure ->
         val main = Handler(Looper.getMainLooper())
         StreamTransport(client, pairing, dispatch = { callback -> main.post { callback() } }, event = event, failure = failure)
@@ -32,7 +32,7 @@ internal class QuickDictateModel(
     private var client: OkHttpClient? = null
     private var stream: DictationStream? = null
     private var privateUtterance = false
-    var status by mutableStateOf("Connecting to your computer…")
+    var status by mutableStateOf<DictationStatus>(StatusLine.CONNECTING)
         internal set
     var partial by mutableStateOf("")
         private set
@@ -66,8 +66,8 @@ internal class QuickDictateModel(
     fun start() {
         if (active || copied) return
         errorCode = null
-        if (!micGranted()) { fail("Allow microphone in Chirp settings", RecognizerIntent.RESULT_AUDIO_ERROR); return }
-        val paired = pairing() ?: run { fail("Pair your computer in Chirp settings", RecognizerIntent.RESULT_SERVER_ERROR); return }
+        if (!micGranted()) { fail(StatusLine.ALLOW_MICROPHONE, RecognizerIntent.RESULT_AUDIO_ERROR); return }
+        val paired = pairing() ?: run { fail(StatusLine.NOT_PAIRED, RecognizerIntent.RESULT_SERVER_ERROR); return }
         privateUtterance = PrivateSession.enabled
         partial = ""; stable = ""
         val http = client ?: ChirpNetwork.client(app).also { client = it }
@@ -76,9 +76,9 @@ internal class QuickDictateModel(
             transportFactory = { event, failure -> transportFactory(http, paired, event, failure) },
             captureFactory = { frame, meter, done -> captureFactory(app, frame, meter, done) },
             changed = { message, event ->
-                status = if (message.startsWith("Computer unreachable") && TailscaleControl.routes(paired.base)) when {
-                    !tailscale.installed() -> DictationAction.TAILSCALE_MISSING
-                    !tailscale.connected() -> DictationAction.TAILSCALE_OFF
+                status = if (message == ConnectionFailure.Kind.OTHER && TailscaleControl.routes(paired.base)) when {
+                    !tailscale.installed() -> StatusLine.TAILSCALE_MISSING
+                    !tailscale.connected() -> StatusLine.TAILSCALE_OFF
                     else -> message
                 } else message
                 if (event != null) { partial = event.text; stable = event.stable }
@@ -87,7 +87,7 @@ internal class QuickDictateModel(
             level = { level = it }, retention = { retained = it },
             final = { result ->
                 text = if (!privateUtterance && LearnedStore(app).allowed) learnedPayload.apply(result.text) else result.text; raw = result.raw.takeIf { result.corrected && it != result.text }
-                status = "Copied — paste anywhere"
+                status = StatusLine.COPIED_PASTE
                 closeAt = android.os.SystemClock.elapsedRealtime() + 4_000
                 val label = appLabel
                 val original = raw
@@ -113,7 +113,7 @@ internal class QuickDictateModel(
             }
         }
     }
-    private fun fail(message: String, code: Int) { status = message; errorCode = code }
+    private fun fail(message: DictationStatus, code: Int) { status = message; errorCode = code }
     fun stop() { if (waitingForLearn) { stopBeforeLearn = true; stopping = true } else { stream?.stop(); sync() } }
     /** Every departure cancels, including a final still being polished. */
     fun cancel() {
@@ -127,9 +127,11 @@ internal class QuickDictateModel(
         client?.let(ChirpNetwork::dispose); client = null
     }
     companion object {
-        fun errorFor(status: String): Int = when {
-            status.startsWith("Microphone") || status.startsWith("Allow microphone") || status == "Didn't catch that" -> RecognizerIntent.RESULT_AUDIO_ERROR
-            ConnectionFailure.kind(status) != null || status.startsWith("Computer unreachable") || status.startsWith("Connection too slow") || status.startsWith("Tailscale") -> RecognizerIntent.RESULT_NETWORK_ERROR
+        fun errorFor(status: DictationStatus): Int = when (status) {
+            StatusLine.ALLOW_MICROPHONE, StatusLine.MICROPHONE_NEEDED, StatusLine.MICROPHONE_UNAVAILABLE, StatusLine.MICROPHONE_BLOCKED,
+            StatusLine.NO_SPEECH -> RecognizerIntent.RESULT_AUDIO_ERROR
+            is ConnectionFailure.Kind, StatusLine.CONNECTION_SLOW, StatusLine.TAILSCALE_OFF, StatusLine.TAILSCALE_STALLED,
+            StatusLine.TAILSCALE_MISSING, StatusLine.TAILSCALE_CONNECTED -> RecognizerIntent.RESULT_NETWORK_ERROR
             else -> RecognizerIntent.RESULT_SERVER_ERROR
         }
     }

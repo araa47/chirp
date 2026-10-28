@@ -11,7 +11,10 @@ import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class ConnectionFailureTest {
     private fun kind(t: Throwable?) = ConnectionFailure.classify(t)
 
@@ -34,25 +37,24 @@ class ConnectionFailureTest {
         assertEquals(setOf(ConnectionFailure.Kind.DNS, ConnectionFailure.Kind.DOWN), ConnectionFailure.Kind.entries.filter { it.offline }.toSet())
     }
     @Test fun `statuses are hedged, distinct and round-trip`() {
-        val statuses = ConnectionFailure.Kind.entries.map { it.status }
+        val statuses = ConnectionFailure.Kind.entries.map { it.english() }
         assertEquals(statuses.size, statuses.toSet().size)
-        assertEquals("Computer may be asleep, or Chirp isn't running", ConnectionFailure.Kind.DOWN.status)
-        assertTrue(ConnectionFailure.Kind.DNS.status.startsWith("Can't find your computer on the tailnet"))
-        ConnectionFailure.Kind.entries.forEach { assertEquals(it, ConnectionFailure.kind(it.status)) }
-        assertNull(ConnectionFailure.kind("Didn't catch that"))
-        assertEquals(ConnectionFailure.Kind.DNS.status, ConnectionFailure.status(ConnectionFailure.Kind.DNS, timedOut = true))
-        assertEquals(ConnectionFailure.Kind.DOWN.status, ConnectionFailure.status(null, timedOut = true))
-        assertEquals(ConnectionFailure.Kind.DOWN.status, ConnectionFailure.status(ConnectionFailure.Kind.OTHER, timedOut = true))
-        assertEquals(ConnectionFailure.Kind.OTHER.status, ConnectionFailure.status(ConnectionFailure.Kind.OTHER))
+        assertEquals("Computer may be asleep, or Chirp isn't running", ConnectionFailure.Kind.DOWN.english())
+        assertTrue(ConnectionFailure.Kind.DNS.english().startsWith("Can't find your computer on the tailnet"))
+        ConnectionFailure.Kind.entries.forEach { assertEquals(it, statusOf(it.english())) }
+        assertEquals(ConnectionFailure.Kind.DNS, ConnectionFailure.status(ConnectionFailure.Kind.DNS, timedOut = true))
+        assertEquals(ConnectionFailure.Kind.DOWN, ConnectionFailure.status(null, timedOut = true))
+        assertEquals(ConnectionFailure.Kind.DOWN, ConnectionFailure.status(ConnectionFailure.Kind.OTHER, timedOut = true))
+        assertEquals(ConnectionFailure.Kind.OTHER, ConnectionFailure.status(ConnectionFailure.Kind.OTHER))
     }
     @Test fun `connection statuses offer Check Tailscale except TLS and keep the existing actions`() {
-        assertEquals(DictationAction.NETWORK, DictationAction.forStatus(ConnectionFailure.Kind.DNS.status))
-        assertEquals(DictationAction.NETWORK, DictationAction.forStatus(ConnectionFailure.Kind.DOWN.status))
-        assertEquals(DictationAction.NETWORK, DictationAction.forStatus(ConnectionFailure.Kind.OTHER.status))
-        assertNull(DictationAction.forStatus(ConnectionFailure.Kind.TLS.status))
-        assertNull(DictationAction.forStatus(ConnectionFailure.OFFLINE))
-        assertEquals(DictationAction.PAIR, DictationAction.forStatus("Pairing refused — pair again in Chirp settings"))
-        assertEquals(DictationAction.TAILSCALE_ON, DictationAction.forStatus(DictationAction.TAILSCALE_OFF))
+        assertEquals(DictationAction.NETWORK, ConnectionFailure.Kind.DNS.action)
+        assertEquals(DictationAction.NETWORK, ConnectionFailure.Kind.DOWN.action)
+        assertEquals(DictationAction.NETWORK, ConnectionFailure.Kind.OTHER.action)
+        assertNull(ConnectionFailure.Kind.TLS.action)
+        assertNull(StatusLine.OFFLINE.action)
+        assertEquals(DictationAction.PAIR, statusOf("Pairing refused — pair again in Chirp settings").action)
+        assertEquals(DictationAction.TAILSCALE_ON, statusOf("Tailscale is off").action)
     }
     @Test fun `offline state lasts 30 seconds and clears on reachability`() {
         var now = 1000L

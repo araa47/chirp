@@ -27,9 +27,9 @@ class RollingDictationTest {
         val session: RollingDictation = RollingDictation(
             transportFactory = { event, failure -> ChirpImeServiceTest.FakeTransport(event, failure, order).also { transports += it } },
             captureFactory = { frame, _, done -> ChirpImeServiceTest.FakeCapture(frame, done, order).also { capture = it } },
-            changed = { status, partial -> statuses += status; if (partial != null) partials += partial.text },
+            changed = { status, partial -> statuses += status.english(); if (partial != null) partials += partial.text },
             level = {}, retention = {}, final = { landed += "final:${it.text}"; lasts += session.landingLast }, ended = { ended++ },
-            kept = if (kept) { heard, reason -> landed += "kept:$heard:$reason" } else null,
+            kept = if (kept) { heard, reason -> landed += "kept:$heard:${reason.english()}" } else null,
             next = { nexts++; landed += "next" },
         )
         fun advance(ms: Long = 0) { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms)) }
@@ -113,7 +113,7 @@ class RollingDictationTest {
         val session = RollingDictation(
             transportFactory = { event, failure -> ChirpImeServiceTest.FakeTransport(event, failure, h.order).also { h.transports += it } },
             captureFactory = { frame, _, done -> ChirpImeServiceTest.FakeCapture(frame, done, h.order).also { h.capture = it } },
-            changed = { status, _ -> h.statuses += status }, level = {}, retention = {}, final = { h.landed += it.text }, ended = { h.ended++ },
+            changed = { status, _ -> h.statuses += status.english() }, level = {}, retention = {}, final = { h.landed += it.text }, ended = { h.ended++ },
             correcting = { raws += it.raw },
         )
         session.start(true); h.transports[0].ready(); h.rollOver(); h.transports[1].ready()
@@ -178,7 +178,7 @@ class RollingDictationTest {
         h.speak(DictationSegmenter.MIN_SEGMENT); h.session.stop(); h.speak(1.0, loud = false); h.advance()
         assertEquals(1, h.transports.size)
         val mic = Harness(); mic.session.start(false); mic.transports[0].ready(); mic.transports[0].partial(1, "heard")
-        mic.capture.finish("Microphone unavailable"); mic.advance()
+        mic.capture.finish(statusOf("Microphone unavailable")); mic.advance()
         assertEquals(listOf("kept:heard:Microphone unavailable"), mic.landed); assertEquals(1, mic.ended)
     }
 }

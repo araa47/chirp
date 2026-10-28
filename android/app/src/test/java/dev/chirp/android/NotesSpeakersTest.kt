@@ -267,7 +267,8 @@ class NotesSpeakersTest {
         val rig = ModelRig(speakersMac)
         rig.answer = null
         rig.model.activate(); rig.idle()
-        assertTrue(rig.model.retryable); assertEquals("Couldn’t download the speaker model.", rig.model.status)
+        assertTrue(rig.model.retryable); assertEquals(SpeakerModelNotice.DownloadFailed, rig.model.status)
+        assertEquals("Couldn’t download the speaker model.", rig.model.status!!.ui.notesEnglish())
         rig.latest = speakersMac; rig.model.refresh(); rig.idle()
         assertTrue(rig.model.retryable) // A health refresh never hides a failed POST.
         rig.latest = null
@@ -318,7 +319,8 @@ class NotesSpeakersTest {
         rig.model.activate(); rig.idle()
         assertTrue(rig.requests.isEmpty()); assertTrue(rig.model.retryable)
         rig.model.retry(); rig.idle()
-        assertEquals("Getting the speaker model ready (27 MB, once)…", rig.model.status)
+        assertEquals(SpeakerModelNotice.Preparing(27), rig.model.status)
+        assertEquals("Getting the speaker model ready (27 MB, once)…", rig.model.status!!.ui.notesEnglish())
         rig.latest = speakersMac.copy(speakersModel = "ready")
         rig.model.refresh(); rig.idle()
         assertEquals("ready", rig.store.health?.speakersModel); assertTrue(rig.model.ready)

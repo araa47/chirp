@@ -4,6 +4,7 @@ import android.content.Context
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.LayoutType
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -12,6 +13,8 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class KeyboardLayoutDefaultsTest {
     private val key = Settings.PREF_LAYOUT_PREFIX + LayoutType.FUNCTIONAL.name
+    // HeliBoard's Settings is a process-wide singleton; don't depend on an earlier test having set it up.
+    @Before fun setUp() { Settings.init(RuntimeEnvironment.getApplication()) }
 
     @Test fun `existing installs and fresh installs get phone function keys once`() {
         val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("layout-defaults", Context.MODE_PRIVATE)

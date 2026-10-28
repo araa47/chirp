@@ -73,7 +73,7 @@ internal object NotesSessionHolder : ViewModelStoreOwner {
 /** What a screen hosting [NotesScreen] needs from its activity: permission prompts, the save picker, copy, share and fix actions. */
 internal class NotesHost(private val activity: ComponentActivity, private val tailscale: () -> TailscaleControl, private val model: () -> NotesModel) {
     private val micPermission = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) recordWith(pendingRecord ?: { model().start() }) else model().message = "Microphone permission is needed to take notes — open mic settings"
+        if (granted) recordWith(pendingRecord ?: { model().start() }) else model().message = NotesStatus.MICROPHONE_PERMISSION
     }
     /** Optional: without it the recording still runs, only its notification (with Stop) stays hidden. */
     private val notificationPermission = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { val action = pendingRecord; pendingRecord = null; action?.invoke() }
@@ -110,7 +110,7 @@ internal class NotesHost(private val activity: ComponentActivity, private val ta
             putBoolean(if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE else "android.content.extra.IS_SENSITIVE", true)
         }
         activity.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip)
-        model.message = "Copied as Markdown"
+        model.message = NotesStatus.COPIED
     }
     fun share() = share(model())
     fun share(model: NotesModel) {
@@ -122,7 +122,7 @@ internal class NotesHost(private val activity: ComponentActivity, private val ta
     fun save(model: NotesModel) {
         if (!model.hasContent) return
         exportModel = model
-        try { saveFile.launch(model.document.fileName()) } catch (_: android.content.ActivityNotFoundException) { model.message = "No app to save files — use Share" }
+        try { saveFile.launch(model.document.fileName()) } catch (_: android.content.ActivityNotFoundException) { model.message = NotesStatus.NO_SAVE_APP }
     }
     fun write(uri: Uri) {
         val note = exportModel ?: model(); exportModel = null
@@ -137,7 +137,7 @@ internal class NotesHost(private val activity: ComponentActivity, private val ta
             DictationAction.MICROPHONE -> activity.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)))
             DictationAction.NETWORK, DictationAction.TAILSCALE_OPEN -> if (!tailscale.open()) setup("network")
             DictationAction.TAILSCALE_SETUP -> setup("network")
-            DictationAction.TAILSCALE_ON -> if (tailscale.connect()) model().message = "Connecting Tailscale…" else if (!tailscale.open()) setup("network")
+            DictationAction.TAILSCALE_ON -> if (tailscale.connect()) model().message = NotesStatus.CONNECTING_TAILSCALE else if (!tailscale.open()) setup("network")
         }
     }
 }

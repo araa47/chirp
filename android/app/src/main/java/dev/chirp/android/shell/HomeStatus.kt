@@ -1,11 +1,14 @@
 package dev.chirp.android.shell
 
+import androidx.annotation.StringRes
+import dev.chirp.android.R
 
-internal enum class SetupNeed(val title: String, val action: String, val section: String) {
-    Pair("Pair your computer", "Pair computer", "pair"),
-    Microphone("Allow the microphone", "Allow", "microphone"),
-    Keyboard("Turn on Chirp Keyboard", "Set up", "input"),
-    FloatingMic("Turn on the floating mic", "Set up", "input"),
+/** [next] reads after "Next: " (lower-case start); [action] is the card's button. */
+internal enum class SetupNeed(@StringRes val next: Int, @StringRes val action: Int, val section: String) {
+    Pair(R.string.setup_next_pair, R.string.setup_action_pair, "pair"),
+    Microphone(R.string.setup_next_microphone, R.string.setup_action_allow, "microphone"),
+    Keyboard(R.string.setup_next_keyboard, R.string.setup_action_set_up, "input"),
+    FloatingMic(R.string.setup_next_floating_mic, R.string.setup_action_set_up, "input"),
 }
 
 internal data class SetupProgress(val missing: SetupNeed?, val done: Int)
@@ -20,13 +23,15 @@ internal fun setupProgress(paired: Boolean, mic: Boolean, keyboard: Boolean, sel
 }
 
 /** The one fix Home's connection card offers. */
-internal enum class HomeFix(val label: String) { Pair("Pair computer"), Microphone("Allow"), TailscaleOn("Turn on"), Retry("Check again") }
+internal enum class HomeFix(@StringRes val label: Int) {
+    Pair(R.string.setup_action_pair), Microphone(R.string.setup_action_allow), TailscaleOn(R.string.setup_action_turn_on), Retry(R.string.setup_action_check_again)
+}
 
 /** Compact status for the Notes top bar. Setup help belongs in Settings → Connection. */
-internal data class NotesConnectionStatus(val label: String, val connected: Boolean)
+internal data class NotesConnectionStatus(@StringRes val label: Int, val connected: Boolean)
 
 internal fun notesConnectionStatus(paired: Boolean, reachable: Boolean?, tailscaleOff: Boolean, phone: Boolean) = when {
-    paired && reachable != false && !tailscaleOff -> NotesConnectionStatus("Computer", true)
-    !paired && phone -> NotesConnectionStatus("Phone", false)
-    else -> NotesConnectionStatus("Offline", false)
+    paired && reachable != false && !tailscaleOff -> NotesConnectionStatus(R.string.notes_connection_computer, true)
+    !paired && phone -> NotesConnectionStatus(R.string.notes_connection_phone, false)
+    else -> NotesConnectionStatus(R.string.notes_connection_offline, false)
 }

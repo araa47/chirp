@@ -122,7 +122,7 @@ class HistoryKeyboardTest {
 
     @Test fun `cancelled empty and incognito dictations are never recorded`() {
         store.enable()
-        tap(); stream.ready(); stream.partial(); advance(16); voice.cancel("Cancelled")
+        tap(); stream.ready(); stream.partial(); advance(16); voice.cancel(StatusLine.CANCELLED)
         dictate("", "")
         host.info.imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
         dictate()

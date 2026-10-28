@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @SuppressLint("SetTextI18n")
-open class LegacyVoiceImeService : InputMethodService() {
+internal open class LegacyVoiceImeService : InputMethodService() {
     private enum class Phase { IDLE, CONNECTING, RECORDING, FINALIZING }
     private val handler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -171,7 +171,7 @@ open class LegacyVoiceImeService : InputMethodService() {
             done = { error -> handler.post {
                 if (generation == id) {
                     capture = null
-                    if (error != null) cancelSession(error) else finishAudio(id)
+                    if (error != null) cancelSession(error.resolve(resources)) else finishAudio(id)
                 }
             } })
         capture?.start(); haptic(); render()
@@ -273,10 +273,10 @@ open class LegacyVoiceImeService : InputMethodService() {
         audioFinished = false; streamReady = false; stopSent = false
         render()
     }
-    protected open fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit,
-                                     done: (String?) -> Unit): Capture = PcmCapture(frame, level, done)
+    internal open fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit,
+                                     done: (DictationStatus?) -> Unit): Capture = PcmCapture(frame, level, done)
 
-    protected open fun createTransport(paired: Pairing, event: (ServerEvent) -> Unit,
+    internal open fun createTransport(paired: Pairing, event: (ServerEvent) -> Unit,
                                       failure: () -> Unit): ImeTransport = StreamTransport(client, paired,
         dispatch = { callback -> handler.post { callback() } }, event = event, failure = failure)
 
@@ -366,7 +366,7 @@ open class LegacyVoiceImeService : InputMethodService() {
         panel.show(status, partial, stable, phase != Phase.IDLE, phase == Phase.FINALIZING)
         if (partial.isEmpty()) strip.text = status
         banner.retention(retained || store.health?.debugRetention == true)
-        correction.text = correctionLabel(store.health)
+        correction.text = correctionLabel(store.health).resolve(resources)
         correction.isEnabled = phase == Phase.IDLE && store.health?.let {
             it.correctionAvailable && (!it.correctionLeavesMachine || it.correctionHost != null)
         } == true

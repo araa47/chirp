@@ -80,17 +80,17 @@ class BubblePlacementTest {
         assertEquals(setOf("bubble_edge_cover-portrait", "bubble_y_cover-portrait", "bubble_edge_inner-portrait", "bubble_y_inner-portrait"), keys)
     }
     @Test fun `each error maps to exactly one fix and server text never chooses one`() {
-        assertEquals(BubbleFix.PAIR, BubbleFix.forStatus(BubbleFix.NOT_PAIRED))
-        assertEquals(BubbleFix.PAIR, BubbleFix.forStatus("Pairing refused — pair again in Chirp settings"))
-        assertEquals(BubbleFix.MICROPHONE, BubbleFix.forStatus(BubbleFix.NO_MICROPHONE))
-        assertEquals("Allow", BubbleFix.MICROPHONE.label)
-        assertEquals(BubbleFix.QUICK_DICTATE, BubbleFix.forStatus(BubbleFix.BLOCKED))
-        assertEquals(BubbleFix.TAILSCALE_ON, BubbleFix.forStatus(DictationAction.TAILSCALE_OFF))
-        ConnectionFailure.Kind.entries.forEach { assertEquals(BubbleFix.CHECK_AGAIN, BubbleFix.forStatus(it.status)) }
-        assertEquals(BubbleFix.CHECK_AGAIN, BubbleFix.forStatus("Chirp server took too long — try again"))
-        assertEquals(BubbleFix.TRY_AGAIN, BubbleFix.forStatus("Didn't catch that"))
-        assertEquals(BubbleFix.TRY_AGAIN, BubbleFix.forStatus("Chirp server is busy — try again"))
-        assertNull(BubbleFix.forStatus("Listening…"))
-        assertNull(PanelModel(FloatingState.LISTENING, status = BubbleFix.NOT_PAIRED).fix)
+        assertEquals(BubbleFix.PAIR, BubbleFix.forStatus(statusOf("Pair your computer to dictate")))
+        assertEquals(BubbleFix.PAIR, BubbleFix.forStatus(statusOf("Pairing refused — pair again in Chirp settings")))
+        assertEquals(BubbleFix.MICROPHONE, BubbleFix.forStatus(statusOf("Allow the microphone for Chirp")))
+        assertEquals("Allow", english.getString(BubbleFix.MICROPHONE.label))
+        assertEquals(BubbleFix.QUICK_DICTATE, BubbleFix.forStatus(statusOf("Android blocked the microphone here")))
+        assertEquals(BubbleFix.TAILSCALE_ON, BubbleFix.forStatus(statusOf("Tailscale is off")))
+        ConnectionFailure.Kind.entries.forEach { assertEquals(BubbleFix.CHECK_AGAIN, BubbleFix.forStatus(it)) }
+        assertEquals(BubbleFix.CHECK_AGAIN, BubbleFix.forStatus(statusOf("Chirp server took too long — try again")))
+        assertEquals(BubbleFix.TRY_AGAIN, BubbleFix.forStatus(statusOf("Didn't catch that")))
+        assertEquals(BubbleFix.TRY_AGAIN, BubbleFix.forStatus(statusOf("Chirp server is busy — try again")))
+        assertNull(BubbleFix.forStatus(statusOf("Listening…")))
+        assertNull(PanelModel(FloatingState.LISTENING, status = StatusLine.BUBBLE_NOT_PAIRED).fix)
     }
 }

@@ -1,5 +1,6 @@
 package dev.chirp.android
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -21,8 +22,35 @@ internal object RetranscribeGate {
 }
 
 internal data class RetranscribeProgress(val noteId: String, val done: Int, val total: Int, val seconds: Double, val duration: Double, val waiting: Boolean = false) {
-    val label get() = if (waiting) "Waiting for your computer…" else "Re-transcribing · $done of $total · ${clock(seconds)} of ${clock(duration)}"
-    private fun clock(value: Double) = "${value.toInt() / 60}:${(value.toInt() % 60).toString().padStart(2, '0')}"
+    val label: UiText get() = if (waiting) UiText.Res(R.string.notes_status_rt_waiting)
+        else UiText.Res(R.string.notes_status_rt_progress, done, total, clock(seconds), clock(duration))
+    private fun clock(value: Double) = UiText.Res(R.string.notes_status_clock_short, value.toInt() / 60, value.toInt() % 60)
+}
+
+/** What the banner says when a re-transcribe, a restore or a rebuild ended; [restorable] offers Undo for the transcript. */
+internal sealed interface RetranscribeNotice {
+    val ui: UiText
+    /** The transcript now holds new text, so the previous one can be restored. */
+    val restorable get() = false
+
+    data object Updated : RetranscribeNotice { override val ui = UiText.Res(R.string.notes_status_rt_updated); override val restorable = true }
+    data object Cancelled : RetranscribeNotice { override val ui = UiText.Res(R.string.notes_status_rt_cancelled) }
+    data object NoneUpdated : RetranscribeNotice { override val ui = UiText.Res(R.string.notes_status_rt_none) }
+    data object RebuildFailed : RetranscribeNotice { override val ui = UiText.Res(R.string.notes_status_rt_rebuild_failed); override val restorable = true }
+    data class Partial(val updated: Int, val total: Int) : RetranscribeNotice {
+        override val ui get() = UiText.Plural(R.plurals.notes_status_rt_partial, total - updated, listOf(updated, total, total - updated))
+        override val restorable get() = true
+    }
+    data object Restored : RetranscribeNotice { override val ui = UiText.Res(R.string.notes_status_rt_restored) }
+    /** The notes were rebuilt from the new transcript; Undo takes the rebuild back. */
+    data object Rebuilt : RetranscribeNotice { override val ui = UiText.Res(R.string.notes_status_rt_rebuilt) }
+    data object Interrupted : RetranscribeNotice { override val ui = UiText.Res(R.string.notes_status_rt_interrupted) }
+}
+
+/** Why a re-transcribe changed nothing. */
+internal enum class RetranscribeFailure(@StringRes id: Int) {
+    FAILED(R.string.notes_status_rt_failed), TRANSCRIPT_CHANGED(R.string.notes_status_rt_transcript_changed), NOTE_CHANGED(R.string.notes_status_rt_note_changed);
+    val ui = UiText.Res(id)
 }
 
 internal class RetranscribeError(val code: String) : Exception(code)

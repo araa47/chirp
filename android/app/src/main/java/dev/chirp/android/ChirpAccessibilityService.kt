@@ -62,7 +62,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
     private var pendingStop = false
     private var surface = Surface.BUBBLE
     private var state = FloatingState.IDLE
-    private var status = ""
+    private var status: DictationStatus? = null
     private var partial = ""
     private var stable = ""
     /** Ready to copy, or what was heard before an error: memory only, cleared on Done, Hide, screen off or after 2 minutes. */
@@ -218,7 +218,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
         handler.removeCallbacks(insertedDone)
         overlay?.closePanel(); overlay?.leaveHold()
         surface = Surface.BUBBLE
-        if (!dictating) { state = FloatingState.IDLE; status = ""; partial = ""; stable = ""; polishing = false }
+        if (!dictating) { state = FloatingState.IDLE; status = null; partial = ""; stable = ""; polishing = false }
     }
 
     // ---- Bubble gestures (FloatingMicOverlay.Host) -----------------------------------------------------------
@@ -286,15 +286,15 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
         val eligibility = FocusedInsertion.eligibility(focused)
         if (eligibility == FocusedInsertion.Eligibility.NONE) { collapse(); return }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            fail(BubbleFix.NO_MICROPHONE); return
+            fail(StatusLine.BUBBLE_NO_MICROPHONE); return
         }
-        val paired = loadPairing() ?: run { fail(BubbleFix.NOT_PAIRED); return }
+        val paired = loadPairing() ?: run { fail(StatusLine.BUBBLE_NOT_PAIRED); return }
         tailscaleProblem(paired)?.let { fail(it); return }
         privateUtterance = PrivateSession.enabled
         historyId = null
         target = FocusedInsertion.from(focused)
         copyMode = target == null
-        partial = ""; stable = ""; polishing = false; level = 0.0; status = ""
+        partial = ""; stable = ""; polishing = false; level = 0.0; status = null
         state = FloatingState.CONNECTING
         pendingStart = true; pendingStop = false
         try {
@@ -303,17 +303,17 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
             ContextCompat.startForegroundService(this, Intent(this, ChirpAccessibilityService::class.java).setAction(START))
         } catch (_: RuntimeException) {
             pendingStart = false; target?.forget(); target = null
-            fail(BubbleFix.BLOCKED); return
+            fail(StatusLine.BUBBLE_BLOCKED); return
         }
         render()
     }
     /** A tailnet pairing with the VPN down can't reach the Mac: say so before opening the mic. */
-    private fun tailscaleProblem(paired: Pairing): String? {
+    private fun tailscaleProblem(paired: Pairing): DictationStatus? {
         if (!TailscaleControl.routes(paired.base)) return null
         val control = tailscale()
         return when {
-            !control.installed() -> DictationAction.TAILSCALE_MISSING
-            !control.connected() -> DictationAction.TAILSCALE_OFF
+            !control.installed() -> StatusLine.TAILSCALE_MISSING
+            !control.connected() -> StatusLine.TAILSCALE_OFF
             else -> null
         }
     }
@@ -363,17 +363,17 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
             haptic()
             if (pendingStop) session.stop()
         } catch (_: RuntimeException) {
-            cancel(); fail(BubbleFix.BLOCKED)
+            cancel(); fail(StatusLine.BUBBLE_BLOCKED)
         }
         return START_NOT_STICKY
     }
-    private fun changed(text: String, event: ServerEvent.Partial?, paired: Pairing) {
+    private fun changed(text: DictationStatus, event: ServerEvent.Partial?, paired: Pairing) {
         if (event != null) { partial = event.text; stable = event.stable }
-        when {
-            text.startsWith("Connecting") -> state = FloatingState.CONNECTING
-            text.startsWith("Listening") -> state = FloatingState.LISTENING
-            text.startsWith("Finishing") -> state = FloatingState.FINISHING
-            text.startsWith("Polishing") -> { state = FloatingState.FINISHING; polishing = true }
+        when (text) {
+            StatusLine.CONNECTING -> state = FloatingState.CONNECTING
+            StatusLine.LISTENING -> state = FloatingState.LISTENING
+            StatusLine.FINISHING -> state = FloatingState.FINISHING
+            StatusLine.POLISHING -> { state = FloatingState.FINISHING; polishing = true }
             else -> {
                 // Errors: an unreachable Mac on a tailnet pairing with the VPN down says so, with Turn on.
                 val offline = BubbleFix.forStatus(text) == BubbleFix.CHECK_AGAIN
@@ -408,7 +408,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
         }
     }
     /** Never lose a final (#167): words that can't go in the field wait in the panel, for Copy or the Scratchpad. */
-    private fun keep(text: String, into: FloatingState, reason: String = "") {
+    private fun keep(text: String, into: FloatingState, reason: DictationStatus? = null) {
         kept = text; state = into; status = reason
         handler.removeCallbacks(keptExpiry); handler.postDelayed(keptExpiry, KEPT_MS)
         if (surface != Surface.PANEL) expand() else render()
@@ -423,7 +423,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
             else -> render()
         }
     }
-    private fun fail(message: String) {
+    private fun fail(message: DictationStatus) {
         state = FloatingState.ERROR; status = message
         if (surface != Surface.PANEL) expand() else render()
     }
@@ -454,7 +454,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
     }
     private fun clearKept() {
         handler.removeCallbacks(keptExpiry); kept = ""
-        if (state == FloatingState.READY_TO_COPY || state == FloatingState.ERROR) { state = FloatingState.IDLE; status = "" }
+        if (state == FloatingState.READY_TO_COPY || state == FloatingState.ERROR) { state = FloatingState.IDLE; status = null }
     }
     private fun useRaw() {
         val text = raw ?: return
@@ -468,7 +468,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
     /** Copy is always a tap, never automatic, and marked sensitive. */
     private fun copyKept() {
         val text = kept.takeIf { it.isNotBlank() } ?: return
-        val clip = ClipData.newPlainText("Chirp dictation", text)
+        val clip = ClipData.newPlainText(getString(R.string.bubble_clip_label), text)
         clip.description.extras = PersistableBundle().apply {
             putBoolean(if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE else "android.content.extra.IS_SENSITIVE", true)
         }
@@ -479,7 +479,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
     private fun fix() {
         fun open(intent: Intent) { cancel(); clearKept(); collapse(); startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         fun setup(section: String) = open(Intent(this, SetupActivity::class.java).putExtra("section", section))
-        when (BubbleFix.forStatus(status)) {
+        when (status?.let(BubbleFix::forStatus)) {
             BubbleFix.PAIR -> setup("pair")
             BubbleFix.MICROPHONE -> open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
             BubbleFix.CHECK_AGAIN, BubbleFix.TRY_AGAIN -> { clearKept(); begin() }
@@ -499,9 +499,9 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
     internal open fun createLearning() = EditLearning(this)
     protected open fun loadPairing(): Pairing? = store.pairing()
     internal open fun tailscale(): TailscaleControl = AndroidTailscale(this)
-    protected open fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (String?) -> Unit): Capture =
+    internal open fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (DictationStatus?) -> Unit): Capture =
         captureForBuild(this, frame, level, done)
-    protected open fun createTransport(client: okhttp3.OkHttpClient, pairing: Pairing, event: (ServerEvent) -> Unit, failure: () -> Unit): ImeTransport =
+    internal open fun createTransport(client: okhttp3.OkHttpClient, pairing: Pairing, event: (ServerEvent) -> Unit, failure: () -> Unit): ImeTransport =
         StreamTransport(client, pairing, dispatch = { callback -> handler.post { callback() } }, event = event, failure = failure)
     private fun haptic() { if (store.haptics) overlay?.bubble?.performHapticFeedback(HapticFeedbackConstants.CONFIRM) }
 

@@ -58,13 +58,13 @@ class StripStatesTest {
         noMotion()
         val strip = strip()
         assertEquals(0, Color.alpha(strip.tintColor))
-        strip.show("Listening…", "", true, false, false, false)
+        strip.show(statusOf("Listening…"), "", true, false, false, false)
         assertEquals(StripKind.LISTENING, strip.stripKind); assertNotEquals(0, Color.alpha(strip.tintColor))
-        strip.show("Inserted · tap mic to dictate again", "", false, false, true, false, notice = true, undoable = true)
+        strip.show(statusOf("Inserted · tap mic to dictate again"), "", false, false, true, false, notice = true, undoable = true)
         assertEquals(StripKind.SUCCESS, strip.stripKind); assertEquals("Finished", strip.status.text.toString())
-        strip.show("Tap mic · hold to talk", "", false, false, false, false)
+        strip.show(statusOf("Tap mic · hold to talk"), "", false, false, false, false)
         assertEquals(StripKind.IDLE, strip.stripKind); assertEquals(0, Color.alpha(strip.tintColor))
-        strip.show(DictationAction.TAILSCALE_OFF, "", false, false, false, false)
+        strip.show(statusOf("Tailscale is off"), "", false, false, false, false)
         assertEquals(StripKind.ERROR, strip.stripKind); assertEquals(View.VISIBLE, strip.action.visibility)
     }
 
@@ -72,18 +72,18 @@ class StripStatesTest {
         noMotion()
         val strip = strip()
         for (state in listOf("Connecting to your computer…" to false, "Listening…" to false, "Polishing…" to true)) {
-            strip.show(state.first, "", true, state.second, false, false, polishing = state.second, style = "Email")
+            strip.show(statusOf(state.first), "", true, state.second, false, false, polishing = state.second, style = "Email")
             assertFalse("${state.first} animating", strip.animating)
         }
-        strip.show("Listening…", "", true, false, false, false)
+        strip.show(statusOf("Listening…"), "", true, false, false, false)
         assertEquals("shape is applied instantly", app.dp(12), strip.mic.cornerRadius)
     }
 
     @Test fun `with animations on the morph runs once and settles on the tint`() {
         val strip = strip()
-        strip.show("Listening…", "", true, false, false, false)
+        strip.show(statusOf("Listening…"), "", true, false, false, false)
         assertTrue(strip.animating)
-        strip.show("Listening…", "", true, false, false, false) // a partial re-render must not restart it
+        strip.show(statusOf("Listening…"), "", true, false, false, false) // a partial re-render must not restart it
         shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(400))
         assertEquals(strip.stripKind, StripKind.LISTENING)
         assertEquals(app.dp(12), strip.mic.cornerRadius)
@@ -96,18 +96,18 @@ class StripStatesTest {
         var now = 0L
         val strip = strip { now }
         assertEquals(View.GONE, strip.timer.visibility)
-        strip.show("Connecting to your computer…", "", true, false, false, false)
+        strip.show(statusOf("Connecting to your computer…"), "", true, false, false, false)
         assertEquals("no timer while connecting", View.GONE, strip.timer.visibility)
-        strip.show("Listening…", "", true, false, false, false)
+        strip.show(statusOf("Listening…"), "", true, false, false, false)
         assertEquals(View.VISIBLE, strip.timer.visibility); assertEquals("0:00", strip.timer.text.toString())
         now = 12_400
         shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
         assertEquals("0:12", strip.timer.text.toString()); assertEquals("12 seconds", strip.timer.contentDescription.toString())
         strip.nextSegment(); assertEquals("0:12 · #2", strip.timer.text.toString()); assertTrue(strip.timer.contentDescription.endsWith("part 2"))
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, strip.timer.importantForAccessibility)
-        strip.show("Tap mic · hold to talk", "", false, false, false, false)
+        strip.show(statusOf("Tap mic · hold to talk"), "", false, false, false, false)
         assertEquals(View.GONE, strip.timer.visibility)
-        now = 99_000; strip.show("Listening…", "", true, false, false, false); assertEquals("0:00", strip.timer.text.toString())
+        now = 99_000; strip.show(statusOf("Listening…"), "", true, false, false, false); assertEquals("0:00", strip.timer.text.toString())
     }
 
     @Test fun `spoken times come from plural resources`() {
@@ -128,14 +128,14 @@ class StripStatesTest {
         noMotion()
         var now = 0L
         val strip = strip { now }
-        strip.show("Listening…", "", true, false, false, false)
+        strip.show(statusOf("Listening…"), "", true, false, false, false)
         now = 5_300; shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
-        strip.show("Finishing…", "", true, true, false, false)
+        strip.show(statusOf("Finishing…"), "", true, true, false, false)
         assertEquals("0:05", strip.timer.text.toString())
         now = 9_000; shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3))
-        strip.show("Finishing…", "", true, true, false, false)
+        strip.show(statusOf("Finishing…"), "", true, true, false, false)
         assertEquals("finishing must not keep counting", "0:05", strip.timer.text.toString())
-        strip.show("Listening…", "", true, false, false, false) // the next segment of a long dictation
+        strip.show(statusOf("Listening…"), "", true, false, false, false) // the next segment of a long dictation
         assertEquals("0:09", strip.timer.text.toString())
     }
 
@@ -143,12 +143,12 @@ class StripStatesTest {
         noMotion()
         var now = 0L
         val before = strip { now }
-        before.show("Listening…", "", true, false, false, false)
+        before.show(statusOf("Listening…"), "", true, false, false, false)
         before.nextSegment()
         now = 42_700
         // Rotation or a fold: HeliBoard replaces the input view and Chirp mounts a new strip.
         val after = strip { now }.apply { continueTimer(before) }
-        after.show("Listening…", "", true, false, false, false)
+        after.show(statusOf("Listening…"), "", true, false, false, false)
         assertEquals("0:42 · #2", after.timer.text.toString())
         // The next tick lands on the second boundary (300 ms away), not a whole second after the rebuild.
         now = 43_000; shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(300))
@@ -162,7 +162,7 @@ class StripStatesTest {
         val strip = KeyboardStrip(ContextThemeWrapper(activity, R.style.Theme_Chirp)) { now }
         val host = android.widget.FrameLayout(activity).also(activity::setContentView)
         host.addView(strip)
-        strip.show("Listening…", "", true, false, false, false)
+        strip.show(statusOf("Listening…"), "", true, false, false, false)
         host.removeView(strip); host.addView(strip)
         now = 3_000; shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
         assertEquals("0:03", strip.timer.text.toString())
@@ -171,10 +171,10 @@ class StripStatesTest {
     @Test fun `near the limit the timer is a warning chip but the one live region is unchanged`() {
         noMotion()
         val strip = strip()
-        strip.show("Listening… · 15 s left", "", true, false, false, false, countdown = true)
+        strip.show(StatusLine.LISTENING, "", true, false, false, false, countdown = true, decorate = { "$it · 15 s left" })
         assertNotNull(strip.timer.compoundDrawablesRelative[0])
         assertEquals(1, descendants(strip).count { it.accessibilityLiveRegion != View.ACCESSIBILITY_LIVE_REGION_NONE })
-        strip.show("Listening…", "", true, false, false, false)
+        strip.show(statusOf("Listening…"), "", true, false, false, false)
         assertEquals(0, descendants(strip).count { it.accessibilityLiveRegion != View.ACCESSIBILITY_LIVE_REGION_NONE })
         assertEquals("Listening…", strip.status.text.toString())
     }
@@ -182,7 +182,7 @@ class StripStatesTest {
     @Test fun `the final shows Undo then Use raw chips and no truncated hint`() {
         noMotion()
         val strip = strip()
-        strip.show("cleaned", "", false, false, true, false, notice = true, undoable = true)
+        strip.show(statusOf("cleaned"), "", false, false, true, false, notice = true, undoable = true)
         assertEquals(View.VISIBLE, strip.raw.visibility); assertEquals(View.VISIBLE, strip.revert.visibility)
         assertTrue(strip.indexOfChild(strip.revert) < strip.indexOfChild(strip.raw))
         assertEquals("Polished", strip.status.text.toString())
@@ -192,7 +192,7 @@ class StripStatesTest {
     @Test fun `debug retention uses the palette error colours not a fixed red`() {
         noMotion()
         val strip = strip()
-        strip.show("Listening…", "", true, false, false, true)
+        strip.show(statusOf("Listening…"), "", true, false, false, true)
         val fill = (strip.status.background as android.graphics.drawable.ColorDrawable).color
         val error = StripColors.of(app).tints.solidError
         assertEquals(error.fill, fill); assertEquals(error.text, strip.status.currentTextColor)

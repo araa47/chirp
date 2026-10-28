@@ -45,6 +45,6 @@ internal class AutoStopDetector(private val silence: Double = DEFAULT_SILENCE) {
         /** Speech is this many times the noise floor. */
         const val SPEECH_RATIO = 3f
         fun nearest(seconds: Double) = if (seconds.isFinite()) CHOICES.minByOrNull { abs(it - seconds) }!! else DEFAULT_SILENCE
-        fun label(seconds: Double) = (if (seconds % 1.0 == 0.0) seconds.toInt().toString() else seconds.toString()) + " s"
+        fun label(seconds: Double) = UiText.Res(R.string.stop_pause_seconds, if (seconds % 1.0 == 0.0) seconds.toInt().toString() else seconds.toString())
     }
 }

@@ -49,7 +49,7 @@ internal fun SavedVoicesContent(model: SavedVoicesModel) {
                 style = MaterialTheme.typography.bodyMedium)
         }
         model.error?.let { message ->
-            SettingsItem { Text(message, color = MaterialTheme.colorScheme.error) }
+            SettingsItem { Text(message.text(), color = MaterialTheme.colorScheme.error) }
         }
         if (model.busy) SettingsItem { Text(stringResource(R.string.saved_voices_updating)) }
         if (library?.voices?.isEmpty() == true) SettingsItem {

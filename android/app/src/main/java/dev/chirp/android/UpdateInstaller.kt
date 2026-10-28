@@ -16,7 +16,7 @@ internal object UpdateInstaller {
     /** Null on success, otherwise a short reason. The archive must be this app at the announced version, so a bad manifest can't loop. */
     fun install(context: Context, apk: File, info: UpdateInfo): String? = try {
         val archive = context.packageManager.getPackageArchiveInfo(apk.path, 0)
-        if (archive?.packageName != context.packageName || archive.longVersionCode != info.versionCode) "Downloaded file is not this app's update"
+        if (archive?.packageName != context.packageName || archive.longVersionCode != info.versionCode) context.getString(R.string.update_wrong_archive)
         else {
             val installer = context.packageManager.packageInstaller
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -33,7 +33,7 @@ internal object UpdateInstaller {
             }
             null
         }
-    } catch (_: Exception) { "Android couldn't start the install" }
+    } catch (_: Exception) { context.getString(R.string.update_install_failed) }
 }
 
 /** Opens Android's confirmation when the installer asks for it. Success replaces this process, so nothing else is needed. */

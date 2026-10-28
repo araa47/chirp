@@ -21,10 +21,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [37])
 class NotesGroupsTest {
     @Test fun `groups use calendar days and include older months and years`() {
         val now = Instant.parse("2026-10-24T00:10:00Z").toEpochMilli()
-        fun group(date: String) = notesGroup(now, Instant.parse(date).toEpochMilli(), ZoneOffset.UTC)
+        fun group(date: String) = notesGroup(now, Instant.parse(date).toEpochMilli(), ZoneOffset.UTC).resolve(RuntimeEnvironment.getApplication().resources)
         assertEquals("Today", group("2026-10-24T00:01:00Z"))
         assertEquals("Yesterday", group("2026-10-23T23:59:00Z"))
         assertEquals("Previous 7 days", group("2026-10-17T12:00:00Z"))
@@ -259,7 +261,7 @@ class NotesLibraryScreenTest {
         assertEquals("Open the recording", node.config[androidx.compose.ui.semantics.SemanticsActions.OnClick].label)
         // One merged node: the title and the frozen preview are announced by the card itself.
         assertTrue(node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].any { "Product conversation" in it.text })
-        assertTrue("elapsed is available when focusing the card", node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].any { live.model.elapsedText in it.text })
+        assertTrue("elapsed is available when focusing the card", node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].any { live.model.elapsedText.notesEnglish() in it.text })
         assertTrue("one focus target", node.children.isEmpty())
         fun quiet(n: androidx.compose.ui.semantics.SemanticsNode) {
             if (androidx.compose.ui.semantics.SemanticsProperties.LiveRegion in n.config)

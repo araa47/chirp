@@ -55,15 +55,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /** Calendar groups, including midnight and month/year boundaries, in the device's time zone. */
-internal fun notesGroup(now: Long, time: Long, zone: ZoneId = ZoneId.systemDefault()): String {
+internal fun notesGroup(now: Long, time: Long, zone: ZoneId = ZoneId.systemDefault()): UiText {
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     val date = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
     return when (ChronoUnit.DAYS.between(date, today)) {
-        in Long.MIN_VALUE..0L -> "Today"
-        1L -> "Yesterday"
-        in 2L..7L -> "Previous 7 days"
-        in 8L..30L -> "Previous 30 days"
-        else -> date.format(DateTimeFormatter.ofPattern(if (date.year == today.year) "MMMM" else "MMMM yyyy"))
+        in Long.MIN_VALUE..0L -> UiText.Res(R.string.notes_library_group_today)
+        1L -> UiText.Res(R.string.notes_library_group_yesterday)
+        in 2L..7L -> UiText.Res(R.string.notes_library_group_week)
+        in 8L..30L -> UiText.Res(R.string.notes_library_group_month)
+        else -> UiText.Raw(date.format(DateTimeFormatter.ofPattern(if (date.year == today.year) "MMMM" else "MMMM yyyy")))
     }
 }
 
@@ -242,7 +242,7 @@ internal fun NotesLibraryScreen(
     val shown = if (trash) rows.filter { it.deleted && (query.isBlank() || it.title.contains(query.trim(), true) || it.snippet.contains(query.trim(), true)) }
         else if (query.isNotBlank()) hits.map { it.entry } else rows.filterNot { it.deleted }
     val currentTime = now()
-    val deletedGroup = stringResource(R.string.notes_library_group_deleted)
+    val deletedGroup = UiText.Res(R.string.notes_library_group_deleted)
     val primaryDescription = stringResource(if (!recording) R.string.notes_library_record_new else if (live.paused) R.string.notes_library_open_paused_recording else R.string.notes_library_open_current_recording)
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Surface(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }, color = MaterialTheme.colorScheme.background) {
@@ -332,7 +332,7 @@ internal fun NotesLibraryScreen(
                                 Modifier.padding(horizontal = 8.dp, vertical = 16.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             val grouped = shown.filterNot { !trash && recording && it.id == liveId }.groupBy { if (trash) deletedGroup else notesGroup(currentTime, it.updatedAt) }
                             grouped.forEach { (group, entries) ->
-                                item(key = "group-$group") { Text(group, Modifier.padding(start = 8.dp, top = 24.dp, bottom = 8.dp).semantics { heading() },
+                                item(key = "group-$group") { Text(group.text(), Modifier.padding(start = 8.dp, top = 24.dp, bottom = 8.dp).semantics { heading() },
                                     style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Serif, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 items(entries, key = { "${if (trash) "trash" else "note"}-${it.id}-$restoreVersion" }) { entry ->
                                     val select = {
@@ -397,7 +397,7 @@ internal fun NotesLibraryScreen(
 @Composable
 private fun ConnectionChip(state: SetupState?, click: () -> Unit) {
     val status = dev.chirp.android.shell.notesConnectionStatus(state?.paired == true, state?.reachable, state?.tailscaleOff == true, SettingsStore(LocalContext.current).phoneFallback)
-    val label = status.label
+    val label = stringResource(status.label)
     val color = if (status.connected) LocalChirpRoles.current.lily else MaterialTheme.colorScheme.onSurfaceVariant
     val description = stringResource(R.string.notes_library_connection, label)
     AssistChip(click, label = { Text(label) }, leadingIcon = { Box(Modifier.size(7.dp).clip(CircleShape).background(color)) },
@@ -411,8 +411,8 @@ private fun SetupCard(progress: dev.chirp.android.shell.SetupProgress, fix: () -
         Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f).padding(top = 8.dp)) {
                 Text(stringResource(R.string.notes_library_setup_title), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.notes_library_setup_next, progress.missing!!.title.replaceFirstChar { it.lowercase() }), Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(fix, contentPadding = PaddingValues(vertical = 8.dp)) { Text(progress.missing!!.action) }
+                Text(stringResource(R.string.notes_library_setup_next, stringResource(progress.missing!!.next)), Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(fix, contentPadding = PaddingValues(vertical = 8.dp)) { Text(stringResource(progress.missing!!.action)) }
             }
             IconButton(dismiss) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.notes_library_setup_dismiss)) }
         }
@@ -457,7 +457,7 @@ private fun RecordingNoteCard(model: NotesModel, click: () -> Unit) {
                 else Ripple(0f, Modifier.size(28.dp).clearAndSetSemantics { }, animate = false)
                 Text(model.displayTitle, Modifier.weight(1f), fontFamily = FontFamily.Serif, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Text(stringResource(R.string.notes_library_recording_state, state, model.elapsedText), style = ChirpTokens.timer,
+            Text(stringResource(R.string.notes_library_recording_state, state, model.elapsedText.text()), style = ChirpTokens.timer,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(preview.ifBlank { stringResource(if (paused) R.string.notes_library_preview_paused else R.string.notes_library_preview_recording) }, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

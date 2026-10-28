@@ -64,7 +64,7 @@ internal class ScratchpadModel(
     context: Context,
     private val store: SettingsStore = SettingsStore(context.applicationContext),
     private val history: DictationHistory = DictationHistory(context.applicationContext),
-    private val captureFactory: (Context, (ByteArray) -> Boolean, (Double) -> Unit, (String?) -> Unit) -> Capture = ::captureForBuild,
+    private val captureFactory: (Context, (ByteArray) -> Boolean, (Double) -> Unit, (DictationStatus?) -> Unit) -> Capture = ::captureForBuild,
     private val transportFactory: (OkHttpClient, Pairing, (ServerEvent) -> Unit, () -> Unit) -> ImeTransport = { client, pairing, event, failure ->
         val main = Handler(Looper.getMainLooper())
         StreamTransport(client, pairing, dispatch = { callback -> main.post { callback() } }, event = event, failure = failure)
@@ -102,11 +102,11 @@ internal class ScratchpadModel(
         val words = rawWords ?: return
         field = ScratchpadText.insert(before, words, store.spokenCommands)
         rawHistoryId?.let { id -> io { history.usedRaw(id) } }
-        clearRaw(); status = "Kept what was heard"
+        clearRaw(); status = StatusLine.PAD_KEPT
     }
     private fun clearRaw() { rawBase = null; rawInserted = null; rawWords = null; rawUntil = null; rawHistoryId = null }
     var field by mutableStateOf(TextFieldValue(""))
-    var status by mutableStateOf(IDLE)
+    var status by mutableStateOf<DictationStatus>(StatusLine.PAD_IDLE)
         internal set
     var partial by mutableStateOf("")
         private set
@@ -144,10 +144,10 @@ internal class ScratchpadModel(
         val current = session
         active = current != null; stopping = current?.stopping == true; polishing = current?.polishing == true
     }
-    private fun tailscaleStatus(paired: Pairing): String? = when {
+    private fun tailscaleStatus(paired: Pairing): DictationStatus? = when {
         !TailscaleControl.routes(paired.base) -> null
-        !tailscale.installed() -> DictationAction.TAILSCALE_MISSING
-        !tailscale.connected() -> DictationAction.TAILSCALE_OFF
+        !tailscale.installed() -> StatusLine.TAILSCALE_MISSING
+        !tailscale.connected() -> StatusLine.TAILSCALE_OFF
         else -> null
     }
 
@@ -169,8 +169,8 @@ internal class ScratchpadModel(
     fun start() {
         if (active) return
         clearRaw()
-        if (!micGranted()) { status = "Allow microphone in Chirp settings"; return }
-        val paired = pairing().also { this.paired = it != null } ?: run { status = "Pair your computer in Chirp settings"; return }
+        if (!micGranted()) { status = StatusLine.ALLOW_MICROPHONE; return }
+        val paired = pairing().also { this.paired = it != null } ?: run { status = StatusLine.NOT_PAIRED; return }
         privateUtterance = PrivateSession.enabled
         val chosen = style
         partial = ""; level = 0.0
@@ -180,7 +180,7 @@ internal class ScratchpadModel(
             captureFactory = { frame, lvl, done -> captureFactory(app, frame, lvl, done) },
             changed = { text, event ->
                 // A failed connection to a tailnet Mac usually means Tailscale is off; say that instead.
-                status = if (text.startsWith("Computer unreachable")) tailscaleStatus(paired) ?: text else text
+                status = if (text == ConnectionFailure.Kind.OTHER) tailscaleStatus(paired) ?: text else text
                 if (event != null) partial = event.text
                 sync()
             },
@@ -197,7 +197,7 @@ internal class ScratchpadModel(
                     rawUntil = deadline
                     scope.launch { kotlinx.coroutines.delay(5000); if (rawUntil == deadline) clearRaw() }
                 }
-                status = if (result.correctionError != null) "Kept what was heard" else "Finished"
+                status = if (result.correctionError != null) StatusLine.PAD_KEPT else StatusLine.PAD_FINISHED
             },
             ended = { session = null; partial = ""; level = 0.0; sync(); client?.let(ChirpNetwork::release) },
         )
@@ -205,7 +205,7 @@ internal class ScratchpadModel(
         stream.start(cleanup && cleanupAvailable, chosen.id, prompt = store.promptEdits[chosen.id])
     }
 
-    fun cancel(message: String = IDLE) {
+    fun cancel(message: DictationStatus = StatusLine.PAD_IDLE) {
         val old = session; session = null; old?.cancel()
         partial = ""; level = 0.0; sync(); status = message
     }
@@ -214,7 +214,7 @@ internal class ScratchpadModel(
     fun pause() { if (active && !stopping) cancel() }
 
     fun clear() {
-        if (!active) { clearRaw(); field = TextFieldValue(""); status = IDLE }
+        if (!active) { clearRaw(); field = TextFieldValue(""); status = StatusLine.PAD_IDLE }
     }
 
     /** Text handed over by the floating mic's "Open in Scratchpad": it becomes the page, or a new paragraph after what is there. */
@@ -228,7 +228,7 @@ internal class ScratchpadModel(
 
     /** "Save as note" (spec §D): the whole text becomes one new note in the library. Never while recording. */
     fun saveAsNote() {
-        if (active) { status = "Stop dictating first"; return }
+        if (active) { status = StatusLine.STOP_FIRST; return }
         val text = field.text.trim()
         if (text.isEmpty()) return
         scope.launch {
@@ -242,9 +242,9 @@ internal class ScratchpadModel(
                 } catch (_: Exception) { SaveNote.FAILED }
             }
             status = when (result) {
-                SaveNote.SAVED -> "Saved as note"
-                SaveNote.OFF -> "Notes are off — turn on Keep notes on this phone in Settings → Notes"
-                SaveNote.FAILED -> "Couldn't save the note"
+                SaveNote.SAVED -> StatusLine.NOTE_SAVED
+                SaveNote.OFF -> StatusLine.NOTES_OFF
+                SaveNote.FAILED -> StatusLine.NOTE_FAILED
             }
         }
     }
@@ -257,7 +257,6 @@ internal class ScratchpadModel(
     }
 
     companion object {
-        const val IDLE = "Tap the mic to dictate"
         // Plain editor: history's own rules (on by default, never password fields) decide whether a final is kept.
         private val HISTORY_EDITOR by lazy { EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT } }
     }

@@ -61,8 +61,8 @@ internal fun LearnedList(store: LearnedStore) {
         SettingsGroup(appTitle) {
             ActionRow(stringResource(R.string.learning_reset_app), { change { store.reset(app) } }, destructive = true)
             group.sortedByDescending { it.time }.forEach { item -> SettingsItem {
-                Text(item.correction.title, style = MaterialTheme.typography.titleMedium)
-                Text(if (item.state == LearnedState.LEARNING) stringResource(R.string.learning_progress, item.count, 2) else item.state.title,
+                Text(item.correction.title.text(), style = MaterialTheme.typography.titleMedium)
+                Text(if (item.state == LearnedState.LEARNING) stringResource(R.string.learning_progress, item.count, 2) else stringResource(item.state.title),
                     style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Text("${item.inserted} → ${item.edited}", style = MaterialTheme.typography.bodyMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

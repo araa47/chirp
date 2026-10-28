@@ -1,5 +1,7 @@
 package dev.chirp.android
 
+import android.content.res.Resources
+import androidx.annotation.StringRes
 import java.io.InterruptedIOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
@@ -8,18 +10,21 @@ import javax.net.ssl.SSLException
 
 /** Why the Mac couldn't be reached, from exception classes only: messages can carry hosts and are never read.
  * Wording is hedged because Android reports the symptom, not the cause. */
-object ConnectionFailure {
-    enum class Kind(val status: String, val offline: Boolean) {
-        DNS("Can't find your computer on the tailnet — is it online?", true),
-        DOWN("Computer may be asleep, or Chirp isn't running", true),
-        TLS("Couldn't make a secure connection to your computer", false),
-        OTHER("Computer unreachable — is Tailscale on?", false),
+internal object ConnectionFailure {
+    internal enum class Kind(@StringRes val id: Int, val offline: Boolean) : DictationStatus {
+        DNS(R.string.status_failure_dns, true),
+        DOWN(R.string.status_failure_down, true),
+        TLS(R.string.status_failure_tls, false),
+        OTHER(R.string.status_failure_other, false);
+        override fun resolve(resources: Resources): String = resources.getString(id)
+        // TLS has no Tailscale fix; the status text alone explains it.
+        override val action get() = DictationAction.NETWORK.takeUnless { this == TLS }
+        override val error get() = true
+        // "Can't find…" and "asleep" say more than the fix does; "unreachable" says nothing the fix doesn't.
+        override val named get() = offline
     }
-    const val OFFLINE = "Computer offline · Check again"
-    const val OFFLINE_DESCRIPTION = "Computer offline, double-tap to retry"
-    const val CHECKING = "Checking your computer…"
 
-    fun classify(failure: Throwable?): Kind {
+    internal fun classify(failure: Throwable?): Kind {
         var current = failure
         repeat(6) {
             when (current) {
@@ -33,9 +38,8 @@ object ConnectionFailure {
         return Kind.OTHER
     }
     /** A deadline expiring before Ready is a connect timeout when the transport recorded no better reason. */
-    fun status(kind: Kind?, timedOut: Boolean = false): String =
-        (if (kind == null || kind == Kind.OTHER) (if (timedOut) Kind.DOWN else Kind.OTHER) else kind).status
-    fun kind(status: String): Kind? = Kind.entries.firstOrNull { it.status == status }
+    internal fun status(kind: Kind?, timedOut: Boolean = false): Kind =
+        if (kind == null || kind == Kind.OTHER) (if (timedOut) Kind.DOWN else Kind.OTHER) else kind
 }
 
 /** The last health/prewarm outcome. Offline only for a short window: a Mac that woke up must not stay marked down. */

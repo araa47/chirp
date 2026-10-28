@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dictation status lines. Logic matches the typed status (DictationStatus.kt); these are only the words. -->
+    <string name="status_idle">Tap mic · hold to talk</string>
+    <string name="status_tap_mic">Tap mic</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_connecting">Connecting to your computer…</string>
+    <string name="status_listening">Listening…</string>
+    <string name="status_finishing">Finishing…</string>
+    <string name="status_polishing">Polishing…</string>
+    <string name="status_phone_listening">Listening on phone…</string>
+    <string name="status_phone_finishing">Finishing on phone…</string>
+    <string name="status_phone_handover">Computer unavailable · listening on phone</string>
+    <string name="status_inserted">Inserted · tap mic to dictate again</string>
+    <string name="status_finished">Finished</string>
+    <!-- The final was polished by clean-up; the strip shows it as status_polished. -->
+    <string name="status_cleaned">cleaned</string>
+    <string name="status_polished">Polished</string>
+    <!-- Clean-up failed and the words as heard went in; the strip shows it as status_kept_heard. -->
+    <string name="status_kept_original">kept original</string>
+    <string name="status_kept_heard">Kept what was heard</string>
+    <string name="status_used_raw">Used raw</string>
+    <string name="status_removed">Dictation removed</string>
+    <string name="status_nothing_to_undo">Text changed — nothing to undo</string>
+    <string name="status_cancelled">Cancelled</string>
+    <string name="status_checking">Checking your computer…</string>
+    <string name="status_offline">Computer offline · Check again</string>
+    <string name="status_offline_description">Computer offline, double-tap to retry</string>
+    <string name="status_tailscale_connecting">Connecting Tailscale…</string>
+    <string name="status_tailscale_connected">Tailscale connected</string>
+    <string name="status_tailscale_off">Tailscale is off</string>
+    <string name="status_tailscale_stalled">Tailscale didn\'t connect</string>
+    <string name="status_tailscale_missing">Tailscale isn\'t installed</string>
+    <string name="status_allow_microphone">Allow microphone in Chirp settings</string>
+    <string name="status_microphone_needed">Microphone permission is needed to dictate — open mic settings</string>
+    <string name="status_microphone_unavailable">Microphone unavailable</string>
+    <string name="status_microphone_blocked">Microphone unavailable — check permission in Chirp settings</string>
+    <string name="status_no_signal">No microphone signal</string>
+    <string name="status_password_field">Dictation unavailable in password fields</string>
+    <string name="status_not_paired">Pair your computer in Chirp settings</string>
+    <!-- A *_brief string is the reason alone, used in status_kept. -->
+    <string name="status_pairing_refused">Pairing refused — pair again in Chirp settings</string>
+    <string name="status_pairing_refused_brief">Pairing refused</string>
+    <string name="status_no_speech">Didn\'t catch that</string>
+    <string name="status_engine_hiccup">Speech engine hiccup</string>
+    <string name="status_engine_unavailable">Speech engine unavailable — try again</string>
+    <string name="status_engine_unavailable_brief">Speech engine unavailable</string>
+    <string name="status_busy">Chirp server is busy — try again</string>
+    <string name="status_busy_brief">Chirp server is busy</string>
+    <string name="status_too_long">Dictation limit is 120 seconds</string>
+    <string name="status_prompt_too_long">Clean-up prompt too long — shorten it in Chirp settings</string>
+    <string name="status_prompt_too_long_brief">Clean-up prompt too long</string>
+    <string name="status_server_slow">Chirp server took too long — try again</string>
+    <string name="status_connection_slow">Connection too slow — try again</string>
+    <string name="status_unexpected">Unexpected server response</string>
+    <string name="status_field_unavailable">Text field unavailable — try again</string>
+    <string name="status_phone_no_language">Phone has no offline speech for this language</string>
+    <string name="status_phone_busy">Phone recogniser is busy — try again</string>
+    <string name="status_phone_busy_brief">Phone recogniser is busy</string>
+    <string name="status_phone_failed">Phone recogniser failed — try again</string>
+    <string name="status_phone_failed_brief">Phone recogniser failed</string>
+    <!-- Why the computer couldn't be reached. Hedged: Android reports the symptom, not the cause. -->
+    <string name="status_failure_dns">Can\'t find your computer on the tailnet — is it online?</string>
+    <string name="status_failure_down">Computer may be asleep, or Chirp isn\'t running</string>
+    <string name="status_failure_tls">Couldn\'t make a secure connection to your computer</string>
+    <string name="status_failure_other">Computer unreachable — is Tailscale on?</string>
+    <!-- %1$s is the reason, such as status_pairing_refused_brief or status_connection_lost. -->
+    <string name="status_kept">%1$s — kept what I heard</string>
+    <string name="status_connection_lost">Connection lost</string>
+    <!-- %1$s is the result line; the field's Send key was pressed after it. -->
+    <string name="status_sent">%1$s · ↵ sent</string>
+    <!-- %1$s is the status line, %2$d the seconds before the time limit stops dictation. -->
+    <string name="status_seconds_left">%1$s · %2$d s left</string>
+    <!-- %1$s is the status line, %2$s its fix, such as action_pair. -->
+    <string name="status_with_action">%1$s · %2$s</string>
+    <string name="status_with_action_spoken">%1$s. %2$s</string>
+    <string name="status_polished_spoken">Polished, Use raw available</string>
+    <!-- Debug overlay only. %1$s is the status line, %2$s and %3$s milliseconds or —. -->
+    <string name="status_debug_timings">%1$s · first %2$s ms · final %3$s ms</string>
+    <!-- Floating mic -->
+    <string name="status_bubble_not_paired">Pair your computer to dictate</string>
+    <string name="status_bubble_no_microphone">Allow the microphone for Chirp</string>
+    <string name="status_bubble_blocked">Android blocked the microphone here</string>
+    <!-- Quick dictate and the Scratchpad -->
+    <string name="status_copied_paste">Copied — paste anywhere</string>
+    <string name="status_copied">Copied</string>
+    <string name="status_pad_idle">Tap the mic to dictate</string>
+    <string name="status_stop_first">Stop dictating first</string>
+    <string name="status_note_saved">Saved as note</string>
+    <string name="status_notes_off">Notes are off — turn on Keep notes on this phone in Settings → Notes</string>
+    <string name="status_note_failed">Couldn\'t save the note</string>
+    <!-- The floating mic bubble. -->
+    <string name="bubble_window_title">Chirp floating microphone</string>
+    <string name="bubble_description">Chirp microphone: tap to dictate, hold to talk</string>
+    <string name="bubble_description_copy">Chirp microphone — this field can\'t be filled automatically; your words will be ready to copy</string>
+    <string name="bubble_action_move_side">Move to other side</string>
+    <string name="bubble_action_hide">Hide in this app</string>
+    <string name="bubble_clip_label">Chirp dictation</string>
+    <!-- The floating mic panel's headline. -->
+    <string name="panel_copy_mode">This field can\'t be filled automatically</string>
+    <string name="panel_tap_to_dictate">Tap to dictate</string>
+    <string name="panel_headline_listening">Listening</string>
+    <string name="panel_inserted">Inserted</string>
+    <string name="panel_not_inserted">Couldn\'t put this in the field</string>
+    <!-- The one fix a status offers. -->
+    <string name="action_pair">Pair computer</string>
+    <string name="action_microphone">Open mic settings</string>
+    <string name="action_network">Check Tailscale</string>
+    <string name="action_tailscale_on">Turn on</string>
+    <string name="action_tailscale_open">Open Tailscale</string>
+    <string name="action_tailscale_setup">Set up</string>
+    <!-- The floating mic panel's fix for an error: a label and its spoken description. -->
+    <string name="fix_pair_description">Pair your computer in Chirp</string>
+    <string name="fix_microphone">Allow</string>
+    <string name="fix_microphone_description">Allow the microphone in Chirp\'s app permissions</string>
+    <string name="fix_check_again">Check again</string>
+    <string name="fix_check_again_description">Check the connection to your computer and dictate again</string>
+    <string name="fix_tailscale_on_description">Turn on Tailscale</string>
+    <string name="fix_tailscale_setup_description">Set up Tailscale in Chirp</string>
+    <string name="fix_quick_dictate">Use Quick dictate</string>
+    <string name="fix_quick_dictate_description">Dictate in Chirp instead, then copy</string>
+    <string name="fix_settings">Open settings</string>
+    <string name="fix_settings_description">Open Chirp settings</string>
+    <string name="fix_try_again">Try again</string>
+    <string name="fix_try_again_description">Dictate again</string>
+    <!-- The keyboard options menu: where clean-up runs. %1$s is the clean-up host's name, or options_cleanup_host_unavailable. -->
+    <string name="options_cleanup_host">Sends text to %1$s</string>
+    <string name="options_cleanup_host_unavailable">external host (unavailable)</string>
+    <string name="options_cleanup_local">On your computer</string>
+    <!-- The phone's own recogniser when the computer is unavailable. %1$s is its provider, such as Android System Intelligence, or phone_generic. -->
+    <string name="phone_chip">on phone</string>
+    <string name="phone_disclosure">Recognised on this phone by %1$s, not your computer</string>
+    <string name="phone_generic">the phone\'s own speech service</string>
+    <string name="phone_fallback_group">When your computer is unavailable</string>
+    <string name="phone_fallback_use">Use this phone\'s recogniser</string>
+    <string name="phone_fallback_none">This phone has no on-device speech recogniser.</string>
+    <string name="phone_fallback_off">Off by default</string>
+    <string name="phone_fallback_info">When your computer can\'t be reached, dictation is recognised on this phone by %1$s — not by Chirp\'s engine on your computer. Android runs it on-device; that service\'s own terms apply. No clean-up; the row shows \"on phone\".</string>
+    <string name="phone_fallback_generic">the phone\'s own speech service (from Google or the phone maker)</string>
+    <plurals name="status_inserted_words">
+        <item quantity="one">Inserted, %d word</item>
+        <item quantity="other">Inserted, %d words</item>
+    </plurals>
+</resources>

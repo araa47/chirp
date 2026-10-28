@@ -156,7 +156,7 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
                     renaming = renaming, rename = { renaming = it }, back = back)
                 RetranscribeBanner(model)
                 if (recordingElsewhere != null) AssistChip(jumpToRecording, modifier = Modifier.padding(horizontal = gutter),
-                    label = { Text(stringResource(R.string.notes_editor_recording_elsewhere, recordingElsewhere.displayTitle, recordingElsewhere.elapsedText), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    label = { Text(stringResource(R.string.notes_editor_recording_elsewhere, recordingElsewhere.displayTitle, recordingElsewhere.elapsedText.text()), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = { Ripple(recordingElsewhere.level.toFloat(), Modifier.size(20.dp)) })
                 // Independent recovery, connection and speaker notices coexist; cap the stack so notes stay usable.
                 NotesStatusStack(model, act, Modifier.padding(horizontal = gutter).heightIn(max = statusMaxHeight))
@@ -197,17 +197,18 @@ internal fun captureState(model: NotesModel): String = stringResource(when (mode
 
 @Composable
 internal fun NotesStatusStack(model: NotesModel, act: (DictationAction) -> Unit, modifier: Modifier = Modifier) {
-    val action = DictationAction.forStatus(model.status)
+    val status = model.status
+    val action = status.action
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (model.retained) StatusBanner(StatusKind.Error, stringResource(R.string.debug_retention))
-        if (action != null) StatusBanner(StatusKind.Warning, model.status, action = action.label, onAction = { act(action) })
+        if (action != null) StatusBanner(StatusKind.Warning, status.text.text(), action = stringResource(action.label), onAction = { act(action) })
         if (model.recovered != null) StatusBanner(StatusKind.Info, stringResource(R.string.notes_editor_recovered_title), body = stringResource(R.string.notes_editor_recovered_body))
         if (model.speakerModelControl.status != null) SpeakerModelStatus(model.speakerModelControl)
         // Naming is premature while the model is still preparing. Keep the actionable model status instead.
         else if (model.askToNameSpeakers) StatusBanner(StatusKind.Info, stringResource(R.string.notes_editor_who_spoke), action = stringResource(R.string.notes_speakers_name_all_title),
             onAction = { model.nameSpeakersOpen = true })
         if (!model.retained && action == null) model.explanation?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(it.text(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -240,9 +241,9 @@ private fun NotesTopBar(model: NotesModel, editing: Boolean, gutter: androidx.co
             }
             Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (model.state.active) LiveDot(model.recording)
-                Text(model.status, Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.labelLarge,
+                Text(model.status.text.text(), Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.labelLarge,
                     color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (editing && (model.state.active || model.elapsed > 0)) Text(stringResource(R.string.notes_editor_elapsed, model.elapsedText), style = dev.chirp.android.ui.ChirpTokens.timerSmall,
+                if (editing && (model.state.active || model.elapsed > 0)) Text(stringResource(R.string.notes_editor_elapsed, model.elapsedText.text()), style = dev.chirp.android.ui.ChirpTokens.timerSmall,
                     color = scheme.onSurfaceVariant)
             }
         }
@@ -420,14 +421,14 @@ private fun NotesDock(model: NotesModel, record: () -> Unit, modifier: Modifier,
 @Composable
 private fun Notices(model: NotesModel) {
     val organized = model.organizeNote
-    var shown by remember { mutableStateOf<String?>(null) }
+    var shown by remember { mutableStateOf<UiText?>(null) }
     LaunchedEffect(organized) { shown = organized; if (organized != null) { delay(NOTICE_MS); shown = null } }
     LaunchedEffect(model.voiceEditDone) { if (model.voiceEditNote != null) { delay(NotesVoiceEdit.NOTE_MS); model.dismissVoiceEdit() } }
     when {
         model.listeningForCommand -> TextButton(model::cancelCommand) { Text(stringResource(R.string.notes_action_cancel)) }
         model.showEditedChip -> EditedChip(model)
-        model.voiceEditNote != null -> Notice(model.voiceEditNote!!)
-        shown != null -> Notice(shown!!)
+        model.voiceEditNote != null -> Notice(model.voiceEditNote!!.text())
+        shown != null -> Notice(shown!!.text())
     }
 }
 
@@ -460,7 +461,7 @@ private fun RecordingPill(model: NotesModel, stop: () -> Unit, modifier: Modifie
     val scheme = MaterialTheme.colorScheme
     val state = captureState(model)
     val pauseDescription = stringResource(if (model.paused) R.string.notes_dock_resume else R.string.notes_dock_pause)
-    val pillDescription = stringResource(R.string.notes_dock_description, model.displayTitle, model.elapsedText)
+    val pillDescription = stringResource(R.string.notes_dock_description, model.displayTitle, model.elapsedText.text())
     val stopDescription = stringResource(R.string.notes_dock_stop)
     Surface(modifier.testTag("notes-recording-dock"), shape = CircleShape, color = scheme.surfaceContainerHighest, shadowElevation = 6.dp) {
         Row(Modifier.heightIn(min = 64.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -477,7 +478,7 @@ private fun RecordingPill(model: NotesModel, stop: () -> Unit, modifier: Modifie
                 else if (model.recording) Ripple(model.level.toFloat(), Modifier.size(24.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(state, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-                    Text(model.elapsedText, style = dev.chirp.android.ui.ChirpTokens.timer)
+                    Text(model.elapsedText.text(), style = dev.chirp.android.ui.ChirpTokens.timer)
                 }
             }
             FilledIconButton(stop, Modifier.size(48.dp).semantics { contentDescription = stopDescription }, enabled = !model.busy,
@@ -532,7 +533,7 @@ private fun EditedChip(model: NotesModel) {
     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer, shadowElevation = 2.dp) {
         Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             val undoDescription = stringResource(R.string.notes_command_undo_description)
-            Text(NotesVoiceEditText.EDITED, style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.notes_status_edited), style = MaterialTheme.typography.labelLarge)
             TextButton(model::undoVoiceEdit, Modifier.semantics { contentDescription = undoDescription }) { Text(stringResource(R.string.notes_action_undo)) }
         }
     }
@@ -558,7 +559,7 @@ internal fun TranscriptPane(model: NotesModel, modifier: Modifier, titled: Boole
             FilterChip(model.raw, { model.raw = !model.raw }, label = { Text(stringResource(R.string.notes_transcript_show_raw)) })
             if (close != null) IconButton(close) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.notes_transcript_close)) }
         }
-        Text(stringResource(R.string.notes_transcript_engine, model.document.transcriptEngine), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        Text(stringResource(R.string.notes_transcript_engine, model.document.transcriptEngine.ui.text()), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
         if (playbackFailed) Text(stringResource(R.string.notes_transcript_playback_failed), Modifier.padding(vertical = 8.dp), color = scheme.error, style = MaterialTheme.typography.bodyMedium)
         val document = model.document
         val roster = document.roster
@@ -570,7 +571,7 @@ internal fun TranscriptPane(model: NotesModel, modifier: Modifier, titled: Boole
         }
         // A copy: the document's list is the same object as it grows, which the lazy list would not see change.
         val rows = document.segments.toList()
-        model.speakerNote?.let { Text(it, Modifier.padding(vertical = 4.dp), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+        model.speakerNote?.let { Text(it.text(), Modifier.padding(vertical = 4.dp), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
         val list = rememberLazyListState()
         LaunchedEffect(rows.size) { if (rows.isNotEmpty() && !list.canScrollForward) list.animateScrollToItem(rows.size) }
         LazyColumn(Modifier.fillMaxWidth().weight(1f), list, contentPadding = PaddingValues(top = 4.dp, bottom = 128.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

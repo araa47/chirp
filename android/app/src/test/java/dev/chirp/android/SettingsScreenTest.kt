@@ -261,15 +261,16 @@ class SettingsScreenTest {
     }
 
     @Test fun `connection summary reflects pairing and reachability`() {
-        assertEquals("Not paired", connectionSummary(false, "", null, false, null).title)
+        fun UiText?.english() = this?.resolve(context.resources)
+        assertEquals("Not paired", connectionSummary(false, "", null, false, null).title.english())
         val health = Health(true, false, true, false, null, engine = "Parakeet")
-        assertEquals("Connected · mac.example.test", connectionSummary(true, "mac.example.test", true, false, health).title)
-        assertEquals("Parakeet · clean-up on your computer", connectionSummary(true, "mac.example.test", true, false, health).summary)
-        assertEquals("Paired · mac.example.test", connectionSummary(true, "mac.example.test", null, false, health).title)
-        assertEquals("Checking · mac.example.test", connectionSummary(true, "mac.example.test", true, true, health).title)
+        assertEquals("Connected · mac.example.test", connectionSummary(true, "mac.example.test", true, false, health).title.english())
+        assertEquals("Parakeet · clean-up on your computer", connectionSummary(true, "mac.example.test", true, false, health).summary.english())
+        assertEquals("Paired · mac.example.test", connectionSummary(true, "mac.example.test", null, false, health).title.english())
+        assertEquals("Checking · mac.example.test", connectionSummary(true, "mac.example.test", true, true, health).title.english())
         val down = connectionSummary(true, "mac.example.test", false, false, health)
-        assertEquals("Computer unreachable · mac.example.test", down.title); assertNotNull(down.hint)
-        assertEquals("Computer is loading its speech model", connectionSummary(true, "m", null, false, health.copy(ready = false)).summary)
+        assertEquals("Computer unreachable · mac.example.test", down.title.english()); assertNotNull(down.hint)
+        assertEquals("Computer is loading its speech model", connectionSummary(true, "m", null, false, health.copy(ready = false)).summary.english())
     }
 
     /** #181: dispatches a 48 dp status bar and a 40 dp gesture area over the window, as an edge-to-edge activity receives them. */

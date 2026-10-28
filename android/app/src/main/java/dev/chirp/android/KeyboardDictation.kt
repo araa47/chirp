@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 /** Owns voice state, separate from HeliBoard's typing/composing state. All editor calls are main-thread. */
 internal class KeyboardDictation(
     private val host: InputMethodService,
-    private val captureFactory: ((ByteArray) -> Boolean, (Double) -> Unit, (String?) -> Unit) -> Capture,
+    private val captureFactory: ((ByteArray) -> Boolean, (Double) -> Unit, (DictationStatus?) -> Unit) -> Capture,
     private val transportFactory: (okhttp3.OkHttpClient, Pairing, (ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
     private val prepare: () -> Unit,
     private val resync: (Int, Int) -> Unit,
@@ -80,7 +80,7 @@ internal class KeyboardDictation(
     private var applying = false
     private var version = 0
     private var healthCall: okhttp3.Call? = null
-    private var message = "Tap mic · hold to talk"
+    private var message: DictationStatus = StatusLine.IDLE
     private var text = ""
     private var undo = false
     private var actionUntil: Long? = null
@@ -104,7 +104,7 @@ internal class KeyboardDictation(
     private var historyInfo: EditorInfo? = null
     private var historyId: String? = null
     private var words = 0
-    private val expiry = Runnable { forgetUndo(); notice = false; words = 0; message = "Tap mic · hold to talk"; render() }
+    private val expiry = Runnable { forgetUndo(); notice = false; words = 0; message = StatusLine.IDLE; render() }
     // Tailscale is checked only for tailnet pairings, locally and without DNS. Ignoring or dismissing
     // the prompt keeps it away for this keyboard process until Tailscale is next seen connected.
     private var tailnet = false
@@ -112,14 +112,14 @@ internal class KeyboardDictation(
     private var tailscaleDismissed = false
     private var tailscaleWatch: AutoCloseable? = null
     private val tailscaleTimeout = Runnable {
-        if (active || message != CONNECTING) return@Runnable
-        if (tailscale.connected()) tailscaleChanged() else { notice = false; message = DictationAction.TAILSCALE_STALLED; render() }
+        if (active || message != StatusLine.TAILSCALE_CONNECTING) return@Runnable
+        if (tailscale.connected()) tailscaleChanged() else { notice = false; message = StatusLine.TAILSCALE_STALLED; render() }
     }
     // The last health/prewarm failure marks the Mac offline for 30 s: the mic shows it before the user speaks.
     private val offline = OfflineState()
     private var offlineDismissed = false
     private var checking = false
-    private val offlineExpiry = Runnable { if (message == ConnectionFailure.OFFLINE) message = IDLE; render() }
+    private val offlineExpiry = Runnable { if (message == StatusLine.OFFLINE) message = StatusLine.IDLE; render() }
     private var secondsLeft: Int? = null
     private var spokenLeft: Int? = null
     // Phone recogniser: this utterance (and its notice) came from it; a Mac failure before anything was heard hands over to it.
@@ -146,12 +146,12 @@ internal class KeyboardDictation(
         // Options moved off the mic's long press to the ⋯ beside it; TalkBack also gets them as an action on the mic.
         view.options.setOnClickListener { if (!active) quickOptions() }
         androidx.core.view.ViewCompat.addAccessibilityAction(view.mic, host.getString(R.string.strip_options)) { _, _ -> if (!active) { quickOptions(); true } else false }
-        view.status.setOnClickListener { val next = action(); if (next != null) openAction(next) else if (message == ConnectionFailure.OFFLINE) start() }
+        view.status.setOnClickListener { val next = action(); if (next != null) openAction(next) else if (message == StatusLine.OFFLINE) start() }
         view.action.setOnClickListener { action()?.let(::openAction) }
         view.cancel.setOnClickListener {
             if (action()?.prompt == true) tailscaleDismissed = true
-            if (message == ConnectionFailure.OFFLINE) offlineDismissed = true
-            handler.removeCallbacks(tailscaleTimeout); cancel("Cancelled")
+            if (message == StatusLine.OFFLINE) offlineDismissed = true
+            handler.removeCallbacks(tailscaleTimeout); cancel(StatusLine.CANCELLED)
         }
         view.raw.setOnClickListener {
             val target = composing ?: return@setOnClickListener
@@ -161,7 +161,7 @@ internal class KeyboardDictation(
             if (changed) {
                 selectionStart = target.selectionStart; selectionEnd = target.selectionEnd
                 historyId?.let { history?.usedRaw(it) }
-                forgetUndo(); message = "Used raw"; handler.postDelayed(expiry, 5000); resync(selectionStart, selectionEnd)
+                forgetUndo(); message = StatusLine.USED_RAW; handler.postDelayed(expiry, 5000); resync(selectionStart, selectionEnd)
             }
             render()
         }
@@ -171,7 +171,7 @@ internal class KeyboardDictation(
             learning.watcher.cancel()
             val changed = try { target.undo(selectionStart, selectionEnd) } finally { applying = false }
             if (changed) { selectionStart = target.selectionStart; selectionEnd = target.selectionEnd; resync(selectionStart, selectionEnd) }
-            forgetUndo(); showNotice(if (changed) "Dictation removed" else "Text changed — nothing to undo")
+            forgetUndo(); showNotice(if (changed) StatusLine.REMOVED else StatusLine.NOTHING_TO_UNDO)
         }
         render()
     }
@@ -181,7 +181,7 @@ internal class KeyboardDictation(
             .putExtra("section", section).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                 android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP))
     }
-    private fun action() = DictationAction.forStatus(message)
+    private fun action() = message.action
     private fun openAction(action: DictationAction) {
         when (action) {
             DictationAction.PAIR -> setup("pair")
@@ -192,18 +192,18 @@ internal class KeyboardDictation(
             // One tap asks Tailscale to connect with consent it already holds; it cannot grant VPN consent.
             DictationAction.TAILSCALE_ON -> if (tailscale.connect()) {
                 handler.removeCallbacks(expiry); handler.removeCallbacks(tailscaleTimeout)
-                message = CONNECTING; notice = true; render()
+                message = StatusLine.TAILSCALE_CONNECTING; notice = true; render()
                 handler.postDelayed(tailscaleTimeout, 10000)
             } else if (!tailscale.open()) setup("network")
         }
     }
-    private fun tailscaleStatus(): String? = when {
+    private fun tailscaleStatus(): DictationStatus? = when {
         !tailnet -> null
-        !tailscale.installed() -> DictationAction.TAILSCALE_MISSING
-        !tailscale.connected() -> DictationAction.TAILSCALE_OFF
+        !tailscale.installed() -> StatusLine.TAILSCALE_MISSING
+        !tailscale.connected() -> StatusLine.TAILSCALE_OFF
         else -> null
     }
-    private fun tailscaleMessage() = action()?.prompt == true || message == CONNECTING
+    private fun tailscaleMessage() = action()?.prompt == true || message == StatusLine.TAILSCALE_CONNECTING
     private fun promptTailscale() {
         if (active || undo || notice || tailscaleDismissed) return
         tailscaleStatus()?.let { message = it }
@@ -213,14 +213,14 @@ internal class KeyboardDictation(
         val now = tailscale.connected()
         if (now) {
             handler.removeCallbacks(tailscaleTimeout); tailscaleDismissed = false
-            if (tailscaleMessage()) showNotice(CONNECTED)
+            if (tailscaleMessage()) showNotice(StatusLine.TAILSCALE_CONNECTED)
             if (!vpn) pairing()?.let { closeWarm(); reach(it) }
         } else if (vpn) { promptTailscale(); render() }
         vpn = now
     }
     private fun promptOffline() {
         if (!visible || active || undo || notice || offlineDismissed || !offline.active() || tailscaleStatus() != null) return
-        message = ConnectionFailure.OFFLINE
+        message = StatusLine.OFFLINE
     }
     /** null or a kind that isn't about reachability means the Mac answered, so the offline mark is dropped. */
     private fun noteReach(kind: ConnectionFailure.Kind?) {
@@ -231,7 +231,7 @@ internal class KeyboardDictation(
         }
         else {
             offline.reachable(); offlineDismissed = false; handler.removeCallbacks(offlineExpiry)
-            if (message == ConnectionFailure.OFFLINE) message = IDLE
+            if (message == StatusLine.OFFLINE) message = StatusLine.IDLE
         }
         render()
     }
@@ -239,11 +239,11 @@ internal class KeyboardDictation(
     private fun retry(paired: Pairing): Boolean {
         if (!offline.active()) return false
         if (checking) { checking = false; return false }
-        checking = true; notice = true; message = ConnectionFailure.CHECKING; render()
+        checking = true; notice = true; message = StatusLine.CHECKING; render()
         reach(paired, quick = true) { kind ->
             if (!checking) return@reach
             checking = false
-            if (kind == null) { notice = false; message = IDLE; start() } else showNotice(tailscaleStatus() ?: kind.status)
+            if (kind == null) { notice = false; message = StatusLine.IDLE; start() } else showNotice(tailscaleStatus() ?: kind)
         }
         return true
     }
@@ -251,7 +251,7 @@ internal class KeyboardDictation(
         val anchor = strip?.mic ?: return
         StripMenu(anchor).apply {
             if (store.health.cleanupAvailable()) {
-                toggle(host.getString(R.string.options_cleanup), correctionLabel(store.health), store.correction) { store.correction = it }
+                toggle(host.getString(R.string.options_cleanup), correctionLabel(store.health).resolve(host.resources), store.correction) { store.correction = it }
                 section(host.getString(R.string.options_style))
                 val selected = styleOverride ?: store.style(targetPackage).id
                 CleanupStyles.profiles(store.health).forEach { profile ->
@@ -274,7 +274,7 @@ internal class KeyboardDictation(
         when (command) {
             MicGesture.Action.START -> start()
             MicGesture.Action.STOP -> if (active) stop()
-            MicGesture.Action.CANCEL -> cancel("Cancelled")
+            MicGesture.Action.CANCEL -> cancel(StatusLine.CANCELLED)
             MicGesture.Action.NONE -> Unit
         }
     }
@@ -285,7 +285,7 @@ internal class KeyboardDictation(
             if (host.currentInputEditorInfo?.isPasswordField() == true || destroyed) false
             else { if (!visible) shown(); if (session?.stopping != true) toggle(); true }
         }
-        HardwareShortcut.Action.CANCEL -> if (active) { cancel("Cancelled"); true } else false
+        HardwareShortcut.Action.CANCEL -> if (active) { cancel(StatusLine.CANCELLED); true } else false
         HardwareShortcut.Action.NONE -> false
     }
     fun input(info: EditorInfo?, restarting: Boolean) {
@@ -322,7 +322,7 @@ internal class KeyboardDictation(
                 val health = withContext(Dispatchers.IO) { healthCheck(call) }
                 if (!visible || destroyed || version != id) return@launch
                 healthCall = null; noteReach(null)
-                if (tailscaleMessage()) { handler.removeCallbacks(tailscaleTimeout); notice = false; message = IDLE }
+                if (tailscaleMessage()) { handler.removeCallbacks(tailscaleTimeout); notice = false; message = StatusLine.IDLE }
                 store.health = health; retained = health.debugRetention; render()
                 then?.invoke(null)
             } catch (e: Exception) {
@@ -336,13 +336,13 @@ internal class KeyboardDictation(
     private fun start(phone: Boolean = false) {
         if (!visible || destroyed || active) return
         if (ContextCompat.checkSelfPermission(host, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            showNotice("Allow microphone in Chirp settings"); return
+            showNotice(StatusLine.ALLOW_MICROPHONE); return
         }
         val info = host.currentInputEditorInfo ?: return
         if (info.isPasswordField()) {
-            showNotice("Dictation unavailable in password fields"); return
+            showNotice(StatusLine.PASSWORD_FIELD); return
         }
-        val paired = pairing() ?: run { showNotice("Pair your computer in Chirp settings"); return }
+        val paired = pairing() ?: run { showNotice(StatusLine.NOT_PAIRED); return }
         onPhone = phone || fallback.usable() && (offline.active() || tailscaleStatus() != null)
         if (!onPhone && retry(paired)) return
         checking = false
@@ -357,7 +357,7 @@ internal class KeyboardDictation(
         composing = compose(connection)
         secondsLeft = null; spokenLeft = null
         text = ""; pressAt = SystemClock.elapsedRealtime(); firstPartial = null; stopAt = null; finalLatency = null
-        if (onPhone) { listenOnPhone(if (phone) PhoneDictation.HANDOVER else PhoneDictation.LISTENING); return }
+        if (onPhone) { listenOnPhone(if (phone) StatusLine.PHONE_HANDOVER else StatusLine.PHONE_LISTENING); return }
         var timer: SessionTimer? = null
         val stream = RollingDictation(
             deadlines = store.health?.operationDeadlines ?: OperationDeadlines(),
@@ -365,11 +365,11 @@ internal class KeyboardDictation(
             captureFactory = captureFactory,
             changed = { status, partial ->
                 // The user just tried to dictate, so a dismissed Tailscale prompt may return as the reason.
-                val kind = ConnectionFailure.kind(status)
+                val kind = status as? ConnectionFailure.Kind
                 if (kind?.offline == true) noteReach(kind)
                 handover = fallback.handsOver(kind, moved)
                 message = if (kind != null) tailscaleStatus() ?: status else status
-                if (Cue.isError(status)) cue(Cue.ERROR)
+                if (status.error) cue(Cue.ERROR)
                 if (partial != null) {
                     if (firstPartial == null) firstPartial = SystemClock.elapsedRealtime() - pressAt
                     text = partial.text
@@ -417,10 +417,10 @@ internal class KeyboardDictation(
         haptic(); cue(Cue.START)
     }
     /** One utterance on the phone's own recogniser while the Mac can't be reached: raw text, never cleaned, history as usual. */
-    private fun listenOnPhone(status: String) {
+    private fun listenOnPhone(status: DictationStatus) {
         val phone = fallback.session(changed = { value, partial ->
             message = value
-            if (Cue.isError(value)) cue(Cue.ERROR)
+            if (value.error) cue(Cue.ERROR)
             if (partial != null) { if (firstPartial == null) firstPartial = SystemClock.elapsedRealtime() - pressAt; text = partial.text; partialFrames.offer(partial) }
             render()
         }, level = { strip?.level(it) }, final = { land(it) }, kept = { heard, reason -> land(ServerEvent.Final(heard, heard, false), reason) }, ended = {
@@ -451,7 +451,7 @@ internal class KeyboardDictation(
         composing = compose(host.currentInputConnection ?: connection)
     }
     /** Commits a final, or what was heard before a failure ([reason]), and offers Undo for five seconds. */
-    private fun land(received: ServerEvent.Final, reason: String? = null) {
+    private fun land(received: ServerEvent.Final, reason: DictationStatus? = null) {
         val result = received.copy(text = if (!privateUtterance && LearnedStore(host).allowed && DictationHistory.allowed(host.currentInputEditorInfo)) learnedPayload.apply(received.text) else received.text)
         partialFrames.clear()
         val target = composing
@@ -464,11 +464,10 @@ internal class KeyboardDictation(
         notice = inserted; words = if (inserted && reason == null) words + result.text.trim().split(Regex("\\s+")).size else 0
         historyId = if (inserted && !privateUtterance) history?.record(result.text, result.raw.takeIf { result.corrected }, historyInfo, partial = reason != null) else null
         if (inserted && session?.landingLast != false) { haptic(); cue(Cue.INSERTED) }
-        message = if (!inserted) reason ?: "Text field unavailable — try again"
-            else if (reason != null) keptStatus(reason)
-            else if (result.correctionError != null) "kept original"
-            else if (result.corrected) "cleaned"
-            else "Inserted · tap mic to dictate again"
+        message = if (!inserted) reason ?: StatusLine.FIELD_UNAVAILABLE
+            else if (reason != null) KeptStatus(reason)
+            else (if (result.correctionError != null) StatusLine.KEPT_ORIGINAL else if (result.corrected) StatusLine.CLEANED else StatusLine.INSERTED)
+                .let { if (sent) SentStatus(it) else it }
         if (inserted && !sent && reason == null && !privateUtterance && target != null) {
             val value = target.committedText
             val connection = host.currentInputConnection
@@ -478,7 +477,6 @@ internal class KeyboardDictation(
                 }
             }
         }
-        if (sent) message += " · ${AutoEnter.SENT}"
         text = ""; finalLatency = stopAt?.let { SystemClock.elapsedRealtime() - it }
         undo = inserted && !sent && (target?.spanEnd ?: -1) >= 0
         actionUntil = SystemClock.elapsedRealtime() + 5000
@@ -506,7 +504,7 @@ internal class KeyboardDictation(
         val inserted = try { insertion.final(ServerEvent.Final(value, value, false)) } finally { applying = false }
         if (inserted && anchor >= 0) { selectionStart = insertion.selectionStart; selectionEnd = insertion.selectionEnd }
         resync(selectionStart, selectionEnd)
-        if (inserted) haptic() else showNotice("Text field unavailable — try again")
+        if (inserted) haptic() else showNotice(StatusLine.FIELD_UNAVAILABLE)
         return inserted
     }
     private fun countdown(left: Int) {
@@ -519,11 +517,11 @@ internal class KeyboardDictation(
     private fun stop() { stopAt = SystemClock.elapsedRealtime(); if (waitingForLearn) stopBeforeLearn = true else session?.stop(); haptic(); cue(Cue.STOP); render() }
     fun beforeEdit() {
         if (active || undo) cancel()
-        else if (message == ConnectionFailure.OFFLINE) { offlineDismissed = true; message = IDLE; render() }
+        else if (message == StatusLine.OFFLINE) { offlineDismissed = true; message = StatusLine.IDLE; render() }
         else if (tailscaleMessage()) {
             // Typing past the prompt means "not now": give the suggestion row back.
             tailscaleDismissed = true; handler.removeCallbacks(tailscaleTimeout)
-            notice = false; message = IDLE; render()
+            notice = false; message = StatusLine.IDLE; render()
         }
     }
     fun selection(oldStart: Int, oldEnd: Int, start: Int, end: Int, composingStart: Int, composingEnd: Int) {
@@ -543,7 +541,7 @@ internal class KeyboardDictation(
         if (session?.stopping != true) { stopAt = SystemClock.elapsedRealtime(); session?.stop() }
         render()
     }
-    fun cancel(status: String = "Tap mic · hold to talk") {
+    fun cancel(status: DictationStatus = StatusLine.IDLE) {
         gesture.cancel(); partialFrames.clear(); handover = false
         // Clear editor composition before notifying HeliBoard that it can resume typing.
         applying = true
@@ -563,9 +561,9 @@ internal class KeyboardDictation(
         destroyed = true; hidden(); scope.cancel(); handler.removeCallbacksAndMessages(null)
         strip = null; ChirpNetwork.dispose(client)
     }
-    private fun showNotice(value: String) {
+    private fun showNotice(value: DictationStatus) {
         message = value; notice = true; words = 0; onPhone = false
-        if (Cue.isError(value)) cue(Cue.ERROR)
+        if (value.error) cue(Cue.ERROR)
         handler.removeCallbacks(expiry); handler.postDelayed(expiry, 5000); render()
     }
     private fun cue(cue: Cue) { if (store.soundCues) cues.play(cue) }
@@ -573,30 +571,30 @@ internal class KeyboardDictation(
     // One spoken result per final: the status live region is silent while listening and reads this once.
     private fun announcement(raw: Boolean) = when {
         active || words == 0 -> null
-        raw -> "Polished, Use raw available"
-        notice -> "Inserted, $words ${if (words == 1) "word" else "words"}"
+        raw -> host.getString(R.string.status_polished_spoken)
+        notice -> host.resources.getQuantityString(R.plurals.status_inserted_words, words, words)
         else -> null
     }
     private fun render() {
+        val res = host.resources
         val left = secondsLeft?.takeIf { active && session?.stopping != true }
-        val shown = left?.let { "$message · $it s left" } ?: message
-        val status = if (store.debugOverlay) "$shown · first ${firstPartial ?: "—"} ms · final ${finalLatency ?: "—"} ms" else shown
+        // The countdown and the debug timings follow whichever form of the line the strip shows.
+        val decorate = { line: String ->
+            val shown = left?.let { res.getString(R.string.status_seconds_left, line, it) } ?: line
+            if (store.debugOverlay) res.getString(R.string.status_debug_timings, shown, firstPartial?.toString() ?: "—", finalLatency?.toString() ?: "—") else shown
+        }
+        val line = message.resolve(res)
         val raw = undo && composing?.rawAvailable == true
-        strip?.show(action()?.takeUnless { it.prompt }?.let { "$status · ${it.label}" } ?: status, "", active, session?.stopping == true, raw, retained || store.health?.debugRetention == true,
+        strip?.show(message, "", active, session?.stopping == true, raw, retained || store.health?.debugRetention == true,
             actionUntil = actionUntil, polishing = session?.polishing == true, style = currentStyle.name, notice = notice, undoable = undo, offline = offline.active(), countdown = left != null,
-            phone = fallback.disclosure.takeIf { onPhone && (active || notice) })
-        strip?.status?.isClickable = action() != null || message == ConnectionFailure.OFFLINE
-        val disclosure = if (retained || store.health?.debugRetention == true) "Debug retention on. " else ""
-        strip?.status?.contentDescription = disclosure + (action()?.let { "$message. ${it.label}" }
-            ?: if (message == ConnectionFailure.OFFLINE) ConnectionFailure.OFFLINE_DESCRIPTION
-            else announcement(raw) ?: if (left != null) spokenLeft?.let { "$message · $it s left" } ?: message else status)
+            phone = fallback.disclosure(res).takeIf { onPhone && (active || notice) }, decorate = decorate)
+        strip?.status?.isClickable = action() != null || message == StatusLine.OFFLINE
+        val disclosure = if (retained || store.health?.debugRetention == true) res.getString(R.string.strip_debug_retention_spoken) else ""
+        strip?.status?.contentDescription = disclosure + (action()?.let { res.getString(R.string.status_with_action_spoken, line, res.getString(it.label)) }
+            ?: if (message == StatusLine.OFFLINE) res.getString(R.string.status_offline_description)
+            else announcement(raw) ?: if (left != null) spokenLeft?.let { res.getString(R.string.status_seconds_left, line, it) } ?: line else decorate(line))
     }
     private companion object {
-        fun keptStatus(reason: String) = (if (DictationAction.forStatus(reason) == DictationAction.NETWORK ||
-            reason.startsWith("Chirp server took too long")) "Connection lost" else reason.substringBefore(" — ")) + " — kept what I heard"
-        const val IDLE = "Tap mic · hold to talk"
-        const val CONNECTING = "Connecting Tailscale…"
-        const val CONNECTED = "Tailscale connected"
         val SPOKEN_MARKS = setOf(15, 10, 5, 3, 2, 1)
     }
 }

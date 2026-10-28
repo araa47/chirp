@@ -208,10 +208,10 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
         banner.retention(model.retention)
         headline.text = when (state) {
             FloatingState.ERROR -> context.getString(R.string.panel_error)
-            FloatingState.IDLE -> if (model.copyMode) model.headline else context.getString(R.string.panel_ready)
+            FloatingState.IDLE -> if (model.copyMode) model.headline.resolve(resources) else context.getString(R.string.panel_ready)
             FloatingState.LISTENING -> context.getString(R.string.panel_listening)
             FloatingState.INSERTED, FloatingState.POLISHED -> context.getString(R.string.panel_finished)
-            else -> model.headline
+            else -> model.headline.resolve(resources)
         }
         val chip = state == FloatingState.POLISHED
         polished.visibility = if (chip) VISIBLE else GONE
@@ -223,9 +223,9 @@ internal class VoicePanel(context: Context) : LinearLayout(context) {
         }
         val fix = model.fix
         error.visibility = if (state == FloatingState.ERROR) VISIBLE else GONE
-        errorText.text = model.status
+        errorText.text = model.status?.resolve(resources).orEmpty()
         this.fix.visibility = if (fix != null) VISIBLE else GONE
-        if (fix != null) { this.fix.text = fix.label; this.fix.contentDescription = fix.description }
+        if (fix != null) { this.fix.text = context.getString(fix.label); this.fix.contentDescription = context.getString(fix.description) }
         // Live partials: stable words in ink, the unstable tail muted. Kept text is shown whole and selectable.
         val text = model.text
         val keeps = state == FloatingState.READY_TO_COPY || state == FloatingState.ERROR

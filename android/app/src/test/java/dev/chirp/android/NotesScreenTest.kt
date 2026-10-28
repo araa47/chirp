@@ -90,7 +90,7 @@ class NotesModelTest {
         rig.api.answers += NotesStructureResponse("## Plan\n- Ship it", true)
         val first = rig.record()
         assertEquals(listOf(true), rig.foreground)
-        assertEquals("Listening…", rig.model.status)
+        assertEquals("Listening…", rig.model.status.notesEnglish())
         first.final("we will ship it"); rig.idle()
         assertEquals("## Plan\n- Ship it", rig.model.field.text)
         rig.model.toggle(); rig.idle()
@@ -130,8 +130,8 @@ class NotesModelTest {
     @Test fun `without a pairing Record explains instead of starting`() {
         val rig = NotesModelRig(context, paired = false)
         rig.model.toggle()
-        assertEquals("Pair your computer in Chirp settings", rig.model.status)
-        assertEquals(DictationAction.PAIR, DictationAction.forStatus(rig.model.status))
+        assertEquals("Pair your computer in Chirp settings", rig.model.status.notesEnglish())
+        assertEquals(DictationAction.PAIR, rig.model.status.action)
         assertTrue(rig.wires.isEmpty())
     }
 

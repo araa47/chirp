@@ -12,7 +12,7 @@ import kotlin.math.sqrt
 internal class NotesCapture(
     private val frame: (ByteArray, Float) -> Unit,
     private val level: (Double) -> Unit,
-    private val done: (String?) -> Unit,
+    private val done: (DictationStatus?) -> Unit,
     private val input: PcmInput = MicrophoneInput(),
 ) : Capture {
     private val running = AtomicBoolean(true)
@@ -22,7 +22,7 @@ internal class NotesCapture(
     override fun start() {
         check(thread == null)
         thread = Thread({
-            var error: String? = null
+            var error: DictationStatus? = null
             val samples = ShortArray(640)
             try {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
@@ -32,7 +32,7 @@ internal class NotesCapture(
                     var count = 0
                     while (count < samples.size && running.get()) {
                         val read = input.read(samples, count, samples.size - count)
-                        if (read <= 0) { if (running.get() && !input.finished) error = "Microphone unavailable"; break }
+                        if (read <= 0) { if (running.get() && !input.finished) error = StatusLine.MICROPHONE_UNAVAILABLE; break }
                         count += read
                     }
                     if (!running.get() || count != samples.size) break
@@ -48,7 +48,7 @@ internal class NotesCapture(
                     frame(bytes, rms.toFloat())
                 }
             } catch (_: Exception) {
-                if (running.get()) error = "Microphone unavailable — check permission in Chirp settings"
+                if (running.get()) error = StatusLine.MICROPHONE_BLOCKED
             } finally {
                 running.set(false); samples.fill(0)
                 synchronized(lock) {

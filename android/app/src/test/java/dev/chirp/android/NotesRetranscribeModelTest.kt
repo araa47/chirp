@@ -79,7 +79,8 @@ class NotesRetranscribeModelTest {
         val rig = rig(); val model = rig.model; model.rebuildChoice = true
         model.startRetranscribe(); rig.idle(); rig.wire.ready(); rig.idle(); rig.wire.final("new speech"); rig.idle()
         assertEquals("My own notes", model.field.text)
-        assertEquals("Couldn’t rebuild the notes. Transcript updated.", model.retranscribeNotice)
+        assertEquals(RetranscribeNotice.RebuildFailed, model.retranscribeNotice)
+        assertEquals("Couldn’t rebuild the notes. Transcript updated.", model.retranscribeNotice!!.ui.notesEnglish())
     }
 
     @Test fun `rebuild review belongs to its note when browsing another document`() {
@@ -97,7 +98,8 @@ class NotesRetranscribeModelTest {
     @Test fun `interrupted notice appears once after process restart without staging on disk`() {
         SettingsStore(context).notesRetranscribeInterrupted = true
         val one = NotesModelRig(context).model
-        assertEquals("Re-transcribe was interrupted. Nothing changed.", one.retranscribeNotice)
+        assertEquals(RetranscribeNotice.Interrupted, one.retranscribeNotice)
+        assertEquals("Re-transcribe was interrupted. Nothing changed.", one.retranscribeNotice!!.ui.notesEnglish())
         assertNull(NotesModelRig(context).model.retranscribeNotice)
     }
 }

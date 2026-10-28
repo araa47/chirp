@@ -176,7 +176,7 @@ internal fun SpeakerModelStatus(model: NotesSpeakerModel, modifier: Modifier = M
     androidx.compose.material3.Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
         color = if (model.retryable) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.padding(12.dp)) {
-            Text(status, style = MaterialTheme.typography.bodyMedium,
+            Text(status.ui.text(), style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite })
             Row {
                 if (model.retryable) TextButton(model::retry) { Text(stringResource(R.string.notes_speakers_retry)) }

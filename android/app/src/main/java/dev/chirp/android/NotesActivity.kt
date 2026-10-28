@@ -20,7 +20,7 @@ open class NotesActivity : ComponentActivity(), AppShortcutHost {
     override fun onKeyShortcut(keyCode: Int, event: android.view.KeyEvent): Boolean = appShortcuts.dispatch(event) || super.onKeyShortcut(keyCode, event)
     override fun onProvideKeyboardShortcuts(groups: MutableList<android.view.KeyboardShortcutGroup>, menu: android.view.Menu?, deviceId: Int) {
         super.onProvideKeyboardShortcuts(groups, menu, deviceId)
-        appShortcuts.provide(groups)
+        appShortcuts.provide(groups, resources)
     }
     internal open fun createModel(): NotesModel = NotesModel(applicationContext)
     internal open val tailscale: TailscaleControl by lazy { AndroidTailscale(this) }

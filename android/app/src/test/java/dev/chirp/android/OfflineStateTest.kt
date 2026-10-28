@@ -64,7 +64,7 @@ class OfflineStateTest {
     private fun assertBadge(offline: Boolean) {
         assertEquals(if (offline) "Computer offline, double-tap to retry" else "Microphone: tap to dictate, hold to talk", strip.mic.contentDescription.toString())
     }
-    private fun assertNotOffline() = assertNotEquals(ConnectionFailure.OFFLINE_DESCRIPTION, strip.mic.contentDescription.toString())
+    private fun assertNotOffline() = assertNotEquals("Computer offline, double-tap to retry", strip.mic.contentDescription.toString())
     private fun assertQuiet() { assertEquals(View.GONE, strip.status.visibility); assertEquals(View.GONE, strip.action.visibility) }
     @Before fun setup() {
         controller.create(); host = controller.get()
@@ -114,13 +114,13 @@ class OfflineStateTest {
     @Test fun `a retry re-checks health, then dictates when the Mac is back`() {
         health = { throw UnknownHostException("synthetic") }
         keyboard(checkHealth = true)
-        await { strip.status.text.toString() == ConnectionFailure.OFFLINE }
+        await { strip.status.text.toString() == "Computer offline · Check again" }
         assertOfflineRow()
         val gate = java.util.concurrent.CountDownLatch(1)
         health = { gate.await(); Health(true, false, true, false, null) }
         tap()
         assertFalse("must not start before the check returns", voice.active)
-        assertEquals(ConnectionFailure.CHECKING, strip.status.text.toString())
+        assertEquals("Checking your computer…", strip.status.text.toString())
         gate.countDown()
         await { voice.active }
         assertNotOffline()
@@ -128,18 +128,18 @@ class OfflineStateTest {
     @Test fun `a retry that still fails names the reason and offers Check Tailscale`() {
         health = { throw UnknownHostException("synthetic") }
         keyboard(checkHealth = true)
-        await { strip.status.text.toString() == ConnectionFailure.OFFLINE }
+        await { strip.status.text.toString() == "Computer offline · Check again" }
         tap()
         await { strip.status.text.toString().startsWith("Can't find your computer") }
         assertFalse(voice.active)
-        assertEquals(DictationAction.NETWORK.label, strip.status.contentDescription.toString().substringAfterLast(". "))
+        assertEquals(english.getString(DictationAction.NETWORK.label), strip.status.contentDescription.toString().substringAfterLast(". "))
         assertBadge(true)
         advance(5000); assertBadge(true)
     }
     @Test fun `a second tap during the check never waits for it`() {
         health = { throw UnknownHostException("synthetic") }
         keyboard(checkHealth = true)
-        await { strip.status.text.toString() == ConnectionFailure.OFFLINE }
+        await { strip.status.text.toString() == "Computer offline · Check again" }
         health = { Thread.sleep(2000); Health(true, false, true, false, null) }
         tap(); assertFalse(voice.active)
         advance(100); tap()
@@ -156,22 +156,22 @@ class OfflineStateTest {
         keyboard(); tap(); assertTrue(voice.active)
         fails(ConnectionFailure.Kind.DNS)
         assertFalse(voice.active)
-        assertEquals("${ConnectionFailure.Kind.DNS.status} · ${DictationAction.NETWORK.label}", strip.status.text.toString())
-        assertEquals(DictationAction.NETWORK.label, strip.status.contentDescription.toString().substringAfterLast(". "))
+        assertEquals("${ConnectionFailure.Kind.DNS.english()} · ${english.getString(DictationAction.NETWORK.label)}", strip.status.text.toString())
+        assertEquals(english.getString(DictationAction.NETWORK.label), strip.status.contentDescription.toString().substringAfterLast(". "))
         assertBadge(true)
         advance(5000); assertBadge(true)
     }
     @Test fun `a TLS failure during dictation names it and offers no Tailscale action`() {
         keyboard(); tap(); fails(ConnectionFailure.Kind.TLS)
-        assertEquals(ConnectionFailure.Kind.TLS.status, strip.status.text.toString())
+        assertEquals(ConnectionFailure.Kind.TLS.english(), strip.status.text.toString())
         assertEquals(View.GONE, strip.action.visibility); assertBadge(false)
     }
     @Test fun `Tailscale being off takes priority over the offline row`() {
         tailscale.connected = false
         keyboard("https://mac.example.ts.net/chirp")
-        assertEquals(DictationAction.TAILSCALE_OFF, strip.status.text.toString())
+        assertEquals("Tailscale is off", strip.status.text.toString())
         fails(ConnectionFailure.Kind.DNS)
-        assertEquals(DictationAction.TAILSCALE_OFF, strip.status.text.toString())
+        assertEquals("Tailscale is off", strip.status.text.toString())
         assertEquals("Turn on", strip.action.text.toString())
         tailscale.connected = true
     }

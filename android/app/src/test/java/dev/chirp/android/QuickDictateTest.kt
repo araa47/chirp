@@ -64,12 +64,12 @@ class QuickDictateTest {
     @Test fun `open starts capture and final copies sensitive text with raw undo`() {
         val controller = Robolectric.buildActivity(TestQuick::class.java).setup()
         val activity = controller.get()
-        assertTrue(activity.model.status, activity.model.active)
+        assertTrue(activity.model.status.english(), activity.model.active)
         activity.rig.finish()
         val clip = app.getSystemService(android.content.ClipboardManager::class.java).primaryClip!!
         assertEquals("Synthetic words.", clip.getItemAt(0).text)
         assertTrue(clip.description.extras!!.getBoolean("android.content.extra.IS_SENSITIVE"))
-        assertEquals("Copied — paste anywhere", activity.model.status)
+        assertEquals("Copied — paste anywhere", activity.model.status.english())
         activity.model.useRaw()
         assertEquals("synthetic words", app.getSystemService(android.content.ClipboardManager::class.java).primaryClip!!.getItemAt(0).text)
         assertNull(activity.model.raw)
@@ -103,12 +103,12 @@ class QuickDictateTest {
         controller.destroy()
     }
     @Test fun `network engine and microphone errors give the matching Activity result when abandoned`() {
-        for ((message, code) in listOf("Computer unreachable — check Tailscale" to RecognizerIntent.RESULT_NETWORK_ERROR,
+        for ((message, code) in listOf("Computer unreachable — is Tailscale on?" to RecognizerIntent.RESULT_NETWORK_ERROR,
             "Speech engine hiccup" to RecognizerIntent.RESULT_SERVER_ERROR, "Microphone unavailable" to RecognizerIntent.RESULT_AUDIO_ERROR)) {
             val controller = Robolectric.buildActivity(TestQuick::class.java, Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)).setup()
             val activity = controller.get()
             activity.rig.wire.event(ServerEvent.Failure(if (code == RecognizerIntent.RESULT_SERVER_ERROR) "engine" else "bad_audio"))
-            assertEquals(code, QuickDictateModel.errorFor(message))
+            assertEquals(code, QuickDictateModel.errorFor(statusOf(message)))
             if (code == RecognizerIntent.RESULT_NETWORK_ERROR) {
                 activity.model.start(); activity.rig.wire.failure()
             }
@@ -131,7 +131,7 @@ class QuickDictateTest {
         activity.fix()
         assertTrue(activity.model.active); assertNotSame(first, activity.rig.wire)
         assertNull(shadowOf(activity).nextStartedActivity)
-        activity.model.cancel(); activity.model.status = "Pair your computer in Chirp settings"
+        activity.model.cancel(); activity.model.status = StatusLine.NOT_PAIRED
         activity.fix()
         val setup = shadowOf(activity).nextStartedActivity
         assertEquals("pair", setup.getStringExtra("section"))

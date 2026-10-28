@@ -46,10 +46,10 @@ open class QuickDictateActivity : ComponentActivity() {
     private var started = false
     private var askedPermission = false
     private var vpnWatch: AutoCloseable? = null
-    private val vpnTimeout = Runnable { endVpnWait(); model.status = DictationAction.TAILSCALE_STALLED }
+    private val vpnTimeout = Runnable { endVpnWait(); model.status = StatusLine.TAILSCALE_STALLED }
     internal val recognizing get() = intent.action == RecognizerIntent.ACTION_RECOGNIZE_SPEECH
     private val permission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        if (it) model.start() else model.status = "Allow microphone in Chirp settings"
+        if (it) model.start() else model.status = StatusLine.ALLOW_MICROPHONE
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -118,7 +118,7 @@ open class QuickDictateActivity : ComponentActivity() {
     private fun setup(section: String) = startActivity(Intent(this, SetupActivity::class.java).putExtra("section", section)
         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
     internal fun fix() {
-        when (DictationAction.forStatus(model.status)) {
+        when (model.status.action) {
             DictationAction.PAIR -> setup("pair")
             DictationAction.MICROPHONE -> {
                 if (askedPermission && !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO))
@@ -129,9 +129,9 @@ open class QuickDictateActivity : ComponentActivity() {
                 endVpnWait()
                 vpnWatch = tailscale.watch { if (tailscale.connected()) { endVpnWait(); model.start() } }
                 if (tailscale.connect()) {
-                    model.status = "Connecting Tailscale…"
+                    model.status = StatusLine.TAILSCALE_CONNECTING
                     handler.postDelayed(vpnTimeout, 12_000)
-                } else { endVpnWait(); model.status = DictationAction.TAILSCALE_STALLED }
+                } else { endVpnWait(); model.status = StatusLine.TAILSCALE_STALLED }
             }
             DictationAction.TAILSCALE_OPEN, DictationAction.TAILSCALE_SETUP -> {
                 if (!tailscale.open()) setup("network")
@@ -183,7 +183,7 @@ internal fun QuickDictateScreen(model: QuickDictateModel, prompt: String? = null
                     else Ripple(model.level.toFloat(), Modifier.fillMaxSize(), animate = false)
                     Icon(painterResource(R.drawable.ic_mic), null, Modifier.size(32.dp), tint = colors.primary)
                 }
-                Text(if (recognizing && model.copied) stringResource(R.string.quick_dictate_finished) else model.status,
+                Text(if (recognizing && model.copied) stringResource(R.string.quick_dictate_finished) else model.status.text(),
                     Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium)
                 if (model.retained) Text(stringResource(R.string.debug_retention), style = MaterialTheme.typography.bodySmall)
                 val content = if (model.copied) model.text else model.partial
@@ -204,7 +204,7 @@ internal fun QuickDictateScreen(model: QuickDictateModel, prompt: String? = null
                     OutlinedButton(edit, Modifier.fillMaxWidth()) { Text(stringResource(R.string.quick_dictate_edit)) }
                     Button(done, Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_done)) }
                 } else {
-                    Button(retry, Modifier.fillMaxWidth()) { Text(stringResource(when (DictationAction.forStatus(model.status)) {
+                    Button(retry, Modifier.fillMaxWidth()) { Text(stringResource(when (model.status.action) {
                         DictationAction.PAIR -> R.string.settings_pair_computer
                         DictationAction.MICROPHONE -> R.string.quick_dictate_allow
                         DictationAction.TAILSCALE_ON, DictationAction.TAILSCALE_OPEN, DictationAction.TAILSCALE_SETUP -> R.string.quick_dictate_tailscale_on

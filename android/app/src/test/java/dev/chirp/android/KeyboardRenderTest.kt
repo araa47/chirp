@@ -51,16 +51,16 @@ class KeyboardRenderTest {
     }
     private class Fixture(val name: String, val message: String, val kind: StripKind, val show: (KeyboardStrip) -> Unit)
     private val fixtures = listOf(
-        Fixture("idle", "Tap mic · hold to talk", StripKind.IDLE) { it.show("Tap mic · hold to talk", "", false, false, false, false) },
-        Fixture("connecting", "Connecting to your computer…", StripKind.CONNECTING) { it.show("Connecting to your computer…", "", true, false, false, false) },
-        Fixture("listening", "Listening…", StripKind.LISTENING) { it.show("Listening…", "Synthetic example for visual review", true, false, false, false); it.level(.45) },
-        Fixture("countdown", "Listening… · 15 s left", StripKind.LISTENING) { it.show("Listening… · 15 s left", "", true, false, false, false, countdown = true); it.level(.45) },
-        Fixture("polishing", "Polishing…", StripKind.POLISHING) { it.show("Polishing…", "", true, true, false, false, polishing = true, style = "Email") },
-        Fixture("final", "Inserted", StripKind.SUCCESS) { it.show("Inserted · tap mic to dictate again", "", false, false, true, false, notice = true, undoable = true) },
-        Fixture("tailscale", DictationAction.TAILSCALE_OFF, StripKind.ERROR) { it.show(DictationAction.TAILSCALE_OFF, "", false, false, false, false) },
-        Fixture("offline", ConnectionFailure.OFFLINE, StripKind.ERROR) { it.show(ConnectionFailure.OFFLINE, "", false, false, false, false, offline = true) },
-        Fixture("phone", "Listening…", StripKind.LISTENING) { it.show("Listening…", "", true, false, false, false, phone = "Phone speech recogniser"); it.level(.3) },
-        Fixture("retention", "Debug retention on · Listening…", StripKind.LISTENING) { it.show("Listening…", "", true, false, false, true); it.level(.3) },
+        Fixture("idle", "Tap mic · hold to talk", StripKind.IDLE) { it.show(statusOf("Tap mic · hold to talk"), "", false, false, false, false) },
+        Fixture("connecting", "Connecting to your computer…", StripKind.CONNECTING) { it.show(statusOf("Connecting to your computer…"), "", true, false, false, false) },
+        Fixture("listening", "Listening…", StripKind.LISTENING) { it.show(statusOf("Listening…"), "Synthetic example for visual review", true, false, false, false); it.level(.45) },
+        Fixture("countdown", "Listening… · 15 s left", StripKind.LISTENING) { it.show(StatusLine.LISTENING, "", true, false, false, false, countdown = true, decorate = { line -> "$line · 15 s left" }); it.level(.45) },
+        Fixture("polishing", "Polishing…", StripKind.POLISHING) { it.show(statusOf("Polishing…"), "", true, true, false, false, polishing = true, style = "Email") },
+        Fixture("final", "Inserted", StripKind.SUCCESS) { it.show(statusOf("Inserted · tap mic to dictate again"), "", false, false, true, false, notice = true, undoable = true) },
+        Fixture("tailscale", "Tailscale is off", StripKind.ERROR) { it.show(StatusLine.TAILSCALE_OFF, "", false, false, false, false) },
+        Fixture("offline", "Computer offline · Check again", StripKind.ERROR) { it.show(StatusLine.OFFLINE, "", false, false, false, false, offline = true) },
+        Fixture("phone", "Listening…", StripKind.LISTENING) { it.show(statusOf("Listening…"), "", true, false, false, false, phone = "Phone speech recogniser"); it.level(.3) },
+        Fixture("retention", "Debug retention on · Listening…", StripKind.LISTENING) { it.show(statusOf("Listening…"), "", true, false, false, true); it.level(.3) },
     )
     @Test fun `render every strip state in both themes, looks and cover and inner widths at an unchanged height`() {
         val app = RuntimeEnvironment.getApplication()
@@ -89,7 +89,7 @@ class KeyboardRenderTest {
                     PrivateSession.set(state.name == "final")
                     strip.privateChip.visibility = if (state.name == "final") View.VISIBLE else View.GONE
                     state.show(strip)
-                    if (state.name == "final") strip.show("cleaned", "", false, false, true, false, notice = true, undoable = true,
+                    if (state.name == "final") strip.show(statusOf("cleaned"), "", false, false, true, false, notice = true, undoable = true,
                         actionUntil = android.os.SystemClock.elapsedRealtime() + 4000)
                     assertEquals("${state.name} ${look.name} $size $name", state.kind, strip.stripKind)
                     root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(900, View.MeasureSpec.AT_MOST))
@@ -136,7 +136,7 @@ class KeyboardRenderTest {
                     assertTrue(Settings.getValues().mColors.hasKeyBorders)
                     Settings.getValues().mColors.setBackground(root, ColorType.MAIN_BACKGROUND)
                     for (state in listOf("idle", "listening")) {
-                        strip.show(if (state == "listening") "Listening…" else "Tap mic · hold to talk", "", state == "listening", false, false, false)
+                        strip.show(if (state == "listening") StatusLine.LISTENING else StatusLine.IDLE, "", state == "listening", false, false, false)
                         strip.level(if (state == "listening") .45 else 0.0)
                         root.measure(View.MeasureSpec.makeMeasureSpec(411, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(900, View.MeasureSpec.AT_MOST))
                         root.layout(0, 0, 411, root.measuredHeight)

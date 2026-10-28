@@ -32,14 +32,18 @@ import org.robolectric.annotation.Config
 import org.robolectric.android.controller.ActivityController
 import java.time.ZoneOffset
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [37])
 class NotesConnectionStatusTest {
     @Test fun `connection chip distinguishes Mac offline and phone fallback`() {
-        assertEquals("Computer", notesConnectionStatus(true, true, false, false).label)
+        fun label(paired: Boolean, reachable: Boolean?, tailscaleOff: Boolean, phone: Boolean) =
+            RuntimeEnvironment.getApplication().getString(notesConnectionStatus(paired, reachable, tailscaleOff, phone).label)
+        assertEquals("Computer", label(true, true, false, false))
         assertTrue(notesConnectionStatus(true, true, false, false).connected)
-        assertEquals("Offline", notesConnectionStatus(true, false, false, true).label)
-        assertEquals("Offline", notesConnectionStatus(true, true, true, false).label)
-        assertEquals("Offline", notesConnectionStatus(false, null, false, false).label)
-        assertEquals("Phone", notesConnectionStatus(false, null, false, true).label)
+        assertEquals("Offline", label(true, false, false, true))
+        assertEquals("Offline", label(true, true, true, false))
+        assertEquals("Offline", label(false, null, false, false))
+        assertEquals("Phone", label(false, null, false, true))
     }
 }
 
@@ -77,7 +81,7 @@ class LauncherRoutingTest {
         SettingsStore(app).onboarded = true
         val activity = launch()
         activity.fix(HomeFix.TailscaleOn)
-        assertEquals(1, activity.fake.connects); assertEquals("Connecting Tailscale…", activity.state.status)
+        assertEquals(1, activity.fake.connects); assertEquals("Connecting Tailscale…", activity.state.status.resolve(activity.resources))
         activity.fix(HomeFix.Pair)
         assertFalse(activity.state.shellOpen); assertEquals(PAGE_PAIR, activity.state.step); assertTrue(activity.state.pairFromShell)
         activity.state.micDenied = true

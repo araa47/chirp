@@ -28,7 +28,7 @@ class PcmCaptureTest {
             override fun close() { order += "release" }
         }
         val done = CountDownLatch(1)
-        val error = AtomicReference<String?>()
+        val error = AtomicReference<DictationStatus?>()
         val frames = mutableListOf<ByteArray>()
         PcmCapture({ bytes -> frames += bytes.copyOf(); bytes.fill(0); true }, {}, {
             error.set(it); order += "done"; done.countDown()
@@ -39,7 +39,7 @@ class PcmCaptureTest {
     }
     @Test fun `capture initialization failure still closes source and exposes no exception message`() {
         val done = CountDownLatch(1)
-        val error = AtomicReference<String?>()
+        val error = AtomicReference<DictationStatus?>()
         var closed = false
         val input = object : PcmInput {
             override fun start() { throw SecurityException("synthetic private detail") }
@@ -49,12 +49,12 @@ class PcmCaptureTest {
         }
         PcmCapture({ true }, {}, { error.set(it); done.countDown() }, input).start()
         assertTrue(done.await(10, TimeUnit.SECONDS)); assertTrue(closed)
-        assertTrue(error.get().orEmpty().contains("Microphone unavailable"))
-        assertFalse(error.get().orEmpty().contains("private"))
+        assertTrue(error.get()!!.english().contains("Microphone unavailable"))
+        assertFalse(error.get()!!.english().contains("private"))
     }
     @Test fun `stop before first frame releases without reporting a microphone failure`() {
         val done = CountDownLatch(1)
-        val error = AtomicReference<String?>("unfinished")
+        val error = AtomicReference<DictationStatus?>(StatusLine.UNEXPECTED)
         var opened = false
         var closed = false
         val input = object : PcmInput {
@@ -84,7 +84,7 @@ class PcmCaptureTest {
     }
     private fun run(input: Endless, pause: Double? = null, countdown: MutableList<Int>? = null, limit: Int? = null): Pair<Int, String?> {
         val done = CountDownLatch(1)
-        val error = AtomicReference<String?>()
+        val error = AtomicReference<DictationStatus?>()
         var sent = 0
         val capture = PcmCapture({ sent++; true }, {}, { error.set(it); done.countDown() }, input)
         capture.pauseSeconds = pause
@@ -92,7 +92,7 @@ class PcmCaptureTest {
         if (countdown != null) capture.countdown = { countdown += it }
         capture.start()
         assertTrue(done.await(20, TimeUnit.SECONDS))
-        return sent to error.get()
+        return sent to error.get()?.english()
     }
     @Test fun `capture stops itself at 119 seconds and counts down from 15 without an error`() {
         val left = mutableListOf<Int>()

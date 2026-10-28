@@ -47,15 +47,17 @@ internal sealed interface VoiceAction {
 }
 /** Fixed codes and copy only; no server message, name, URL or response body in exceptions. */
 internal class VoiceLibraryError(val code: String) : IOException("Saved voices: $code") {
-    val userMessage get() = when (code) {
-        "gone" -> "Record a little more with them, then try again"
-        "too_short" -> "Name kept in this note. The voice will be remembered after 20 seconds of speech."
-        "disabled" -> "Remember voices is off on your computer"
-        "full" -> "Saved voices is full. Forget a voice, then try again."
-        "no_voice" -> "This voice was forgotten on another device. Refresh Saved voices."
-        "unsupported" -> "Update Chirp on your computer to save voices"
-        "bad_speakers" -> "Use a name with letters, without colons or line breaks"
-        "auth" -> "Pair your computer again to use Saved voices"
-        else -> "Couldn’t reach Saved voices. Try again."
+    companion object {
+        fun text(code: String) = UiText.Res(when (code) {
+            "gone" -> R.string.notes_status_voice_gone
+            "too_short" -> R.string.notes_status_voice_too_short
+            "disabled" -> R.string.notes_status_voice_disabled
+            "full" -> R.string.notes_status_voice_full
+            "no_voice" -> R.string.notes_status_voice_no_voice
+            "unsupported" -> R.string.notes_status_voice_unsupported
+            "bad_speakers" -> R.string.notes_status_voice_bad_speakers
+            "auth" -> R.string.notes_status_voice_auth
+            else -> R.string.notes_status_voice_failed
+        })
     }
 }

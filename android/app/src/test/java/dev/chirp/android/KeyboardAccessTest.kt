@@ -88,7 +88,7 @@ class KeyboardAccessTest {
     }
     @Test fun `cue plays for server errors and setup errors but not for cancel`() {
         SettingsStore(host).soundCues = true
-        listen(); voice.cancel("Cancelled"); assertEquals(listOf(Cue.START), cues.played)
+        listen(); voice.cancel(StatusLine.CANCELLED); assertEquals(listOf(Cue.START), cues.played)
         listen(); stream.event(ServerEvent.Failure("engine")); assertTrue(Cue.ERROR in cues.played)
         cues.played.clear()
         shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(Manifest.permission.RECORD_AUDIO)

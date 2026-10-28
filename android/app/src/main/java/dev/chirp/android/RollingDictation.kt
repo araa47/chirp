@@ -46,12 +46,12 @@ internal class DictationSegmenter(
 }
 
 /** One segment's view of the shared microphone: frames arrive only while the router points at it. */
-private class SegmentCapture(val frame: (ByteArray) -> Boolean, private val done: (String?) -> Unit,
+private class SegmentCapture(val frame: (ByteArray) -> Boolean, private val done: (DictationStatus?) -> Unit,
                              private val started: (SegmentCapture) -> Unit, private val stopped: (SegmentCapture) -> Unit) : Capture {
     private val finished = AtomicBoolean(false)
     override fun start() = started(this)
     override fun stop() = stopped(this)
-    fun finish(error: String?) { if (finished.compareAndSet(false, true)) done(error) }
+    fun finish(error: DictationStatus?) { if (finished.compareAndSet(false, true)) done(error) }
 }
 
 /** Routes capture frames to the current segment and runs the segmenter on the capture thread. A swap is atomic, so every frame lands on exactly one segment, in order. */
@@ -83,7 +83,7 @@ private class SegmentRouter(private val cut: () -> Unit) {
     }
     fun current(segment: SegmentCapture) = synchronized(lock) { target === segment }
     /** Capture ended: the current segment finishes with its reason, and no later swap is accepted. */
-    fun end(error: String?) = synchronized(lock) { ended = true; target }?.finish(error)
+    fun end(error: DictationStatus?) = synchronized(lock) { ended = true; target }?.finish(error)
 }
 
 /**
@@ -94,15 +94,15 @@ private class SegmentRouter(private val cut: () -> Unit) {
  */
 internal class RollingDictation(
     private val transportFactory: ((ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
-    private val captureFactory: ((ByteArray) -> Boolean, (Double) -> Unit, (String?) -> Unit) -> Capture,
-    private val changed: (String, ServerEvent.Partial?) -> Unit,
+    private val captureFactory: ((ByteArray) -> Boolean, (Double) -> Unit, (DictationStatus?) -> Unit) -> Capture,
+    private val changed: (DictationStatus, ServerEvent.Partial?) -> Unit,
     private val level: (Double) -> Unit,
     private val retention: (Boolean) -> Unit,
     private val final: (ServerEvent.Final) -> Unit,
     private val ended: () -> Unit,
     private val handler: Handler = Handler(Looper.getMainLooper()),
     private val correcting: (ServerEvent.Correcting) -> Unit = {},
-    private val kept: ((String, String) -> Unit)? = null,
+    private val kept: ((String, DictationStatus) -> Unit)? = null,
     private val pauseSeconds: Double? = null,
     private val countdown: (Int) -> Unit = {},
     /** The editor's next utterance starts after the segment that just landed (or was dropped). */
@@ -114,7 +114,7 @@ internal class RollingDictation(
 ) : Utterance {
     private inner class Segment {
         lateinit var stream: DictationStream
-        var status = ""
+        var status: DictationStatus = StatusLine.CONNECTING
         var partial: ServerEvent.Partial? = null
         var raw: ServerEvent.Correcting? = null
         var outcome: (() -> Unit)? = null
@@ -191,7 +191,7 @@ internal class RollingDictation(
         if (segments.size > 1) emit(segments.first(), null)
     }
     private fun emit(segment: Segment, partial: ServerEvent.Partial?) =
-        changed(if (!stopping && segments.size > 1) "Listening…" else segment.status, partial)
+        changed(if (!stopping && segments.size > 1) StatusLine.LISTENING else segment.status, partial)
     /** Lands finished segments oldest first; a later one waits until every earlier one has landed. */
     private fun drain() {
         while (live) {

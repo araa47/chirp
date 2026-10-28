@@ -25,9 +25,9 @@ internal fun ChirpSettingsSection() {
     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
         SettingsGroup {
-            NavRow(connection.title, { open("connection") }, summary = connection.summary, icon = connection.kind.icon)
+            NavRow(connection.title.text(), { open("connection") }, summary = connection.summary?.text(), icon = connection.kind.icon)
             if (store.health.cleanupAvailable()) SwitchRow(stringResource(R.string.settings_cleanup), cleanup, { cleanup = it; store.correction = it },
-                summary = cleanupDescription(store.health))
+                summary = cleanupDescription(store.health).text())
             NavRow(stringResource(R.string.settings_open_chirp), { open("settings") })
         }
         HorizontalDivider()

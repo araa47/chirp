@@ -56,7 +56,7 @@ internal sealed interface Reorganizing {
  */
 internal class NotesRecorder(
     private val transportFactory: ((ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
-    private val captureFactory: (frame: (ByteArray, Float) -> Unit, level: (Double) -> Unit, done: (String?) -> Unit) -> Capture,
+    private val captureFactory: (frame: (ByteArray, Float) -> Unit, level: (Double) -> Unit, done: (DictationStatus?) -> Unit) -> Capture,
     private val structure: suspend (NotesStructureRequest) -> NotesStructureResponse,
     private val reorganize: suspend (NotesReorganizeRequest) -> NotesReorganizeResponse,
     var options: Options,
@@ -79,7 +79,7 @@ internal class NotesRecorder(
 
     var state = State.IDLE
         private set(value) { if (field != value) { field = value; changed() } }
-    var error: String? = null
+    var error: RecordingFailure? = null
         private set
     var document = NotesDocument()
         private set
@@ -291,7 +291,7 @@ internal class NotesRecorder(
             { problem -> scope.launch { if (capture === made) captureEnded(problem) } })
         capture = made
         made.start()
-        if (!startSegment(segment)) segmentFailed(segment, ConnectionFailure.status(segment.transport.failureKind))
+        if (!startSegment(segment)) segmentFailed(segment, RecordingFailure.Connection(segment.transport.failureKind))
     }
 
     private fun startSegment(segment: Segment) =
@@ -302,7 +302,7 @@ internal class NotesRecorder(
         val buffer = PreReadyBuffer(send = { segment.transport.audio(it) }, maxBytes = PRE_READY_BYTES)
         val kept = if (keepAudio && audioSink != null) java.io.ByteArrayOutputStream() else null
         val transport = transportFactory({ event -> handle(segment, event) },
-            { segmentFailed(segment, ConnectionFailure.status(segment.transport.failureKind)) })
+            { segmentFailed(segment, RecordingFailure.Connection(segment.transport.failureKind)) })
         segment = Segment(transport, buffer, kept)
         return segment
     }
@@ -317,11 +317,11 @@ internal class NotesRecorder(
     }
 
     /** Ends recording with an error (lost microphone…): finishes like Stop and keeps the content. */
-    fun fail(reason: String) = finishRecording(reason)
+    fun fail(failure: RecordingFailure) = finishRecording(failure)
 
-    private fun captureEnded(problem: String?) {
+    private fun captureEnded(problem: DictationStatus?) {
         capture = null
-        val message = problem ?: "The microphone stopped"
+        val message = RecordingFailure.Capture(problem)
         if (state == State.STARTING && resuming) current?.let { abandonResume(it, message) }
         else if (state == State.STARTING && !sawReady) { cancel(); error = message; state = State.ERROR }
         else if (state.capturing) finishRecording(message)
@@ -339,7 +339,7 @@ internal class NotesRecorder(
     }
 
     /** A Resume whose socket never got Ready: back to paused, the socket dropped as an empty segment. */
-    private fun abandonResume(seq: Int, reason: String?) {
+    private fun abandonResume(seq: Int, reason: RecordingFailure?) {
         stopCapture(); router.swap(null); current = null; resuming = false
         error = reason; state = State.PAUSED
         finish(seq, null)
@@ -403,7 +403,7 @@ internal class NotesRecorder(
             close(next, cancel = true)
             // The current socket keeps the audio meanwhile; a server that stays down ends the session.
             val myEpoch = epoch
-            if (++failureStreak >= MAX_SEGMENT_FAILURES) finishRecording("Notes stopped: " + ConnectionFailure.status(next.transport.failureKind))
+            if (++failureStreak >= MAX_SEGMENT_FAILURES) finishRecording(RecordingFailure.Stopped(RecordingFailure.Connection(next.transport.failureKind)))
             else scope.launch { delay(RETRY_CUT_MS); if (epoch == myEpoch) cut() }
             return
         }
@@ -422,11 +422,11 @@ internal class NotesRecorder(
         val myEpoch = epoch
         segment.timeout = scope.launch {
             delay(FINAL_TIMEOUT_MS)
-            if (epoch == myEpoch && segments[segment.seq] === segment) segmentFailed(segment, "timed out")
+            if (epoch == myEpoch && segments[segment.seq] === segment) segmentFailed(segment, RecordingFailure.TimedOut)
         }
         // Not Ready yet: the Mac is still finishing the segment before it, and this one's audio waits in its buffer.
         if (!segment.ready) segment.stopOnReady = true
-        else if (!segment.transport.stop()) segmentFailed(segment, "connection closed")
+        else if (!segment.transport.stop()) segmentFailed(segment, RecordingFailure.ConnectionClosed)
     }
 
     private fun handle(segment: Segment, event: ServerEvent) {
@@ -435,7 +435,7 @@ internal class NotesRecorder(
             is ServerEvent.Ready -> {
                 segment.engine = event.engine; debugRetention = event.debugRetention; sawReady = true; segment.ready = true
                 if (!segment.buffer.ready()) { lost(segment); return }
-                if (segment.stopOnReady && !segment.transport.stop()) { segmentFailed(segment, "connection closed"); return }
+                if (segment.stopOnReady && !segment.transport.stop()) { segmentFailed(segment, RecordingFailure.ConnectionClosed); return }
                 if (state == State.STARTING && segment.seq == current) { resuming = false; state = State.RECORDING }
                 changed()
             }
@@ -448,7 +448,7 @@ internal class NotesRecorder(
                     val myEpoch = epoch
                     segment.timeout = scope.launch {
                         delay(timeout)
-                        if (epoch == myEpoch && segments[segment.seq] === segment) segmentFailed(segment, "timed out")
+                        if (epoch == myEpoch && segments[segment.seq] === segment) segmentFailed(segment, RecordingFailure.TimedOut)
                     }
                 }
                 if (!quiet) updateLivePartial()
@@ -460,20 +460,20 @@ internal class NotesRecorder(
                 event.speakers?.let { labels[segment.seq] = it }
                 finish(segment.seq, if (text.isEmpty()) null else NotesSegment(segment.seq, segment.offset, raw.ifEmpty { text }, text, event.corrected, kept, engine = event.engine ?: segment.engine))
             }
-            is ServerEvent.Failure -> segmentFailed(segment, friendly(event.code))
+            is ServerEvent.Failure -> segmentFailed(segment, RecordingFailure.Server.of(event.code))
             ServerEvent.Unknown -> Unit
         }
     }
 
     /** A frame could not be sent (backpressure, a dead socket, Ready too late): the segment becomes a gap. */
     private fun lost(segment: Segment) {
-        segmentFailed(segment, if (segment.ready) "connection lost" else ConnectionFailure.status(segment.transport.failureKind, timedOut = true))
+        segmentFailed(segment, if (segment.ready) RecordingFailure.ConnectionLost else RecordingFailure.Connection(segment.transport.failureKind, timedOut = true))
     }
 
-    private fun segmentFailed(segment: Segment, reason: String) {
+    private fun segmentFailed(segment: Segment, reason: RecordingFailure) {
         val seq = segment.seq
         if (segments[seq] !== segment) return
-        problem = "segment: $reason"
+        problem = "segment: ${reason.english}"
         if (state == State.STARTING && resuming && seq == current) { abandonResume(seq, reason); return }
         if (state == State.STARTING && !sawReady && seq == current) {
             // The very first socket never got going: nothing is recording yet.
@@ -483,9 +483,9 @@ internal class NotesRecorder(
             return
         }
         failureStreak++
-        finish(seq, NotesSegment.gap(seq, segment.offset, reason))
+        finish(seq, NotesSegment.gap(seq, segment.offset, reason.english))
         if (state != State.RECORDING) return
-        if (failureStreak >= MAX_SEGMENT_FAILURES) finishRecording("Notes stopped: $reason")
+        if (failureStreak >= MAX_SEGMENT_FAILURES) finishRecording(RecordingFailure.Stopped(reason))
         else if (seq == current) scope.launch { cut() } // The capturing socket died: roll to a fresh one.
     }
 
@@ -1003,7 +1003,7 @@ internal class NotesRecorder(
 
     // Stopping
 
-    private fun finishRecording(problem: String?) {
+    private fun finishRecording(problem: RecordingFailure?) {
         if (!state.live) return
         val myEpoch = epoch
         stoppingSince = now()
@@ -1033,7 +1033,7 @@ internal class NotesRecorder(
             }
             stoppingSince = null
             error = problem
-            if (problem != null) this@NotesRecorder.problem = problem
+            if (problem != null) this@NotesRecorder.problem = problem.english
             state = if (problem != null) State.ERROR else State.STOPPED
             changed()
         }
@@ -1080,14 +1080,5 @@ internal class NotesRecorder(
         const val STOP_REORGANIZE_SKIP_MS = 30000L
         /** The edit attempts a segment clean-up may preempt before it gives up. */
         const val EDIT_ATTEMPTS = 3
-
-        fun friendly(code: String) = when (code) {
-            "auth" -> "Pairing refused — pair again in Chirp settings"
-            "busy" -> "Chirp server is busy"
-            "too_long" -> "Segment too long"
-            "bad_audio" -> "audio not understood"
-            "engine" -> "speech engine hiccup"
-            else -> "speech engine unavailable"
-        }
     }
 }

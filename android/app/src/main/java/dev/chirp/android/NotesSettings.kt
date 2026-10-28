@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import dev.chirp.android.ui.SwitchRow
 @Composable
 internal fun NotesSettings(sessions: NotesSessions? = null, title: String? = null, speakerState: NotesSpeakerModel? = null) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val store = remember { SettingsStore(context) }
     val kept = sessions ?: remember { NotesSessions(context) }
     val scope = rememberCoroutineScope()
@@ -71,7 +73,7 @@ internal fun NotesSettings(sessions: NotesSessions? = null, title: String? = nul
             infoBody = stringResource(R.string.notes_settings_keep_info))
         SettingsItem {
             Text(stringResource(R.string.notes_settings_retention), style = MaterialTheme.typography.bodyMedium)
-            ChoiceChips(NotesRetention.entries, retention, { it.label }) { option ->
+            ChoiceChips(NotesRetention.entries, retention, { resources.getString(it.label) }) { option ->
                 retention = option
                 scope.launch { withContext(Dispatchers.IO) { kept.retention = option } }
             }
@@ -133,6 +135,6 @@ internal fun megabytes(bytes: Long) = if (bytes < 100_000) "<0.1 MB" else "%.1f 
 internal fun notesSummary(context: android.content.Context): String {
     val store = SettingsStore(context); val kept = NotesSessions(context)
     return listOfNotNull(context.getString(R.string.notes_summary_saver).takeIf { store.notesBatterySaver }, context.getString(R.string.notes_summary_recovery).takeIf { store.notesRecovery },
-        kept.takeIf { it.enabled }?.let { if (it.retention == NotesRetention.NEVER) context.getString(R.string.notes_summary_keeps) else context.getString(R.string.notes_summary_deletes_after, it.retention.label) })
+        kept.takeIf { it.enabled }?.let { if (it.retention == NotesRetention.NEVER) context.getString(R.string.notes_summary_keeps) else context.getString(R.string.notes_summary_deletes_after, context.getString(it.retention.label)) })
         .joinToString(" · ").replaceFirstChar { it.uppercase() }.ifEmpty { context.getString(R.string.notes_settings_off) }
 }

@@ -44,18 +44,18 @@ class HardwareKeyboardTest {
     @Test fun `Ctrl Alt Space and its key up are consumed`() = withIme { ime, _, strip ->
         // No pairing in this environment, so the chord reaches dictation and asks to pair.
         assertTrue(ime.onKeyDown(KeyEvent.KEYCODE_SPACE, down(KeyEvent.KEYCODE_SPACE, chord)))
-        assertEquals(DictationAction.PAIR.label, strip.status.text.toString())
+        assertEquals(english.getString(DictationAction.PAIR.label), strip.status.text.toString())
         assertTrue(ime.onKeyUp(KeyEvent.KEYCODE_SPACE, up(KeyEvent.KEYCODE_SPACE, chord)))
     }
     @Test fun `disabled setting leaves the chord to HeliBoard`() = withIme { ime, _, strip ->
         SettingsStore(RuntimeEnvironment.getApplication()).hardwareShortcut = false
         ime.onKeyDown(KeyEvent.KEYCODE_SPACE, down(KeyEvent.KEYCODE_SPACE, chord))
-        assertNotEquals(DictationAction.PAIR.label, strip.status.text.toString())
+        assertNotEquals(english.getString(DictationAction.PAIR.label), strip.status.text.toString())
     }
     @Test fun `password field ignores the chord and Esc is not consumed while idle`() = withIme { ime, _, strip ->
         ime.info.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
         ime.onKeyDown(KeyEvent.KEYCODE_SPACE, down(KeyEvent.KEYCODE_SPACE, chord))
-        assertNotEquals(DictationAction.PAIR.label, strip.status.text.toString())
+        assertNotEquals(english.getString(DictationAction.PAIR.label), strip.status.text.toString())
         assertNotEquals("Dictation unavailable in password fields", strip.status.text.toString())
         ime.info.inputType = android.text.InputType.TYPE_CLASS_TEXT
         assertFalse(ime.onKeyDown(KeyEvent.KEYCODE_ESCAPE, down(KeyEvent.KEYCODE_ESCAPE)) && ime.onKeyUp(KeyEvent.KEYCODE_ESCAPE, up(KeyEvent.KEYCODE_ESCAPE)))

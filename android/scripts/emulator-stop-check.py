@@ -50,7 +50,7 @@ def check(probe, work, expect_crash=False):
             if off is not None: probe['tap'](off)
             else: adb('shell', 'input', 'keyevent', '4')
         else:
-            switch = wait_for('Clean-up, Correction on Mac')
+            switch = wait_for('Clean-up, On your computer')
             assert switch.get('checked') == 'true', 'Clean-up was not on by default'
             adb('shell', 'input', 'keyevent', '4')
         probe["focus_editor"]()

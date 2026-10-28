@@ -59,7 +59,7 @@ internal class SetupState {
     var inputSelected by mutableStateOf(false)
     var diagnostics by mutableStateOf("No crashes recorded")
     var paired by mutableStateOf(false)
-    var status by mutableStateOf("Pair with your computer to begin")
+    var status by mutableStateOf<UiText>(UiText.Res(R.string.setup_status_initial))
     var checking by mutableStateOf(false)
     var scanning by mutableStateOf(false)
     var link by mutableStateOf("")
@@ -92,7 +92,7 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
     override fun onKeyShortcut(keyCode: Int, event: android.view.KeyEvent): Boolean = appShortcuts.dispatch(event) || super.onKeyShortcut(keyCode, event)
     override fun onProvideKeyboardShortcuts(groups: MutableList<android.view.KeyboardShortcutGroup>, menu: android.view.Menu?, deviceId: Int) {
         super.onProvideKeyboardShortcuts(groups, menu, deviceId)
-        appShortcuts.provide(groups)
+        appShortcuts.provide(groups, resources)
     }
     private lateinit var store: SettingsStore
     internal val state = SetupState()
@@ -112,12 +112,12 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
         state.localNetwork = granted
         val pending = pendingNetworkTest; pendingNetworkTest = null
         if (granted && pending != null) testPairing(pending)
-        else state.status = if (granted) "Wi-Fi server access allowed — test your pairing link" else "Wi-Fi server access denied. Tailscale still works; allow Wi-Fi access in app permissions if needed."
+        else state.status = UiText.Res(if (granted) R.string.setup_status_wifi_allowed else R.string.setup_status_wifi_denied)
     }
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         state.mic = it; state.micDenied = !it
         if (it && !state.shellOpen) advance()
-        state.status = if (it) "Microphone permission granted" else "Microphone permission is needed to dictate — open app permissions to allow it"
+        state.status = UiText.Res(if (it) R.string.setup_status_mic_granted else R.string.setup_status_mic_needed)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -147,7 +147,7 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
                     BackHandler(enabled = state.pairFromShell) { state.pairFromShell = false; state.shellOpen = true }
                     Onboarding(state, OnboardingActions(
                         grantMic = {
-                            if (state.mic) state.status = "Microphone permission already granted"
+                            if (state.mic) state.status = UiText.Res(R.string.setup_status_mic_already)
                             else micPermission.launch(Manifest.permission.RECORD_AUDIO)
                         },
                         keyboardSettings = { awaitingPrerequisite = true; startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) },
@@ -214,7 +214,7 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
         when (fix) {
             HomeFix.Pair -> openPairing()
             HomeFix.Microphone -> if (state.micDenied) openAppSettings() else micPermission.launch(Manifest.permission.RECORD_AUDIO)
-            HomeFix.TailscaleOn -> if (tailscale.connect()) state.status = "Connecting Tailscale…" else if (!tailscale.open()) openSettings(SettingsPage.Connection, outside = false)
+            HomeFix.TailscaleOn -> if (tailscale.connect()) state.status = UiText.Res(R.string.setup_status_connecting_tailscale) else if (!tailscale.open()) openSettings(SettingsPage.Connection, outside = false)
             HomeFix.Retry -> testPairing(save = false)
         }
     }
@@ -232,7 +232,7 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
     private fun openKeyboardPreferences() = startActivity(Intent(this, helium314.keyboard.settings.SettingsActivity::class.java))
     private fun forgetPairing() {
         ++pairingGeneration; ChirpNetwork.cancel(pendingHealth); pendingHealth = null
-        store.forget(); state.link = ""; state.status = "Pairing removed"; state.checking = false; state.reachable = null; state.failure = null; state.connected = false; refresh()
+        store.forget(); state.link = ""; state.status = UiText.Res(R.string.setup_status_pairing_removed); state.checking = false; state.reachable = null; state.failure = null; state.connected = false; refresh()
     }
     /** Onboarding is complete (now or on an earlier run): open Notes, with the first-run "Try it" card until it's dismissed. */
     private fun finishOnboarding() {
@@ -288,7 +288,7 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
             ++pairingGeneration; ChirpNetwork.cancel(pendingHealth); pendingHealth = null; state.checking = false
             state.link = value.orEmpty(); openPairing()
             testPairing(save = true)
-        } catch (_: Exception) { state.status = "Invalid Chirp pairing link"; state.pairIssue = PairIssue.InvalidLink }
+        } catch (_: Exception) { state.status = UiText.Res(R.string.setup_status_invalid_link); state.pairIssue = PairIssue.InvalidLink }
     }
     /** The paste field: a pasted link that parses is tested and saved straight away. */
     internal fun editLink(value: String) {
@@ -299,9 +299,9 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
         state.scanning = true; state.pairIssue = null
         scanPairingQr(
             received = { if (!isDestroyed) { state.scanning = false; receivePairingLink(it) } },
-            cancelled = { if (!isDestroyed) { state.scanning = false; state.status = "Scan cancelled — scan again or paste the pairing link" } },
+            cancelled = { if (!isDestroyed) { state.scanning = false; state.status = UiText.Res(R.string.setup_status_scan_cancelled) } },
             failed = { if (!isDestroyed) { state.scanning = false; state.pairIssue = PairIssue.ScannerUnavailable
-                state.status = "Scanner unavailable — check Google Play services or paste the pairing link" } },
+                state.status = UiText.Res(R.string.setup_status_scanner_unavailable) } },
         )
     }
     protected open fun scanPairingQr(received: (String?) -> Unit, cancelled: () -> Unit, failed: () -> Unit) {
@@ -351,12 +351,12 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
     internal fun testPairing(save: Boolean, requestPermission: Boolean = true) {
         val pairing = try {
             if (save) Pairing.parse(state.link) else store.pairing() ?: error("Missing pairing")
-        } catch (_: Exception) { state.status = "Paste a valid Chirp pairing link with an HTTPS server"; return }
+        } catch (_: Exception) { state.status = UiText.Res(R.string.setup_status_paste_valid); return }
         state.wifiPermissionNeeded = false
         val id = ++pairingGeneration
         ChirpNetwork.cancel(pendingHealth)
         val call = ChirpNetwork.healthCall(client, pairing); pendingHealth = call
-        state.checking = true; state.pairIssue = null; state.status = "Checking your computer…"
+        state.checking = true; state.pairIssue = null; state.status = UiText.Res(R.string.setup_status_checking)
         lifecycleScope.launch {
             try {
                 val health = checkMac(call)
@@ -367,21 +367,21 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
                     store.health = health
                 }
                 state.reachable = true; state.failure = null
-                state.status = if (health.ready) "Computer ready" else "Paired · Computer is loading its speech model"
+                state.status = UiText.Res(if (health.ready) R.string.setup_status_ready else R.string.setup_status_loading_model)
                 refresh()
                 if (save) state.connected = true
             } catch (error: Exception) {
                 recordDebugNetworkFailure(this@SetupActivity, error)
                 if (pairingGeneration == id && generateSequence<Throwable>(error) { it.cause }.take(5).any { it is WifiServerPermissionRequired }) {
                     pendingHealth = null; state.checking = false; state.wifiPermissionNeeded = true
-                    state.status = "Local network access is needed only for servers on your Wi-Fi. Tailscale works without it."
+                    state.status = UiText.Res(R.string.setup_status_local_network)
                     if (requestPermission) { pendingNetworkTest = save; networkPermission.launch(LOCAL_NETWORK_PERMISSION) }
                     return@launch
                 }
                 if (pairingGeneration == id) {
                     pendingHealth = null; state.checking = false; state.reachable = false; state.failure = ConnectionFailure.classify(error)
                     if (save) state.pairIssue = PairIssue.Unreachable
-                    state.status = "Computer unreachable — is Tailscale on? Check the computer is awake, Chirp is running, and the pairing link is current."
+                    state.status = UiText.Res(R.string.setup_status_unreachable)
                 }
             }
         }

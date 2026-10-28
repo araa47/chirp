@@ -56,7 +56,7 @@ class NotesCaptureUxTest {
         val rig = NotesModelRig(app, notesMac.copy(notesSpeakers = true, speakersModel = "downloading"), keys = keys)
         rig.idle()
         assertNotNull(rig.model.recovered)
-        rig.model.message = DictationAction.TAILSCALE_OFF
+        rig.model.message = NotesStatus.TAILSCALE_OFF
         var action: DictationAction? = null
         val dark = mutableStateOf(false)
         compose.setContent { ChirpTheme(dark.value) {
@@ -84,7 +84,7 @@ class NotesCaptureUxTest {
         val info = compose.onNode(hasStateDescription("Recording"))
         val node = info.fetchSemanticsNode()
         val spoken = node.config[SemanticsProperties.ContentDescription].joinToString()
-        assertTrue(spoken, "Garden plans" in spoken && rig.model.elapsedText in spoken)
+        assertTrue(spoken, "Garden plans" in spoken && rig.model.elapsedText.notesEnglish() in spoken)
         assertFalse(SemanticsProperties.LiveRegion in node.config)
         assertTrue(node.children.isEmpty())
         compose.onNodeWithContentDescription("Pause recording notes").performClick()

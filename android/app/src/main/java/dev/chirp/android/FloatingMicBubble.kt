@@ -113,7 +113,7 @@ internal class FloatingMicOverlay(context: Context, private val manager: WindowM
         gravity = Gravity.TOP or Gravity.START
         this.x = x; this.y = y
         layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-        title = "Chirp floating microphone"
+        title = context.getString(R.string.bubble_window_title)
     }
 
     /** The overlay windows' ids, so the service ignores accessibility events from its own surfaces. */
@@ -422,14 +422,13 @@ internal class BubbleView(context: Context, private val palette: VoicePalette) :
         describe()
     }
     fun describe() {
-        contentDescription = if (copyMode) "Chirp microphone — this field can't be filled automatically; your words will be ready to copy"
-            else "Chirp microphone: tap to dictate, hold to talk"
+        contentDescription = context.getString(if (copyMode) R.string.bubble_description_copy else R.string.bubble_description)
     }
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
         super.onInitializeAccessibilityNodeInfo(info)
         info.className = android.widget.Button::class.java.name
-        info.addAction(AccessibilityNodeInfo.AccessibilityAction(R.id.bubble_move_side, "Move to other side"))
-        info.addAction(AccessibilityNodeInfo.AccessibilityAction(R.id.bubble_hide_here, "Hide in this app"))
+        info.addAction(AccessibilityNodeInfo.AccessibilityAction(R.id.bubble_move_side, context.getString(R.string.bubble_action_move_side)))
+        info.addAction(AccessibilityNodeInfo.AccessibilityAction(R.id.bubble_hide_here, context.getString(R.string.bubble_action_hide)))
     }
     override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean =
         actions(action) || super.performAccessibilityAction(action, arguments)

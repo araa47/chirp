@@ -230,7 +230,7 @@ class ScratchpadTest {
         val rig = Rig(context, url = "https://mac.tail1234.ts.net/chirp", tailscale = TailscalePromptTest.FakeTailscale(connected = false))
         val actions = mutableListOf<DictationAction>(); screen(rig, actions)
         rig.model.toggle(); rig.wire.failure(); compose.waitForIdle()
-        assertTrue(rig.model.status.startsWith(DictationAction.TAILSCALE_OFF))
+        assertEquals("Tailscale is off", rig.model.status.english())
         compose.onNodeWithText("Turn on").performClick()
         assertEquals(listOf(DictationAction.TAILSCALE_ON), actions)
     }
@@ -242,8 +242,8 @@ class ScratchpadTest {
         assertTrue(unpaired.wires.isEmpty()); assertTrue(unpaired.captures.isEmpty())
         val silent = Rig(context, mic = false)
         silent.model.toggle()
-        assertEquals("Allow microphone in Chirp settings", silent.model.status)
-        assertEquals(DictationAction.MICROPHONE, DictationAction.forStatus(silent.model.status))
+        assertEquals("Allow microphone in Chirp settings", silent.model.status.english())
+        assertEquals(DictationAction.MICROPHONE, silent.model.status.action)
         assertTrue(silent.captures.isEmpty())
     }
 
@@ -387,7 +387,7 @@ class ScratchpadActivityTest {
         val clip = app.getSystemService(ClipboardManager::class.java).primaryClip!!
         assertEquals("Synthetic copy text", clip.getItemAt(0).text.toString())
         assertTrue(clip.description.extras!!.getBoolean("android.content.extra.IS_SENSITIVE"))
-        assertEquals("Copied", activity.model.status)
+        assertEquals("Copied", activity.model.status.english())
     }
 
     @Test fun `mic asks for the microphone first and then dictates once it is granted`() {
@@ -410,7 +410,7 @@ class ScratchpadActivityTest {
         activity.act(DictationAction.MICROPHONE)
         assertEquals(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, shadowOf(activity).nextStartedActivity.action)
         activity.act(DictationAction.TAILSCALE_ON)
-        assertEquals(1, activity.fakeTailscale.connects); assertEquals("Connecting Tailscale…", activity.model.status)
+        assertEquals(1, activity.fakeTailscale.connects); assertEquals("Connecting Tailscale…", activity.model.status.english())
         activity.act(DictationAction.NETWORK)
         assertEquals(1, activity.fakeTailscale.opens)
         activity.fakeTailscale.installed = false

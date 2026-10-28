@@ -35,7 +35,7 @@ internal class NotesVoiceEdit(
     private val recorder: NotesRecorder,
     private val transportFactory: ((ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
     /** Opens the microphone for a command while Notes is not capturing: frames go to the sink; null when it cannot. */
-    private val microphone: (sink: (ByteArray) -> Boolean, ended: (String?) -> Unit) -> Capture?,
+    private val microphone: (sink: (ByteArray) -> Boolean, ended: (DictationStatus?) -> Unit) -> Capture?,
     /** The editor's selection `[start, end)` when the command ends (null or empty: the whole notes). */
     private val selection: () -> Pair<Int, Int>? = { null },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
@@ -197,32 +197,27 @@ internal class NotesVoiceEdit(
 
 /** The words of a voice edit in the Notes screen. */
 internal object NotesVoiceEditText {
-    const val HINT = "Hold Command and say what to change, then let go"
-    const val LISTENING = "Say the edit…"
-    const val RUNNING = "Editing notes…"
-    const val EDITED = "Edited"
-
     /** The note under the editor for an edit that did not apply; null for one that did. */
-    fun note(outcome: NotesEditOutcome): String? = when (outcome) {
+    fun note(outcome: NotesEditOutcome): UiText? = when (outcome) {
         NotesEditOutcome.Applied -> null
-        NotesEditOutcome.Unchanged -> "The edit changed nothing"
-        is NotesEditOutcome.Refused -> when (outcome.reason) {
-            "adds_content" -> "Can’t add new content by voice — ask to remove, move, tidy or reword"
-            "not_an_edit" -> "That didn’t sound like an edit to the notes"
-            else -> "Couldn’t tell what to change — try naming the section"
-        }
-        NotesEditOutcome.Conflict -> "Notes changed while editing — try again"
-        is NotesEditOutcome.Skipped -> when (outcome.why) {
-            "not_heard" -> "Didn’t catch an edit — try again"
-            "too_long" -> "Too much to edit at once — select a section first"
-            else -> "Nothing to edit yet"
-        }
-        is NotesEditOutcome.Failed -> "Couldn’t edit notes (${outcome.code})"
+        NotesEditOutcome.Unchanged -> UiText.Res(R.string.notes_status_edit_unchanged)
+        is NotesEditOutcome.Refused -> UiText.Res(when (outcome.reason) {
+            "adds_content" -> R.string.notes_status_edit_adds_content
+            "not_an_edit" -> R.string.notes_status_edit_not_an_edit
+            else -> R.string.notes_status_edit_unclear
+        })
+        NotesEditOutcome.Conflict -> UiText.Res(R.string.notes_status_edit_conflict)
+        is NotesEditOutcome.Skipped -> UiText.Res(when (outcome.why) {
+            "not_heard" -> R.string.notes_status_edit_not_heard
+            "too_long" -> R.string.notes_status_edit_too_long
+            else -> R.string.notes_status_edit_nothing
+        })
+        is NotesEditOutcome.Failed -> UiText.Res(R.string.notes_status_edit_failed, UiText.Raw(outcome.code))
     }
 
-    fun status(status: VoiceEditStatus): String? = when (status) {
-        is VoiceEditStatus.Listening -> status.heard.ifEmpty { null }?.let { "“$it”" } ?: LISTENING
-        is VoiceEditStatus.Editing -> RUNNING
+    fun status(status: VoiceEditStatus): UiText? = when (status) {
+        is VoiceEditStatus.Listening -> status.heard.ifEmpty { null }?.let { UiText.Res(R.string.notes_status_heard, UiText.Raw(it)) } ?: UiText.Res(R.string.notes_status_say_edit)
+        is VoiceEditStatus.Editing -> UiText.Res(R.string.notes_status_editing)
         else -> null
     }
 }

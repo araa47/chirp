@@ -50,10 +50,36 @@ class NotesRetranscribeRenderTest {
             compose.runOnIdle { font.value = 1f; model.retranscribeSheet = false; RetranscribeGate.progress = RetranscribeProgress(model.document.uid, 12, 40, 92.0, 490.0) }
             compose.onNodeWithText("Re-transcribing · 12 of 40 · 1:32 of 8:10").assertIsDisplayed()
             shot("progress")
-            compose.runOnIdle { RetranscribeGate.progress = null; model.document.applyRetranscription(mapOf(0 to RetranscribedSegment(model.document.audio.single(), ServerEvent.Final("Updated synthetic words", "Updated synthetic words", false), "new"))); model.retranscribeNotice = "Transcript updated" }
+            compose.runOnIdle { RetranscribeGate.progress = null; model.document.applyRetranscription(mapOf(0 to RetranscribedSegment(model.document.audio.single(), ServerEvent.Final("Updated synthetic words", "Updated synthetic words", false), "new"))); model.retranscribeNotice = RetranscribeNotice.Updated }
             compose.onNodeWithText("Undo").assertIsDisplayed(); shot("updated")
             compose.runOnIdle { model.retranscribeNotice = null }
         }
+    }
+
+    @Test fun `the banner offers Undo by the kind of notice, not by its words`() {
+        val rig = NotesModelRig(RuntimeEnvironment.getApplication())
+        val model = rig.model
+        model.document.append(NotesSegment(0, 0.0, "A synthetic meeting example", engine = "Parakeet v2"))
+        model.document.addClip(NotesAudioClip(0, 0.0, 32.0, 16000, 128000))
+        model.document.applyRetranscription(mapOf(0 to RetranscribedSegment(model.document.audio.single(), ServerEvent.Final("Updated synthetic words", "Updated synthetic words", false), "new")))
+        compose.setContent { ChirpTheme(false) { RetranscribeBanner(model) } }
+        for (notice in listOf(RetranscribeNotice.Updated, RetranscribeNotice.Partial(1, 2), RetranscribeNotice.RebuildFailed)) {
+            compose.runOnIdle { model.retranscribeNotice = notice }
+            compose.onNodeWithText(notice.ui.notesEnglish()).assertIsDisplayed()
+            compose.onNodeWithText("Undo").assertIsDisplayed()
+        }
+        // "No segments updated" says updated, but nothing was: no Undo for the transcript an earlier run replaced.
+        for (notice in listOf(RetranscribeNotice.NoneUpdated, RetranscribeNotice.Restored, RetranscribeNotice.Cancelled, RetranscribeNotice.Interrupted)) {
+            compose.runOnIdle { model.retranscribeNotice = notice }
+            compose.onNodeWithText(notice.ui.notesEnglish()).assertIsDisplayed()
+            compose.onNodeWithText("Undo").assertDoesNotExist()
+        }
+        // "Notes rebuilt" offers Undo only while the rebuild can be undone.
+        compose.runOnIdle { model.retranscribeNotice = RetranscribeNotice.Rebuilt }
+        compose.onNodeWithText("Notes rebuilt").assertIsDisplayed()
+        compose.onNodeWithText("Undo").assertDoesNotExist()
+        compose.runOnIdle { model.retranscribeNotice = null; model.retranscribeFailure = RetranscribeFailure.TRANSCRIPT_CHANGED }
+        compose.onNodeWithText("This transcript changed. Re-transcribe again.").assertIsDisplayed()
     }
 
     @Test fun `sheet scrolls at real 200 percent font without horizontal overflow`() {

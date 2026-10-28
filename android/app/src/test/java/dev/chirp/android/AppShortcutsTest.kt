@@ -25,7 +25,7 @@ class AppShortcutsTest {
         assertEquals(1, count)
         assertTrue(shortcuts.dispatch(key(KeyEvent.KEYCODE_N, 0, KeyEvent.ACTION_UP)))
         val groups = mutableListOf<android.view.KeyboardShortcutGroup>()
-        shortcuts.provide(groups)
+        shortcuts.provide(groups, english)
         assertEquals("Chirp", groups.single().label)
         assertEquals("New note", groups.single().items.single().label)
         shortcuts.unbind(owner)
