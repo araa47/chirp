@@ -138,7 +138,13 @@ def focus_editor():
                 if 100 < cy < h - 120:
                     x, y = center(editor)
                     adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/', 'dev.chirp.smoke.UiHierarchy', 'tap', str(x), str(y))
-                    wait_for('Microphone: tap to dictate, hold to talk')
+                    try: wait_for('Microphone: tap to dictate, hold to talk', 20)
+                    except AssertionError:
+                        # A force-stop can race `ime set` and leave the previous keyboard up (#344): select Chirp again and refocus.
+                        adb('shell', 'ime', 'set', IME)
+                        adb('shell', 'input', 'keyevent', '4')
+                        adb('shell', 'CLASSPATH=/data/local/tmp/chirp-ui-probe.jar', 'app_process', '/', 'dev.chirp.smoke.UiHierarchy', 'tap', str(x), str(y))
+                        wait_for('Microphone: tap to dictate, hold to talk')
                     return
             start, end = (h * 3 // 4, h // 3) if direction == 'up' else (h // 3, h * 3 // 4)
             adb('shell', 'input', 'swipe', str(w // 2), str(start), str(w // 2), str(end), '250')
@@ -187,7 +193,13 @@ def tap_key(label):
 
 
 def editor_text():
-    return next(n.get('text', '') for n in nodes() if n.get('class') == 'android.widget.EditText')
+    # A dump taken while windows change can miss the editor (only the status bar is exposed): look again briefly (#344).
+    deadline = time.monotonic() + 10
+    while True:
+        text = next((n.get('text', '') for n in nodes() if n.get('class') == 'android.widget.EditText'), None)
+        if text is not None: return text
+        if time.monotonic() > deadline: raise AssertionError('No editor on screen')
+        time.sleep(.25)
 
 
 def typing_check():
