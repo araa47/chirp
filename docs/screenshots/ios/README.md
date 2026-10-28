@@ -16,14 +16,11 @@ Naming: `iphone-…` and `ipad-…` are the device; a `-dark` suffix (or `iphone
 - `iphone-onboarding-*`, `iphone-dark-onboarding-*`, `iphone-ax5-onboarding-*`, `ipad-onboarding-1-welcome.png`, `ipad-dark-onboarding-1-welcome.png`: first run (welcome, pair, microphone, keyboard).
 - `ipad-sidebar-*`, `ipad-dark-sidebar-*`: the iPad sidebar (Notes, Dictate, History, Settings) expanded and collapsed.
 - `iphone-session-capsule.png`, `iphone-dark-session-capsule.png`, `iphone-live-activity-*`, `iphone-dynamic-island-*`: the armed-session capsule, Live Activities and Dynamic Island (`.jpg`).
-- `strip-compare-*`: Chirp Keyboard's top row beside Android's keyboard strip, for each device and appearance.
+- `strip-compare-*`: Chirp Keyboard's top row beside Android's keyboard strip, for each device and appearance. Rebuild them from current captures with `uv run --with pillow python ios/scripts/strip-compare.py` (the script's docstring says where each side comes from).
 
-## Out of date
+## Capturing
 
-These are kept as evidence and are not current parity coverage. The audit behind this list is araa47/chirp#271 (§3.3, A2-15).
+The captures come from `TEST_RUNNER_CHIRP_SCREENSHOTS=1` UI runs on iPhone 18 Pro and iPad Pro 13-inch (M5) simulators (iOS 27.0): `ChirpScreenshotUITests/testCaptureShell`, `ChirpSettingsUITests/testCaptureSettingsTour`, `ChirpKeyboardUITests/testKeyboardStateScreenshotsInMessages` (with `TEST_RUNNER_CHIRP_PREVIEW_FILE`), and the screenshot cases in `ChirpNotesUITests`. The status bar is fixed with `xcrun simctl status_bar UDID override --time 09:41`. Export the attachments with `xcrun xcresulttool export attachments`.
 
-- `iphone-live-notes-stopped-2026-10-25.png`, `ipad-live-notes-stopped-2026-10-25.png`: the earlier five-tab app.
-- `iphone-history.png`: the earlier History tab.
-- `iphone-landscape-dictate-finished-before.png`: a before capture.
-- `iphone-speakers-consent-live.png`, `iphone-speakers-renamed-live.png`, `iphone-speakers-two-people-live.png`: a run from before speaker labels were on by default, including the download-consent alert that no longer exists.
-- Captures that still say "Mac" for the paired server (before the "your computer" wording) are being regenerated; the app text is the source of truth.
+- **Dark:** set the device's appearance before the run, and pass `TEST_RUNNER_CHIRP_NOTES_APPEARANCE=dark` so the Notes cases don't switch appearance mid-test. If live switching doesn't take, set `UserInterfaceStyleMode` (2 is dark) in the device's `com.apple.uikitservices.userInterfaceStyleMode.plist` while it is shut down, then boot it. Check that dark captures really are dark.
+- **Landscape** (the iPad sidebar and Notes captures, `*-keyboard-landscape-*`, `iphone-landscape-*`): XCUIScreen returns these in portrait bounds with the top of the screen on the right. Rotate them 90° counter-clockwise before committing.

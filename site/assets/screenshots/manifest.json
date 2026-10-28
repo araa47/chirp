@@ -554,7 +554,7 @@
     ]
   },
   "ios/ipad-dark-sidebar-dictate.png": {
-    "sha256": "c49a3ad151111c33c34846c7b7277b7fffdd97f4536e8734e81d3ae182a25d5c",
+    "sha256": "cd2c3d0419d1cc07c94103cb4f56504613bb78d1a92cc817f1ddca91422e91bd",
     "width": 1500,
     "height": 1125,
     "variants": [
@@ -581,7 +581,7 @@
     ]
   },
   "ios/ipad-sidebar-dictate.png": {
-    "sha256": "793711e0be542fc7587259d90a1fa71b3ddfc6ad6b21c5fd67b7dcd9f904d495",
+    "sha256": "5c27e95fe57360b36d6c2d1cc4ab944bd8589065012e0ff27c42ea8e3e9fffff",
     "width": 1500,
     "height": 1125,
     "variants": [
@@ -608,7 +608,7 @@
     ]
   },
   "ios/iphone-dark-dictate-listening.png": {
-    "sha256": "ca70d0b4711bef3d53a2227901d86bd0e5ac44c43f0e009669f9c585ec6ca7c8",
+    "sha256": "962ef991c5daf5e69c56ef3a31ee1f266f894d52d9c16a3ea07b82947f3359c3",
     "width": 690,
     "height": 1500,
     "variants": [
@@ -684,7 +684,7 @@
     ]
   },
   "ios/iphone-dictate-listening.png": {
-    "sha256": "68d63c3e5b706adb48a317865ee41f66ca698fe5cb8199a6bb774e97c595ca27",
+    "sha256": "cdf2fcc552f871e3763c166797ed24ce4f44d9b91f1d1948c48e742b4d8c4bd5",
     "width": 690,
     "height": 1500,
     "variants": [

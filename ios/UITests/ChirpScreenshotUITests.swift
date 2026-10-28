@@ -1,7 +1,8 @@
 import XCTest
 
 /// The README/PR screenshots of the Pond shell (#192), as `keepAlways` attachments: onboarding, Dictate idle,
-/// listening and finished, the session capsule, Notes with the setup card and, on iPad, the sidebar states.
+/// listening and finished (and finished on its side, on iPhone), the session capsule, Notes with the setup card and, on
+/// iPad, the sidebar states.
 /// Synthetic text only. Runs only with `TEST_RUNNER_CHIRP_SCREENSHOTS=1`; set the appearance and text size with
 /// `simctl ui` first. `TEST_RUNNER_CHIRP_SCREENSHOT_ARGS` adds launch arguments (`--chirp-reduce-motion`).
 final class ChirpScreenshotUITests: XCTestCase {
@@ -62,6 +63,14 @@ final class ChirpScreenshotUITests: XCTestCase {
         app.buttons["chirp.dictation.stop"].tap()
         XCTAssertTrue(app.buttons["chirp.dictation.raw"].waitForExistence(timeout: 5))
         shot("dictate-finished", app)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // On its side the phone keeps the results row beside the mic (#238).
+            XCUIDevice.shared.orientation = .landscapeLeft
+            sleep(2)
+            shot("dictate-finished-landscape", app)
+            XCUIDevice.shared.orientation = .portrait
+            sleep(1)
+        }
         app.selectChirpTab("History")
         XCTAssertTrue(app.buttons["chirp.session.end"].waitForExistence(timeout: 5))
         shot("session-capsule", app)
