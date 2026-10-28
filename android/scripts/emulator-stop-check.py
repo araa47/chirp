@@ -30,6 +30,16 @@ def check(probe, work, expect_crash=False):
             print('Crash captured:', label, '; exceptions:', [item['exception'] for item in entries], flush=True)
         return crashed
 
+    def idle_mic():
+        # A dump taken while windows change can miss the keyboard: look again briefly (#344).
+        deadline = time.monotonic() + 10
+        while True:
+            mic = next((n for n in probe['nodes']() if n.get('content-desc', '').startswith('Microphone: tap to dictate,')
+                        and n.get('class') == 'android.widget.Button'), None)
+            if mic is not None: return mic
+            if time.monotonic() > deadline: raise AssertionError('Chirp\'s idle mic is not on screen')
+            time.sleep(.25)
+
     cases = ('partial', 'hide', 'unbind') if expect_crash else (
         'immediate', 'listening', 'partial', 'polishing', 'double', 'hide', 'focus', 'unbind')
     for case in cases:
@@ -40,7 +50,7 @@ def check(probe, work, expect_crash=False):
                 data=('<map><boolean name="synthetic" value="true"/><long name="initial_frame_delay_ms" value="' +
                       ('4000' if case == 'immediate' else '0') + '"/></map>').encode())
             probe['fresh_editor']()
-            mic = next(n for n in probe['nodes']() if n.get('content-desc', '').startswith('Microphone: tap to dictate,') and n.get('class') == 'android.widget.Button')
+            mic = idle_mic()
             before = probe['editor_text']()
             x, y = probe['center'](mic)
             # The first menu item must expose the default without toggling it on.
@@ -55,7 +65,7 @@ def check(probe, work, expect_crash=False):
                 assert switch.get('checked') == 'true', 'Clean-up was not on by default'
                 adb('shell', 'input', 'keyevent', '4')
             probe["focus_editor"]()
-            mic = next(n for n in probe["nodes"]() if n.get("content-desc", "").startswith("Microphone: tap to dictate,") and n.get("class") == "android.widget.Button")
+            mic = idle_mic()
             x, y = probe["center"](mic)
             (work / "events.json").write_text("{}")
             try:
