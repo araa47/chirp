@@ -51,20 +51,55 @@ key presses and real apps are the operator's Windows checklist in [#214](https:/
 
 ### CI
 
-GitHub Actions (`.github/workflows/`) runs the automated checks on every pull request and on pushes to `main`. Each workflow is path-filtered, so a PR only runs the components it touches, and a newer push cancels the superseded run. No secrets, tailnet access or model downloads are involved.
+GitHub Actions (`.github/workflows/`) runs the Linux and Windows checks on every pull request and on pushes to `main`. Each workflow is path-filtered, so a PR only runs the components it touches, and superseded or finished-with runs are cancelled (see [Stale runs](#stale-runs)). The macOS workflows (`mac.yml`, `ios.yml`, the Intel job of `server.yml`) cost 10x Linux minutes and only run when started by hand; the Mac and iOS gates run on a Mac with `scripts/local-gate.sh` instead (see [Local gate](#local-gate)). No secrets, tailnet access or model downloads are involved.
 
 | Workflow | Runner | Runs | Notes |
 |---|---|---|---|
-| `server.yml` | ubuntu | `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q` | MLX packages are darwin-only, so Linux installs the portable set. `-m model` tests (real cached models) are deselected by `addopts`; run them on the Mac. |
+| `server.yml` | ubuntu | `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q` | MLX packages are darwin-only, so Linux installs the portable set. `-m model` tests (real cached models) are deselected by `addopts`; run them on the Mac. The `intel-mac` job runs by hand only. |
 | `desktop-linux.yml` | ubuntu | frontend checks, Rust formatting/Clippy/tests, Xvfb insertion/hotkeys, private-bus portal lifecycle, headless Sway insertion/fallback, Tauri Debian package | The shared desktop client; no speech model download or live server. |
 | `desktop-windows.yml` | windows | frontend checks, Rust formatting/Clippy/tests, SendInput/clipboard/layout smoke in a real Tk window, NSIS installer | The Windows platform module; no speech model download or live server. |
 | `android.yml` | ubuntu, JDK 21, Android SDK 37.2 | `./gradlew lint testDebugUnitTest assembleDebug assembleRelease` | The release APK is unsigned (no keystore secret). Lint and test reports upload on failure. |
-| `mac.yml` | macos | `mac/scripts/ci-test.sh` (wraps `test.sh`) | Only for `mac/**` changes (macOS minutes are expensive). Can also be started by hand (`workflow_dispatch`). |
-| `ios.yml` | macos, newest installed Xcode | `ios/scripts/ci-test.sh`: `check-sources.sh`, `Shared/scripts/test.sh`, the keyboard policy package tests, then `ios/scripts/simulator.sh test` (build and unit tests of the app with its keyboard and widgets) on one iPhone simulator | Only for `ios/**`, the `mac` package sources the app links (`ChirpCore`, `ChirpSpeakers`, `Package.*`) and the workflow file. Ad-hoc simulator signing, no team or secrets. Can also be started by hand. |
+| `mac.yml` | macos | `mac/scripts/ci-test.sh` (wraps `test.sh`) | **By hand only** (`gh workflow run mac.yml --ref <branch>`); the automatic gate is `local/mac-full` from the local gate. |
+| `ios.yml` | macos, newest installed Xcode | `ios/scripts/ci-test.sh`: `check-sources.sh`, `Shared/scripts/test.sh`, the keyboard policy package tests, then `ios/scripts/simulator.sh test` (build and unit tests of the app with its keyboard and widgets) on one iPhone simulator | **By hand only**; the automatic gate is `local/ios` from the local gate, which covers `ios/**` and the `mac` package sources the app links (`ChirpCore`, `ChirpSpeakers`, `Package.*`). Ad-hoc simulator signing, no team or secrets. |
+| `pr-closed-cancel.yml` | ubuntu | `gh api` calls only | When a PR is merged or closed, cancels that PR's queued and running runs of every workflow above. No checkout, no secrets, token limited to `actions: write`. |
 
 The hosted runners only have Xcode 26 (Swift 6.2/6.3). On them, several stream, recorder and Notes suites abort the shared test process (`freed pointer was not the last allocation`) although every test passes alone and on Swift 6.4, so `ci-test.sh` runs those one test per process, together with the Live Notes soak (`NotesSoakTests`; `test.sh` with no arguments also runs it after the rest, so its 2-minute limit covers the soak alone). It skips `GeneratedSoundTests` (needs `swift make-sounds.swift`) and `SnapshotTests` (the runner's fonts render PNGs over the committed-size cap). Both run in `mac/scripts/test.sh` on the Mac.
 
 iOS CI runs the portable checks and the app's unit tests only. The UI schemes and the live-server end to end (`ios/scripts/simulator-e2e.sh`) stay on the Mac: they need `say`, ffmpeg, the cached model and a real keyboard setup, which the runners do not have, and headless simulator UI runs are not reliable enough to gate a PR. Run `ios/scripts/simulator.sh ui` or `simulator-e2e.sh` before merging UI changes.
+
+#### Stale runs
+
+Runners are shared, so a run nobody needs any more should not keep one busy:
+
+- **Newer push to the same PR:** every workflow has `concurrency: group: <workflow>-<PR number or ref>`, `cancel-in-progress: true`. The group holds one workflow of one PR (or of one ref), so a PR's push cancels only its own older run, never another PR's, never `main`'s, and never another workflow's.
+- **Newer push to `main`:** same group, keyed by `refs/heads/main`. The superseded run is cancelled; the newer commit contains the older one, so its run covers it. A commit in the middle of a burst of pushes therefore has no hosted result of its own.
+- **Merged or closed PR:** `concurrency` cannot see a PR closing, so `pr-closed-cancel.yml` (`pull_request: types: [closed]`) lists the unfinished `pull_request` runs of the PR's head branch and cancels them. It matches by branch because GitHub leaves a run's `pull_requests` list empty in some cases, stands down if another open PR uses the same head branch or if the PR was reopened in the meantime, and skips fork PRs (their token is read-only). The push to `main` after a merge runs the same checks anyway.
+- **Pages:** `pages.yml` sets concurrency per job. Builds cancel like the others; the deploy job is alone in the `pages` group with `cancel-in-progress: false`, so a deploy that has started always finishes and the newest queued one runs after it.
+
+#### Local gate
+
+`scripts/local-gate.sh` runs, on a Mac, the gates for the platforms a branch touches and records the result on GitHub for the exact commit it tested:
+
+```sh
+scripts/local-gate.sh             # gates derived from the diff against origin/main
+scripts/local-gate.sh --dry-run   # only print the commit and the gates
+scripts/local-gate.sh mac ios     # explicit gates
+```
+
+| Gate (status context) | Runs when the diff touches | Command (from the repo root) |
+|---|---|---|
+| `local/mac-full` | `mac/**` except `mac/README.md`, `mac/docs/**` | `cd mac && CHIRP_MAC_SERIAL=1 ./scripts/test.sh` (serial, no-argument full suite including the soak) |
+| `local/ios` | `ios/**` except the READMEs, `mac/Package.*`, `mac/Sources/ChirpCore/**`, `mac/Sources/ChirpSpeakers/**` | `cd ios && ./scripts/ci-test.sh` (portable checks, then app unit tests on a simulator) |
+| `local/android` | `android/**` | `cd android && ./gradlew lint testDebugUnitTest assembleDebug --rerun-tasks` |
+| `local/server` | `server/**` | `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q` |
+
+Each gate gets a `pending` status when it starts and `success`, `failure` or `error` (could not run) when it ends, with a short description (test counts, host, minutes). A run of all derived gates also sets `local/gate`, which is `success` only if every gate passed; require that one context if branch protection is ever turned on. A single PR comment lists the gates, counts, host and Xcode version, and the log tail of any failed gate.
+
+- **Why statuses and not a committed results file:** a file in the commit cannot name that commit's SHA, and committing it changes the SHA, so it would always describe its parent. A status is attached to the SHA from outside, so it is exact, and any new commit shows no `local/*` status until the gates are run again. The trade-off: a status lives on GitHub, not in the repository history, and anyone with write access can post one (the same trust as the Mac the author runs the gate on). A results file would be reviewable in the diff and survive a repository move, but only as a claim about an earlier tree.
+- **Preconditions:** a clean tree and a pushed `HEAD`. The script refuses a dirty tree, and does not post a result if `HEAD` or a tracked file changes while the gate runs.
+- **Shared Mac:** heavy gates take the host's leases (`/tmp/chirp-mac-full.lock`, `/tmp/chirp-ios-sim.lock`, `/tmp/chirp-gradle-full.lock`) and wait for them, and build into `/tmp/chirp-local-gate` (not under `~/Documents`, TCC). Logs are in `/tmp/chirp-local-gate/<sha>/`. Android needs the environment from `android/scripts/setup-toolchain.sh` (`CHIRP_ANDROID_ENV` overrides `~/.local/share/chirp-android/env.sh`).
+- **Not covered:** the UI schemes, `ios/scripts/simulator-e2e.sh`, the emulator sweep and `scripts/e2e-local.sh` stay manual (see the sections below); so does the desktop client, which keeps its hosted Linux and Windows workflows.
+- **Options:** `--base REF`, `--pr N` (default: the open PR of the branch), `--no-post` (run only), `--prefix local/` (the context prefix).
 
 `scripts/e2e-local.sh` and the operator steps below need a real Mac, `say` and (for the app) permissions, so they stay local.
 

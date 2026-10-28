@@ -1,19 +1,10 @@
 name: ios
 
-# macOS runner minutes cost 10x Linux: run only when `ios/**`, the mac package sources the iOS app links
-# (ChirpCore, ChirpSpeakers and their pins) or this file change.
+# Not started by pushes or pull requests: macOS runner minutes cost 10x Linux. The gate for `ios/**` and the mac
+# sources the app links is `scripts/local-gate.sh` (portable checks and the app's unit tests on a simulator, result
+# posted on the tested commit as `local/ios`, see docs/TESTING.md). Start this by hand on a branch when a hosted run
+# is wanted: `gh workflow run ios.yml --ref <branch>`.
 on:
-  pull_request:
-    paths: &paths
-      - "ios/**"
-      - "mac/Package.swift"
-      - "mac/Package.resolved"
-      - "mac/Sources/ChirpCore/**"
-      - "mac/Sources/ChirpSpeakers/**"
-      - ".github/workflows/ios.yml"
-  push:
-    branches: [main]
-    paths: *paths
   workflow_dispatch:
 
 concurrency:

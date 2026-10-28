@@ -1,12 +1,9 @@
 name: mac
 
-# macOS runner minutes cost 10x Linux: run only when `mac/**` or this file change.
+# Not started by pushes or pull requests: macOS runner minutes cost 10x Linux. The gate for `mac/**` is
+# `scripts/local-gate.sh` (full suite on a Mac, result posted on the tested commit as `local/mac-full`, see
+# docs/TESTING.md). Start this by hand on a branch when a hosted run is wanted: `gh workflow run mac.yml --ref <branch>`.
 on:
-  pull_request:
-    paths: ["mac/**", ".github/workflows/mac.yml"]
-  push:
-    branches: [main]
-    paths: ["mac/**", ".github/workflows/mac.yml"]
   workflow_dispatch:
 
 concurrency:
