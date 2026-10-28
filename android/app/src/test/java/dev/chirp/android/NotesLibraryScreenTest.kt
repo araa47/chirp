@@ -261,7 +261,7 @@ class NotesLibraryScreenTest {
         assertEquals("Open the recording", node.config[androidx.compose.ui.semantics.SemanticsActions.OnClick].label)
         // One merged node: the title and the frozen preview are announced by the card itself.
         assertTrue(node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].any { "Product conversation" in it.text })
-        assertTrue("elapsed is available when focusing the card", node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].any { live.model.elapsedText in it.text })
+        assertTrue("elapsed is available when focusing the card", node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].any { live.model.elapsedText.notesEnglish() in it.text })
         assertTrue("one focus target", node.children.isEmpty())
         fun quiet(n: androidx.compose.ui.semantics.SemanticsNode) {
             if (androidx.compose.ui.semantics.SemanticsProperties.LiveRegion in n.config)

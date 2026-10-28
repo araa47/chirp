@@ -171,7 +171,9 @@ class NotesRecorderTest {
         rig.calls.structures.forEach { it.second.complete(NotesStructureResponse("- Kept words", true)) }
         rig.idle()
         assertEquals(NotesRecorder.State.ERROR, rig.recorder.state)
-        assertEquals("Notes stopped: Chirp server is busy", rig.recorder.error)
+        assertEquals(RecordingFailure.Stopped(RecordingFailure.Server.BUSY), rig.recorder.error)
+        assertEquals("Notes stopped: Chirp server is busy", rig.recorder.error!!.ui.notesEnglish())
+        assertEquals("diagnostics keep the English", "Notes stopped: Chirp server is busy", rig.recorder.problem)
         assertEquals(listOf("kept words"), rig.recorder.document.segments.filter { !it.isGap }.map { it.text })
         assertTrue(rig.recorder.document.text.contains("Kept words"))
     }
@@ -194,7 +196,8 @@ class NotesRecorderTest {
         rig.recorder.start(); rig.idle()
         rig.wire.failure(); rig.idle()
         assertEquals(NotesRecorder.State.ERROR, rig.recorder.state)
-        assertEquals(ConnectionFailure.status(ConnectionFailure.Kind.OTHER), rig.recorder.error)
+        assertEquals(RecordingFailure.Connection(ConnectionFailure.Kind.OTHER), rig.recorder.error)
+        assertEquals(ConnectionFailure.status(ConnectionFailure.Kind.OTHER), rig.recorder.error!!.english)
         assertTrue(rig.captures.single().stopped)
     }
 

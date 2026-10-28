@@ -19,7 +19,7 @@ internal class SavedVoicesModel(
         private set
     var busy by mutableStateOf(false)
         private set
-    var error by mutableStateOf<String?>(null)
+    var error by mutableStateOf<UiText?>(null)
         private set
     var errorCode: String? = null
         private set
@@ -35,8 +35,8 @@ internal class SavedVoicesModel(
             io { result = request(action) }
             result.also { library = it }
         } catch (e: CancellationException) { throw e }
-        catch (e: VoiceLibraryError) { errorCode = e.code; error = e.userMessage; null }
-        catch (_: Exception) { errorCode = "failed"; error = "Couldn’t reach Saved voices. Try again."; null }
+        catch (e: VoiceLibraryError) { errorCode = e.code; error = VoiceLibraryError.text(e.code); null }
+        catch (_: Exception) { errorCode = "failed"; error = VoiceLibraryError.text("failed"); null }
         finally { busy = false }
     }
 }

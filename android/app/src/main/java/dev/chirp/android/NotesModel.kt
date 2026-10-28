@@ -73,19 +73,19 @@ internal class NotesModel(
     private var retranscribeSegments: List<NotesSegment> = emptyList()
     var retranscribeSheet by mutableStateOf(false)
     var retranscribeSegment by mutableStateOf<Int?>(null)
-    var retranscribeFailure by mutableStateOf<String?>(null)
+    var retranscribeFailure by mutableStateOf<RetranscribeFailure?>(null)
     var rebuildReview: String?
         get() = RetranscribeGate.rebuilds[document.uid]
         set(value) { if (value == null) RetranscribeGate.rebuilds.remove(document.uid) else RetranscribeGate.rebuilds[document.uid] = value }
     var rebuildChoice by mutableStateOf(store.notesRebuild)
-    var retranscribeNotice by mutableStateOf<String?>(null)
+    var retranscribeNotice by mutableStateOf<RetranscribeNotice?>(null)
     val retranscribing get() = RetranscribeGate.progress?.noteId == document.uid || RetranscribeGate.owner?.retranscribeTarget == document.uid
     val retranscribeProgress get() = RetranscribeGate.progress?.takeIf { it.noteId == document.uid }
     val allowRetranscribe get() = revision.let { store.notesAllowRetranscribe }
     val canRetranscribe get() = allowRetranscribe && !state.active && document.audio.isNotEmpty() && RetranscribeGate.owner == null
     val retranscribeCleanup get() = options().correction
     val retranscribeHealth get() = health
-    val retranscribeDestination get() = (consentPairing ?: pairing())?.base?.host ?: "your computer"
+    val retranscribeDestination: UiText get() = (consentPairing ?: pairing())?.base?.host?.let(UiText::Raw) ?: UiText.Res(R.string.notes_status_your_computer)
     val retranscribeClips get() = document.audio.filter { retranscribeSegment == null || it.segment == retranscribeSegment }
 
     fun askRetranscribe(segment: Int? = null) {
@@ -102,7 +102,7 @@ internal class NotesModel(
     fun cancelRetranscribe() {
         retranscribeGeneration++
         retranscribeJob?.cancel(); retranscriber?.cancel(); retranscriber = null
-        retranscribeFailure = null; retranscribeNotice = if (transcriptApplied) "Transcript updated" else "Cancelled. Nothing changed."
+        retranscribeFailure = null; retranscribeNotice = if (transcriptApplied) RetranscribeNotice.Updated else RetranscribeNotice.Cancelled
         if (RetranscribeGate.owner === this) { RetranscribeGate.owner = null; RetranscribeGate.progress = null; store.notesRetranscribeInterrupted = false }
     }
 
@@ -110,7 +110,7 @@ internal class NotesModel(
         val health = health ?: return
         val pairedAtConsent = consentPairing ?: pairing() ?: return
         val currentPairing = pairing()
-        if (pairedAtConsent.base != currentPairing?.base || pairedAtConsent.token != currentPairing.token) { retranscribeSheet = false; message = "Pairing changed. Open Re-transcribe again."; return }
+        if (pairedAtConsent.base != currentPairing?.base || pairedAtConsent.token != currentPairing.token) { retranscribeSheet = false; message = NotesStatus.PAIRING_CHANGED; return }
         if (!canRetranscribe || !health.notesRetranscribe || pairing() == null) return
         retranscribeSheet = false; transcriptApplied = false; retranscribeNotice = null; retranscribeFailure = null
         store.notesRebuild = rebuildChoice
@@ -139,11 +139,11 @@ internal class NotesModel(
                 if (applied && rebuild && health.correctionAvailable && health.notesStructure) rebuildTranscript(bodyVersion)
             } catch (e: kotlinx.coroutines.CancellationException) { runner.cancel(); throw e }
             catch (e: Exception) {
-                if (transcriptApplied) { retranscribeNotice = "Couldn’t rebuild the notes. Transcript updated."; return@launch }
+                if (transcriptApplied) { retranscribeNotice = RetranscribeNotice.RebuildFailed; return@launch }
                 val code = (e as? RetranscribeError)?.code
                 if (code == "auth" || code == "revoked") {
-                    runner.cancel(); paired = false; message = "Pair your computer again"; retranscriber = null
-                } else retranscribeFailure = "Couldn’t finish re-transcribing. Nothing changed."
+                    runner.cancel(); paired = false; message = NotesStatus.PAIR_AGAIN; retranscriber = null
+                } else retranscribeFailure = RetranscribeFailure.FAILED
             } finally {
                 if (generation == retranscribeGeneration) {
                     RetranscribeGate.progress = null
@@ -155,7 +155,7 @@ internal class NotesModel(
     }
 
     fun applyRetranscribed(results: Map<Int, RetranscribedSegment> = retranscriber?.staged.orEmpty()): Boolean {
-        if (results.isEmpty()) { retranscribeNotice = "No segments updated. Nothing changed."; retranscribeFailure = null; return false }
+        if (results.isEmpty()) { retranscribeNotice = RetranscribeNotice.NoneUpdated; retranscribeFailure = null; return false }
         val kept = sessions ?: return false
         val target = retranscribeTarget ?: return false
         val live = NotesSessionHolder.owner(target) ?: this.takeIf { document.uid == target }
@@ -163,12 +163,12 @@ internal class NotesModel(
         val record = kept.open(target) ?: return false
         val current = live?.document ?: NotesDocument.fromJson(record.document)
         if (current.segments != retranscribeSegments || current.audio.none { clip -> results.containsKey(clip.segment) }) {
-            retranscribeFailure = "This transcript changed. Re-transcribe again."; return false
+            retranscribeFailure = RetranscribeFailure.TRANSCRIPT_CHANGED; return false
         }
         val copy = NotesDocument.fromJson(current.toJson())
-        if (!copy.applyRetranscription(results)) { retranscribeNotice = "No segments updated. Nothing changed."; return false }
+        if (!copy.applyRetranscription(results)) { retranscribeNotice = RetranscribeNotice.NoneUpdated; return false }
         val json = copy.toJson().put("elapsed", record.document.optDouble("elapsed", 0.0))
-        if (!kept.put(target, json, expectedRevision = record.revision)) { retranscribeFailure = "This note changed. Re-transcribe again."; return false }
+        if (!kept.put(target, json, expectedRevision = record.revision)) { retranscribeFailure = RetranscribeFailure.NOTE_CHANGED; return false }
         live?.let {
             it.document.applyRetranscription(results, at = requireNotNull(copy.previousTranscript).at)
             // The revision-checked write already saved this exact state. Don’t queue a second, unguarded autosave.
@@ -176,7 +176,7 @@ internal class NotesModel(
             it.sync()
         }
         val total = retranscribeSegments.size
-        retranscribeNotice = if (results.size == total) "Transcript updated" else "${results.size} of $total updated. ${total - results.size} kept their old text."
+        retranscribeNotice = if (results.size == total) RetranscribeNotice.Updated else RetranscribeNotice.Partial(results.size, total)
         transcriptApplied = true
         retranscribeFailure = null; retranscriber = null
         if (retranscribeJob?.isActive != true && RetranscribeGate.owner === this) { RetranscribeGate.owner = null; RetranscribeGate.progress = null }
@@ -186,7 +186,7 @@ internal class NotesModel(
     fun restoreTranscript() {
         if (retranscribing || state.active) return
         persistenceEpoch++
-        if (document.restorePreviousTranscript()) { sync(); keepSession(); retranscribeNotice = "Previous transcript restored" }
+        if (document.restorePreviousTranscript()) { sync(); keepSession(); retranscribeNotice = RetranscribeNotice.Restored }
     }
 
     private suspend fun rebuildTranscript(bodyVersion: Int) {
@@ -194,13 +194,13 @@ internal class NotesModel(
         val owner = NotesSessionHolder.owner(target) ?: this.takeIf { document.uid == target }
         val sourceDocument = owner?.document ?: sessions?.open(target)?.document?.let(NotesDocument::fromJson) ?: return
         val rebuilt = (owner?.recorder ?: recorder).rebuildNotes(sourceDocument)
-        if (rebuilt == null) { retranscribeNotice = "Couldn’t rebuild the notes. Transcript updated."; return }
+        if (rebuilt == null) { retranscribeNotice = RetranscribeNotice.RebuildFailed; return }
         if (owner == null || owner.document !== sourceDocument) { RetranscribeGate.rebuilds[target] = rebuilt; return }
         if (owner.document.version != bodyVersion) owner.rebuildReview = rebuilt
-        else { owner.recorder.applyRebuild(rebuilt); owner.retranscribeNotice = "Notes rebuilt" }
+        else { owner.recorder.applyRebuild(rebuilt); owner.retranscribeNotice = RetranscribeNotice.Rebuilt }
     }
 
-    fun acceptRebuild() { rebuildReview?.let { recorder.applyRebuild(it) }; rebuildReview = null; retranscribeNotice = "Notes rebuilt" }
+    fun acceptRebuild() { rebuildReview?.let { recorder.applyRebuild(it) }; rebuildReview = null; retranscribeNotice = RetranscribeNotice.Rebuilt }
 
     private val app = context.applicationContext as android.app.Application
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -237,7 +237,7 @@ internal class NotesModel(
         private set
     var focused = false
         set(value) { field = value; reportFocus() }
-    var message by mutableStateOf<String?>(null)
+    var message by mutableStateOf<NotesStatus?>(null)
     var raw by mutableStateOf(false)
     var paired by mutableStateOf(pairing() != null)
         private set
@@ -246,7 +246,7 @@ internal class NotesModel(
         private set
     val labelSpeakers get() = speakerModelControl.enabled
     /** "Recovered unsaved notes from 14:03 · 52 min", until the user saves, discards or records. */
-    var recovered by mutableStateOf<String?>(null)
+    var recovered by mutableStateOf<UiText?>(null)
         private set
     /** The library's live notes for the "Recent notes" sheet, newest first; loaded on demand. */
     var recent by mutableStateOf<List<NotesIndexEntry>>(emptyList())
@@ -306,8 +306,8 @@ internal class NotesModel(
             keptKey = key(); savedKey = keptKey
             journal.delete()
         }
-        recovered = "Recovered unsaved notes from " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(restored.startedAt)) +
-            " · " + (seconds / 60).toInt().coerceAtLeast(1) + " min"
+        recovered = UiText.Res(R.string.notes_status_recovered,
+            UiText.Raw(java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(restored.startedAt))), (seconds / 60).toInt().coerceAtLeast(1))
     }
 
     // What the screen reads.
@@ -354,19 +354,22 @@ internal class NotesModel(
 
     val hearing get() = document.let { d -> listOf(d.unstructuredTail, d.livePartial).filter(String::isNotBlank).joinToString(" ") }
 
-    val elapsedText get() = elapsed.toInt().let { s -> if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%02d:%02d".format(s / 60, s % 60) }
+    val elapsedText: UiText get() = elapsed.toInt().let { s ->
+        if (s >= 3600) UiText.Res(R.string.notes_status_clock_hours, s / 3600, s / 60 % 60, s % 60) else UiText.Res(R.string.notes_status_clock, s / 60, s % 60)
+    }
 
-    val status: String get() = voiceEditStatus?.let(NotesVoiceEditText::status) ?: message ?: when (state) {
-        NotesRecorder.State.IDLE -> if (paired) IDLE else "Pair your computer in Chirp settings"
-        NotesRecorder.State.STARTING -> "Connecting to your computer…"
-        NotesRecorder.State.RECORDING -> organizingText ?: if (structuring == Structuring.Running) "Updating notes…" else "Listening…"
-        NotesRecorder.State.PAUSED -> recorder.error?.let { "Couldn’t resume: $it" } ?: organizingText ?: "Paused"
-        NotesRecorder.State.STOPPING -> (organizingText ?: "Finishing…") + (revision.let { recorder.stoppingElapsed }?.takeIf { it >= 3000 }?.let { " · ${it / 1000} s" } ?: "")
-        NotesRecorder.State.STOPPED -> organizingText ?: "Stopped"
+    val status: NotesStatus get() = voiceEditStatus?.let(NotesVoiceEditText::status)?.let(::NotesStatus) ?: message ?: when (state) {
+        NotesRecorder.State.IDLE -> if (paired) NotesStatus.IDLE else NotesStatus.PAIR
+        NotesRecorder.State.STARTING -> NotesStatus(R.string.notes_status_connecting)
+        NotesRecorder.State.RECORDING -> NotesStatus(organizingText ?: UiText.Res(if (structuring == Structuring.Running) R.string.notes_status_updating else R.string.notes_status_listening))
+        NotesRecorder.State.PAUSED -> NotesStatus(recorder.error?.let { UiText.Res(R.string.notes_status_couldnt_resume, it.ui) } ?: organizingText ?: UiText.Res(R.string.notes_status_paused))
+        NotesRecorder.State.STOPPING -> NotesStatus((organizingText ?: UiText.Res(R.string.notes_status_finishing)).let { base ->
+            revision.let { recorder.stoppingElapsed }?.takeIf { it >= 3000 }?.let { UiText.Res(R.string.notes_status_with_seconds, base, it / 1000) } ?: base })
+        NotesRecorder.State.STOPPED -> NotesStatus(organizingText ?: UiText.Res(R.string.notes_status_stopped))
         NotesRecorder.State.ERROR -> recorder.error?.let { error ->
             // A failed connection to a tailnet Mac usually means Tailscale is off; say that instead.
-            if (error.startsWith("Computer unreachable")) pairing()?.let(::tailscaleStatus) ?: error else error
-        } ?: "Notes stopped"
+            (error as? RecordingFailure.Connection)?.takeIf { it.maybeTailscale }?.let { pairing()?.let(::tailscaleStatus) } ?: NotesStatus(error.ui, error.action)
+        } ?: NotesStatus(R.string.notes_status_notes_stopped)
     }
 
     // Edit by voice.
@@ -376,7 +379,7 @@ internal class NotesModel(
     val listeningForCommand get() = revision.let { voiceEdit.status.isListening }
     val canCommand get() = revision.let { voiceEdit.status.isListening || voiceEdit.canStart }
     /** The note for the last edit that did not apply. */
-    val voiceEditNote: String? get() = revision.let { (voiceEdit.status as? VoiceEditStatus.Done)?.let { NotesVoiceEditText.note(it.outcome) } }
+    val voiceEditNote: UiText? get() = revision.let { (voiceEdit.status as? VoiceEditStatus.Done)?.let { NotesVoiceEditText.note(it.outcome) } }
     /** "Edited · Undo" after a voice edit applied, until the next edit, a click or [NotesVoiceEdit.CHIP_MS]. */
     val showEditedChip get() = revision.let { (voiceEdit.status as? VoiceEditStatus.Done)?.outcome == NotesEditOutcome.Applied && recorder.canUndoEdit }
     val voiceEditDone: VoiceEditStatus? get() = revision.let { voiceEdit.status.takeIf { it is VoiceEditStatus.Done } }
@@ -398,33 +401,34 @@ internal class NotesModel(
     override val commanding: Boolean? get() = revision.let { if (recorder.canEdit) voiceEdit.status.isListening else null }
     override fun command() { message = null; voiceEdit.toggle() }
 
-    private val organizingText get() = when (val r = reorganizing) {
-        is Reorganizing.Organizing -> "Organizing notes… ${r.step}/${r.of}"
-        Reorganizing.Running -> "Organizing notes…"
+    private val organizingText: UiText? get() = when (val r = reorganizing) {
+        is Reorganizing.Organizing -> UiText.Res(R.string.notes_status_organizing_step, r.step, r.of)
+        Reorganizing.Running -> UiText.Res(R.string.notes_status_organizing)
         else -> null
     }
 
     /** Why the notes are a plain editor and live transcript, or null when structuring runs. */
-    val explanation: String? get() = when ((structuring as? Structuring.Off)?.why) {
-        StructuringOff.CORRECTION_OFF -> "Clean-up is off on your computer, so these notes are a plain editor beside the live transcript."
-        StructuringOff.UNSUPPORTED -> "Chirp on your computer is too old to structure notes — update it. The transcript still works."
-        StructuringOff.WAITING -> if (paired) "Checking your computer…" else null
+    val explanation: UiText? get() = when ((structuring as? Structuring.Off)?.why) {
+        StructuringOff.CORRECTION_OFF -> UiText.Res(R.string.notes_status_explain_off)
+        StructuringOff.UNSUPPORTED -> UiText.Res(R.string.notes_status_explain_old)
+        StructuringOff.WAITING -> if (paired) UiText.Res(R.string.notes_status_explain_checking) else null
         else -> null
     }
 
-    val organizeNote: String? get() = when (val r = reorganizing) {
-        is Reorganizing.Failed -> "Couldn’t organize (${r.label}) — will retry"
-        is Reorganizing.Organized -> if (r.failed == 0) "Organized" else "Organized · ${r.failed} kept as they were" + (r.reason?.let { " ($it)" } ?: "")
-        Reorganizing.Conflict -> "Notes changed while organizing — try again"
-        Reorganizing.TooLong -> "Too long to organize — split the last section with a heading"
-        Reorganizing.TooShort -> "Nothing to organize yet — keep going"
-        else -> (structuring as? Structuring.Failed)?.let { "Couldn’t update notes (${it.label}) — retrying with the next segment" }
+    val organizeNote: UiText? get() = when (val r = reorganizing) {
+        is Reorganizing.Failed -> UiText.Res(R.string.notes_status_organize_failed, UiText.Raw(r.label))
+        is Reorganizing.Organized -> if (r.failed == 0) UiText.Res(R.string.notes_status_organized)
+            else r.reason?.let { UiText.Plural(R.plurals.notes_status_organized_kept_reason, r.failed, listOf(r.failed, UiText.Raw(it))) } ?: UiText.Plural(R.plurals.notes_status_organized_kept, r.failed)
+        Reorganizing.Conflict -> UiText.Res(R.string.notes_status_organize_conflict)
+        Reorganizing.TooLong -> UiText.Res(R.string.notes_status_organize_too_long)
+        Reorganizing.TooShort -> UiText.Res(R.string.notes_status_organize_too_short)
+        else -> (structuring as? Structuring.Failed)?.let { UiText.Res(R.string.notes_status_structure_failed, UiText.Raw(it.label)) }
     }
 
-    private fun tailscaleStatus(paired: Pairing): String? = when {
+    private fun tailscaleStatus(paired: Pairing): NotesStatus? = when {
         !TailscaleControl.routes(paired.base) -> null
-        !tailscale.installed() -> StatusLine.TAILSCALE_MISSING.resolve(app.resources) // SHIM-339
-        !tailscale.connected() -> StatusLine.TAILSCALE_OFF.resolve(app.resources) // SHIM-339
+        !tailscale.installed() -> NotesStatus.TAILSCALE_MISSING
+        !tailscale.connected() -> NotesStatus.TAILSCALE_OFF
         else -> null
     }
 
@@ -453,9 +457,9 @@ internal class NotesModel(
     fun setStructure(on: Boolean) { structureEnabled = on; recorder.configure(on, health) }
     val speakersAvailable get() = speakerModelControl.available
     val speakerModelState get() = speakerModelControl.state
-    val speakerNote: String? get() = revision.let {
+    val speakerNote: UiText? get() = revision.let {
         if (labelSpeakers && speakersAvailable && recorder.speakerError != null && recorder.speakerError != "unavailable")
-            "Couldn’t label the last segment’s speakers." else null
+            UiText.Res(R.string.notes_status_speaker_note) else null
     }
     fun setSpeakerLabels(on: Boolean) = speakerModelControl.setLabels(on)
 
@@ -471,12 +475,14 @@ internal class NotesModel(
                                   var attempted: Int = -1, var running: Boolean = false)
     private val enrollments = mutableMapOf<Int, Enrollment>()
 
+    /** The saved voices error as the status; a refused pairing offers Pair. */
+    private fun voiceError() = savedVoices.error?.let { NotesStatus(it, DictationAction.PAIR.takeIf { savedVoices.errorCode == "auth" }) }
     fun acknowledgeVoiceNotice() { voicePrefs.edit().putBoolean("shown", true).apply(); voiceNotice = null }
     fun disableRememberVoices() {
         acknowledgeVoiceNotice(); enrollments.clear(); recorder.recognizeVoices = false
         scope.launch {
             savedVoices.perform(VoiceAction.Disable(false))
-            message = savedVoices.error
+            message = voiceError()
         }
     }
     fun refreshVoices() {
@@ -499,7 +505,7 @@ internal class NotesModel(
         scope.launch {
             // Read the server-wide switch before naming stores anything.
             if (savedVoices.perform(null)?.enabled == true) retryEnrollments(force = update)
-            else { enrollments.remove(id); recorder.recognizeVoices = false; message = savedVoices.error }
+            else { enrollments.remove(id); recorder.recognizeVoices = false; message = voiceError() }
         }
     }
     private fun retryEnrollments(force: Boolean = false) {
@@ -511,7 +517,7 @@ internal class NotesModel(
             }
             if (pending.running || (!force && pending.attempted == doc.segments.size)) return@forEach
             val source = doc.roster.source(pending.person, recorder.speakerSession) ?: run {
-                message = "Record a little more with them, then try again"; return@forEach
+                message = NotesStatus.VOICE_GONE; return@forEach
             }
             pending.running = true; pending.attempted = doc.segments.size
             scope.launch {
@@ -519,11 +525,11 @@ internal class NotesModel(
                 pending.running = false
                 if (enrollments[pending.person] !== pending || recorder.document !== doc) return@launch
                 if (result != null) {
-                    if (message == VoiceLibraryError("too_short").userMessage) message = null
+                    if (message?.text == VoiceLibraryError.text("too_short")) message = null
                     enrollments.remove(pending.person)
                     if (!voicePrefs.getBoolean("shown", false)) voiceNotice = pending.name
                 } else {
-                    message = savedVoices.error
+                    message = voiceError()
                     // Only a short voice is eligible for an automatic retry at the next segment.
                     if (savedVoices.errorCode != "too_short") enrollments.remove(pending.person)
                 }
@@ -616,12 +622,12 @@ internal class NotesModel(
     fun toggle() { if (state.active) stop() else start() }
 
     fun start() {
-        if (retranscribing) { message = "Finish re-transcribing first"; return }
+        if (retranscribing) { message = NotesStatus.FINISH_RETRANSCRIBE; return }
         if (state.active) return
-        if (voiceEdit.holdsMicrophone) { message = "Finish the spoken edit first"; return }
+        if (voiceEdit.holdsMicrophone) { message = NotesStatus.FINISH_EDIT; return }
         message = null; recovered = null
-        if (!micGranted()) { message = "Allow microphone in Chirp settings"; return }
-        pairing().also { paired = it != null } ?: run { message = "Pair your computer in Chirp settings"; return }
+        if (!micGranted()) { message = NotesStatus.ALLOW_MICROPHONE; return }
+        pairing().also { paired = it != null } ?: run { message = NotesStatus.PAIR; return }
         recorder.options = options()
         recorder.configure(structureEnabled, health)
         recorder.keepAudio = sessions?.let { it.enabled && it.keepAudio } == true
@@ -651,7 +657,7 @@ internal class NotesModel(
 
     override fun stop() { message = null; recorder.stop() }
     override fun pause() { message = null; recorder.pause() }
-    override fun resume() { if (voiceEdit.holdsMicrophone) { message = "Finish the spoken edit first"; return }; message = null; recorder.resume() }
+    override fun resume() { if (voiceEdit.holdsMicrophone) { message = NotesStatus.FINISH_EDIT; return }; message = null; recorder.resume() }
     fun togglePause() { if (paused) resume() else pause() }
 
     /** Rename: the title of the notes, the export and the saved file; blank goes back to the start time. */
@@ -666,8 +672,8 @@ internal class NotesModel(
         scope.launch {
             var ok = false
             io { ok = try { open()?.use { it.write(text.toByteArray(Charsets.UTF_8)) } != null } catch (_: Exception) { false } }
-            if (!ok) { message = "Couldn’t save — try another place, or Share"; return@launch }
-            savedKey = what; recovered = null; message = "Saved"
+            if (!ok) { message = NotesStatus.SAVE_FAILED; return@launch }
+            savedKey = what; recovered = null; message = NotesStatus.SAVED
             if (!dirty) journal?.delete()
             revision++
         }
@@ -720,8 +726,8 @@ internal class NotesModel(
         var record: NotesRecord? = null
         io { record = kept.open(id) }
         if (request != openRequest || state.active) return false
-        val found = record ?: run { message = "Couldn’t open these notes"; return false }
-        val document = try { NotesDocument.fromJson(found.document) } catch (_: Exception) { message = "Couldn’t open these notes"; return false }
+        val found = record ?: run { message = NotesStatus.OPEN_FAILED; return false }
+        val document = try { NotesDocument.fromJson(found.document) } catch (_: Exception) { message = NotesStatus.OPEN_FAILED; return false }
         loading = true
         try {
             recorder.restore(document, found.document.optDouble("elapsed", 0.0))
@@ -912,7 +918,7 @@ internal class NotesModel(
 
     init {
         if (store.notesRetranscribeInterrupted && RetranscribeGate.owner == null) {
-            retranscribeNotice = "Re-transcribe was interrupted. Nothing changed."
+            retranscribeNotice = RetranscribeNotice.Interrupted
             store.notesRetranscribeInterrupted = false
         }
         scope.launch { RetranscribeGate.allowed.collect { if (!store.notesAllowRetranscribe) { retranscribeSheet = false; if (RetranscribeGate.owner === this@NotesModel) cancelRetranscribe(); revision++ } else revision++ } }
@@ -921,7 +927,6 @@ internal class NotesModel(
     }
 
     companion object {
-        const val IDLE = "Tap Record to take notes"
         const val MAX_NAME = 120
         /** The library is written at most this often while notes change. */
         const val SAVE_MS = 2000L

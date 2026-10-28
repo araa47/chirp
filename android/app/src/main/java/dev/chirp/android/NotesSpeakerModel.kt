@@ -10,6 +10,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/** What the speaker model is doing, when it needs saying. */
+internal sealed interface SpeakerModelNotice {
+    val ui: UiText
+
+    data object CancelFailed : SpeakerModelNotice { override val ui = UiText.Res(R.string.notes_status_speaker_cancel_failed) }
+    data object DownloadFailed : SpeakerModelNotice { override val ui = UiText.Res(R.string.notes_status_speaker_download_failed) }
+    /** Getting it ready; [megabytes] is the download, rounded up, when the Mac reports it. */
+    data class Preparing(val megabytes: Int?) : SpeakerModelNotice {
+        override val ui get() = if (megabytes == null) UiText.Res(R.string.notes_status_speaker_preparing) else UiText.Res(R.string.notes_status_speaker_preparing_size, megabytes)
+    }
+}
+
 /** Shared by Notes and Settings. Model readiness never writes the user's preference. */
 internal class NotesSpeakerModel(
     private val store: SettingsStore,
@@ -38,14 +50,12 @@ internal class NotesSpeakerModel(
     val available get() = health?.notesSpeakers == true
     val ready get() = enabled && available && state == "ready"
     val retryable get() = cancelFailed || state == "failed"
-    val status: String? get() = when {
-        cancelFailed -> "Couldn’t cancel the speaker model download."
+    val status: SpeakerModelNotice? get() = when {
+        cancelFailed -> SpeakerModelNotice.CancelFailed
         !enabled || !available -> null
-        state == "failed" -> "Couldn’t download the speaker model."
-        state == "downloading" || state == "not_downloaded" -> {
-            val size = health?.speakersModelBytes?.let { " (${(it / 1_000_000.0).toInt() + if (it % 1_000_000L > 0) 1 else 0} MB, once)" }.orEmpty()
-            "Getting the speaker model ready$size…"
-        }
+        state == "failed" -> SpeakerModelNotice.DownloadFailed
+        state == "downloading" || state == "not_downloaded" ->
+            SpeakerModelNotice.Preparing(health?.speakersModelBytes?.let { (it / 1_000_000.0).toInt() + if (it % 1_000_000L > 0) 1 else 0 })
         else -> null
     }
 

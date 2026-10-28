@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notes status text that models hold as UiText and resolve where it is shown (#339): the status line, notices,
+     re-transcribe progress, recording failures and the saved voices errors. -->
+<resources>
+    <!-- Status line -->
+    <string name="notes_status_idle">Tap Record to take notes</string>
+    <string name="notes_status_pair">Pair your computer in Chirp settings</string>
+    <string name="notes_status_connecting">Connecting to your computer…</string>
+    <string name="notes_status_updating">Updating notes…</string>
+    <string name="notes_status_listening">Listening…</string>
+    <!-- %1$s is why it failed, from the failures below. -->
+    <string name="notes_status_couldnt_resume">Couldn’t resume: %1$s</string>
+    <string name="notes_status_paused">Paused</string>
+    <string name="notes_status_finishing">Finishing…</string>
+    <!-- %1$s is the status, %2$d the seconds the stop has been waiting. -->
+    <string name="notes_status_with_seconds">%1$s · %2$d s</string>
+    <string name="notes_status_stopped">Stopped</string>
+    <string name="notes_status_notes_stopped">Notes stopped</string>
+    <string name="notes_status_organizing">Organizing notes…</string>
+    <!-- %1$d of %2$d is the section being organized. -->
+    <string name="notes_status_organizing_step">Organizing notes… %1$d/%2$d</string>
+    <!-- %1$s is what the speaker said, between quotation marks. -->
+    <string name="notes_status_heard">“%1$s”</string>
+    <string name="notes_status_say_edit">Say the edit…</string>
+    <string name="notes_status_editing">Editing notes…</string>
+    <string name="notes_status_edited">Edited</string>
+    <string name="notes_status_tailscale_off">Tailscale is off</string>
+    <string name="notes_status_tailscale_missing">Tailscale isn\'t installed</string>
+    <string name="notes_status_connecting_tailscale">Connecting Tailscale…</string>
+
+    <!-- Messages shown in place of the status until the next action -->
+    <string name="notes_status_pairing_changed">Pairing changed. Open Re-transcribe again.</string>
+    <string name="notes_status_pair_again">Pair your computer again</string>
+    <string name="notes_status_finish_retranscribe">Finish re-transcribing first</string>
+    <string name="notes_status_finish_edit">Finish the spoken edit first</string>
+    <string name="notes_status_allow_mic">Allow microphone in Chirp settings</string>
+    <string name="notes_status_mic_permission">Microphone permission is needed to take notes — open mic settings</string>
+    <string name="notes_status_save_failed">Couldn’t save — try another place, or Share</string>
+    <string name="notes_status_saved">Saved</string>
+    <string name="notes_status_open_failed">Couldn’t open these notes</string>
+    <string name="notes_status_copied">Copied as Markdown</string>
+    <string name="notes_status_no_save_app">No app to save files — use Share</string>
+    <!-- %1$s is a time (14:03), %2$d the minutes recorded. -->
+    <string name="notes_status_recovered">Recovered unsaved notes from %1$s · %2$d min</string>
+    <string name="notes_status_your_computer">your computer</string>
+
+    <!-- Clocks: minutes:seconds, with the minutes padded (running time) or not (re-transcribe), and with hours. -->
+    <string name="notes_status_clock">%1$02d:%2$02d</string>
+    <string name="notes_status_clock_hours">%1$d:%2$02d:%3$02d</string>
+    <string name="notes_status_clock_short">%1$d:%2$02d</string>
+
+    <!-- Why the notes are a plain editor -->
+    <string name="notes_status_explain_off">Clean-up is off on your computer, so these notes are a plain editor beside the live transcript.</string>
+    <string name="notes_status_explain_old">Chirp on your computer is too old to structure notes — update it. The transcript still works.</string>
+    <string name="notes_status_explain_checking">Checking your computer…</string>
+
+    <!-- Organize notices. %1$s is a short failure code. -->
+    <string name="notes_status_organize_failed">Couldn’t organize (%1$s) — will retry</string>
+    <string name="notes_status_organized">Organized</string>
+    <!-- %1$d is how many pieces were kept as they were; %2$s is the short reason. -->
+    <plurals name="notes_status_organized_kept">
+        <item quantity="one">Organized · %1$d kept as they were</item>
+        <item quantity="other">Organized · %1$d kept as they were</item>
+    </plurals>
+    <plurals name="notes_status_organized_kept_reason">
+        <item quantity="one">Organized · %1$d kept as they were (%2$s)</item>
+        <item quantity="other">Organized · %1$d kept as they were (%2$s)</item>
+    </plurals>
+    <string name="notes_status_organize_conflict">Notes changed while organizing — try again</string>
+    <string name="notes_status_organize_too_long">Too long to organize — split the last section with a heading</string>
+    <string name="notes_status_organize_too_short">Nothing to organize yet — keep going</string>
+    <string name="notes_status_structure_failed">Couldn’t update notes (%1$s) — retrying with the next segment</string>
+
+    <!-- Voice edit notices. %1$s is a short failure code. -->
+    <string name="notes_status_edit_unchanged">The edit changed nothing</string>
+    <string name="notes_status_edit_adds_content">Can’t add new content by voice — ask to remove, move, tidy or reword</string>
+    <string name="notes_status_edit_not_an_edit">That didn’t sound like an edit to the notes</string>
+    <string name="notes_status_edit_unclear">Couldn’t tell what to change — try naming the section</string>
+    <string name="notes_status_edit_conflict">Notes changed while editing — try again</string>
+    <string name="notes_status_edit_not_heard">Didn’t catch an edit — try again</string>
+    <string name="notes_status_edit_too_long">Too much to edit at once — select a section first</string>
+    <string name="notes_status_edit_nothing">Nothing to edit yet</string>
+    <string name="notes_status_edit_failed">Couldn’t edit notes (%1$s)</string>
+
+    <!-- Speakers -->
+    <string name="notes_status_speaker_note">Couldn’t label the last segment’s speakers.</string>
+    <string name="notes_status_speaker_cancel_failed">Couldn’t cancel the speaker model download.</string>
+    <string name="notes_status_speaker_download_failed">Couldn’t download the speaker model.</string>
+    <string name="notes_status_speaker_preparing">Getting the speaker model ready…</string>
+    <!-- %1$d is the model’s download size in MB. -->
+    <string name="notes_status_speaker_preparing_size">Getting the speaker model ready (%1$d MB, once)…</string>
+    <!-- Shown as the engine a note was transcribed with, when its segments name more than one. -->
+    <string name="notes_status_engine_mixed">mixed</string>
+
+    <!-- Re-transcribe -->
+    <string name="notes_status_rt_updated">Transcript updated</string>
+    <string name="notes_status_rt_cancelled">Cancelled. Nothing changed.</string>
+    <string name="notes_status_rt_none">No segments updated. Nothing changed.</string>
+    <string name="notes_status_rt_rebuild_failed">Couldn’t rebuild the notes. Transcript updated.</string>
+    <!-- %1$d of %2$d segments updated; %3$d kept their old text (the quantity). -->
+    <plurals name="notes_status_rt_partial">
+        <item quantity="one">%1$d of %2$d updated. %3$d kept their old text.</item>
+        <item quantity="other">%1$d of %2$d updated. %3$d kept their old text.</item>
+    </plurals>
+    <string name="notes_status_rt_restored">Previous transcript restored</string>
+    <string name="notes_status_rt_rebuilt">Notes rebuilt</string>
+    <string name="notes_status_rt_interrupted">Re-transcribe was interrupted. Nothing changed.</string>
+    <string name="notes_status_rt_failed">Couldn’t finish re-transcribing. Nothing changed.</string>
+    <string name="notes_status_rt_transcript_changed">This transcript changed. Re-transcribe again.</string>
+    <string name="notes_status_rt_note_changed">This note changed. Re-transcribe again.</string>
+    <string name="notes_status_rt_waiting">Waiting for your computer…</string>
+    <!-- %1$d of %2$d clips; %3$s of %4$s is the audio done of the total, as minutes:seconds. -->
+    <string name="notes_status_rt_progress">Re-transcribing · %1$d of %2$d · %3$s of %4$s</string>
+
+    <!-- Why a recording or a segment failed -->
+    <string name="notes_status_fail_auth">Pairing refused — pair again in Chirp settings</string>
+    <string name="notes_status_fail_busy">Chirp server is busy</string>
+    <string name="notes_status_fail_too_long">Segment too long</string>
+    <string name="notes_status_fail_bad_audio">audio not understood</string>
+    <string name="notes_status_fail_engine">speech engine hiccup</string>
+    <string name="notes_status_fail_unavailable">speech engine unavailable</string>
+    <string name="notes_status_fail_timed_out">timed out</string>
+    <string name="notes_status_fail_closed">connection closed</string>
+    <string name="notes_status_fail_lost">connection lost</string>
+    <string name="notes_status_fail_microphone">The microphone stopped</string>
+    <!-- %1$s is why: the recording ended after segments kept failing. -->
+    <string name="notes_status_fail_stopped">Notes stopped: %1$s</string>
+
+    <!-- Saved voices errors -->
+    <string name="notes_status_voice_gone">Record a little more with them, then try again</string>
+    <string name="notes_status_voice_too_short">Name kept in this note. The voice will be remembered after 20 seconds of speech.</string>
+    <string name="notes_status_voice_disabled">Remember voices is off on your computer</string>
+    <string name="notes_status_voice_full">Saved voices is full. Forget a voice, then try again.</string>
+    <string name="notes_status_voice_no_voice">This voice was forgotten on another device. Refresh Saved voices.</string>
+    <string name="notes_status_voice_unsupported">Update Chirp on your computer to save voices</string>
+    <string name="notes_status_voice_bad_speakers">Use a name with letters, without colons or line breaks</string>
+    <string name="notes_status_voice_auth">Pair your computer again to use Saved voices</string>
+    <string name="notes_status_voice_failed">Couldn’t reach Saved voices. Try again.</string>
+</resources>

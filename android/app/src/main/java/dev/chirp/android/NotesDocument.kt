@@ -151,7 +151,7 @@ internal class NotesDocument(var startedAt: Long = System.currentTimeMillis(), t
 
     var previousTranscript: PreviousTranscript? = null
         private set
-    val transcriptEngine get() = committed.map { it.engine ?: "unknown" }.distinct().let { if (it.size == 1) it.first() else if (it.isEmpty()) "unknown" else "mixed" }
+    val transcriptEngine: TranscriptEngine get() = committed.map { it.engine }.distinct().let { when (it.size) { 0 -> TranscriptEngine.Unknown; 1 -> it.first()?.let(TranscriptEngine::Named) ?: TranscriptEngine.Unknown; else -> TranscriptEngine.Mixed } }
 
     /** Replace words only; all indices, clip boundaries, roster and manual speaker overrides stay in place. */
     fun applyRetranscription(results: Map<Int, RetranscribedSegment>, at: Long = System.currentTimeMillis()): Boolean {
@@ -162,14 +162,14 @@ internal class NotesDocument(var startedAt: Long = System.currentTimeMillis(), t
                 keptOriginal = final.correctionError != null && !final.corrected, failure = null,
                 engine = result.engine, turns = reattribute(old.turns, result))
         } ?: old }
-        previousTranscript = PreviousTranscript(at, transcriptEngine, committed.toList())
+        previousTranscript = PreviousTranscript(at, transcriptEngine.wire, committed.toList())
         committed.clear(); committed.addAll(next); speakerVersion++
         return true
     }
 
     fun restorePreviousTranscript(): Boolean {
         val previous = previousTranscript ?: return false
-        previousTranscript = PreviousTranscript(System.currentTimeMillis(), transcriptEngine, committed.toList())
+        previousTranscript = PreviousTranscript(System.currentTimeMillis(), transcriptEngine.wire, committed.toList())
         committed.clear(); committed.addAll(previous.segments); speakerVersion++
         return true
     }

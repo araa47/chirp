@@ -22,10 +22,10 @@ internal fun RetranscribeSheet(model: NotesModel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.notes_retranscribe_title, model.displayTitle), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
             Text(if (model.retranscribeSegment != null)
-                stringResource(R.string.notes_retranscribe_send_clip, seconds / 60, (seconds % 60).toString().padStart(2, '0'), model.retranscribeDestination)
-                else pluralStringResource(R.plurals.notes_retranscribe_send_note, clips.size, seconds / 60, seconds % 60, clips.size, model.retranscribeDestination))
+                stringResource(R.string.notes_retranscribe_send_clip, seconds / 60, (seconds % 60).toString().padStart(2, '0'), model.retranscribeDestination.text())
+                else pluralStringResource(R.plurals.notes_retranscribe_send_note, clips.size, seconds / 60, seconds % 60, clips.size, model.retranscribeDestination.text()))
             Text(stringResource(R.string.notes_retranscribe_not_kept))
-            Text(stringResource(R.string.notes_retranscribe_models, health?.speechModel ?: health?.engine ?: stringResource(R.string.notes_retranscribe_model_unknown), model.document.transcriptEngine))
+            Text(stringResource(R.string.notes_retranscribe_models, health?.speechModel ?: health?.engine ?: stringResource(R.string.notes_retranscribe_model_unknown), model.document.transcriptEngine.ui.text()))
             if (model.document.segments.isNotEmpty() && model.document.segments.all { it.engine != null && it.engine == health?.engine })
                 Text(stringResource(R.string.notes_retranscribe_same_model))
             Text(stringResource(if (model.retranscribeCleanup) R.string.notes_retranscribe_cleanup_on else R.string.notes_retranscribe_cleanup_off))
@@ -61,23 +61,23 @@ internal fun RetranscribeSheet(model: NotesModel) {
 internal fun RetranscribeBanner(model: NotesModel) {
     model.retranscribeProgress?.let { progress ->
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
-            Text(progress.label)
+            Text(progress.label.text())
             LinearProgressIndicator(progress = { if (progress.total == 0) 0f else progress.done.toFloat() / progress.total }, modifier = Modifier.fillMaxWidth())
             TextButton({ RetranscribeGate.owner?.cancelRetranscribe() }) { Text(stringResource(R.string.notes_action_cancel)) }
         }
     }
     model.retranscribeFailure?.let { failure ->
         Column(Modifier.padding(horizontal = 20.dp)) {
-            Text(failure, color = MaterialTheme.colorScheme.error)
+            Text(failure.ui.text(), color = MaterialTheme.colorScheme.error)
             if (model.canApplyRetranscribed) TextButton({ model.applyRetranscribed() }) { Text(stringResource(R.string.notes_retranscribe_apply_done)) }
             TextButton(model::cancelRetranscribe) { Text(stringResource(R.string.notes_action_cancel)) }
         }
     }
     model.retranscribeNotice?.let { notice ->
         Column(Modifier.padding(horizontal = 20.dp)) {
-            Text(notice, Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-            if (notice == "Notes rebuilt" && model.canUndo) TextButton(model::undo) { Text(stringResource(R.string.notes_action_undo)) }
-            else if (notice.contains("updated") && model.document.previousTranscript != null) TextButton(model::restoreTranscript) { Text(stringResource(R.string.notes_action_undo)) }
+            Text(notice.ui.text(), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            if (notice == RetranscribeNotice.Rebuilt && model.canUndo) TextButton(model::undo) { Text(stringResource(R.string.notes_action_undo)) }
+            else if (notice.restorable && model.document.previousTranscript != null) TextButton(model::restoreTranscript) { Text(stringResource(R.string.notes_action_undo)) }
             TextButton({ model.retranscribeNotice = null }) { Text(stringResource(R.string.notes_action_dismiss)) }
         }
     }

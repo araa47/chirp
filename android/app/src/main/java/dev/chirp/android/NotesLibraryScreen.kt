@@ -457,7 +457,7 @@ private fun RecordingNoteCard(model: NotesModel, click: () -> Unit) {
                 else Ripple(0f, Modifier.size(28.dp).clearAndSetSemantics { }, animate = false)
                 Text(model.displayTitle, Modifier.weight(1f), fontFamily = FontFamily.Serif, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Text(stringResource(R.string.notes_library_recording_state, state, model.elapsedText), style = ChirpTokens.timer,
+            Text(stringResource(R.string.notes_library_recording_state, state, model.elapsedText.text()), style = ChirpTokens.timer,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(preview.ifBlank { stringResource(if (paused) R.string.notes_library_preview_paused else R.string.notes_library_preview_recording) }, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
