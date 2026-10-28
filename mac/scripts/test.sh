@@ -22,10 +22,12 @@ run() {
         swift test "$@"
     fi
 }
-# With no arguments the 2-hour Live Notes soak runs on its own after the rest: its 2-minute limit must not include
-# minutes where the snapshot renderer holds the main actor.
+# With no arguments the snapshot renderer and the 2-hour Live Notes soak each run on their own after the rest. The
+# renderer holds the main actor for minutes, which other suites' time limits and real-time deadlines must not include
+# (#315); the soak's 2-minute limit is for the soak alone.
 if [ $# -eq 0 ]; then
-    run --skip NotesSoakTests
+    run --skip 'NotesSoakTests|ChirpCoreTests\.SnapshotTests/'
+    ./scripts/test.sh --skip-build --filter 'ChirpCoreTests\.SnapshotTests/'
     exec ./scripts/test.sh --skip-build --filter NotesSoakTests
 fi
 run "$@"
