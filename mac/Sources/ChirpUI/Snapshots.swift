@@ -1344,8 +1344,9 @@ public enum Snapshots {
 
     public static var allScenarios: [Scenario] {
         // `CHIRP_SNAPSHOT_REVIEW=303 ChirpMac --render-snapshots <dir>` renders only the #303 text-size/geometry review
-        // matrix (never part of the committed set).
+        // matrix, and `=332` the long-value Settings pages (never part of the committed set).
         if ProcessInfo.processInfo.environment["CHIRP_SNAPSHOT_REVIEW"] == "303" { return modernUXScenarios }
+        if ProcessInfo.processInfo.environment["CHIRP_SNAPSHOT_REVIEW"] == "332" { return settingsSizeScenarios }
         return hudScenarios + rippleScenarios + wordWaveScenarios + settingsScenarios + onboardingScenarios + menuScenarios
             + localModelsScenarios + notesScenarios + pairingScenarios + historyScenarios + savedVoicesScenarios
     }
@@ -1633,5 +1634,58 @@ private final class SubmenuRowView: NSView {
             })
         }
         return scenes
+    }
+}
+
+// #332 review: the Settings window at its one size (720 × 520; it does not resize) with the longest values a user can bring.
+// `CHIRP_SNAPSHOT_REVIEW=332 ChirpMac --render-snapshots <dir>` renders each page as the window shows it and stretched to the
+// whole page. `SettingsWindowSizeTests` lays out the same values.
+@MainActor extension Snapshots {
+    static let longValuesDate = Date(timeIntervalSince1970: 1_791_849_600)
+
+    /// Long values in every slot the user fills: microphone, sound and folder names, the server, errors and counts.
+    static var longValueSettings: SettingsState {
+        var s = SettingsState()
+        s.serverURL = "https://a-very-long-server-name.with-a-long-tailnet-name.example.ts.net:7821/chirp/v1"
+        s.serverHost = "a-very-long-server-name.with-a-long-tailnet-name.example.ts.net"
+        s.serverStatus = "Unreachable: the server did not answer within ten seconds"; s.serverStatusTone = .error
+        s.inputs = [AudioInput(uid: "a", name: "MacBook Pro Microphone"),
+                    AudioInput(uid: "b", name: "Elgato Wave:3 USB Condenser Microphone With Clipguard (Channel 1 + 2)")]
+        s.defaultInput = s.inputs[1]; s.chosenInputUID = "b"
+        s.soundsEnabled = true; s.soundPack = .custom
+        s.customStart = CustomSound(fileName: "x.m4a", displayName: "A really long custom start sound file name that goes on.m4a", duration: 1.2)
+        s.customStop = CustomSound(fileName: "y.m4a", displayName: "A really long custom stop sound file name that goes on and on.m4a", duration: 0.2)
+        s.exportFolder = "/Volumes/Shared Drive/Work/Meetings/2026/Quarterly planning notes and minutes for the whole team"
+        s.notesKeepAudio = true; s.notesAudioBytes = 123_456_789_012; s.recentlyDeletedCount = 12_345
+        s.historyCount = 123_456; s.learnedSummary = "1,234 in use, 56 waiting"
+        s.speakerModelDownloaded = true
+        s.speakerModel = .failed("The download stopped: the network connection was lost. Try again on a stable connection.")
+        s.micGranted = false; s.accessibilityGranted = false
+        s.cleanupEnabled = true
+        s.appStyles = [AppStyleRule(bundleID: "com.example.a-really-long-bundle-identifier.for-an-enterprise-app.helper", profile: "chat")]
+        s.about = AboutInfo(version: "0.1.0", build: "1")
+        s.voices.supported = true; s.voices.enabled = true
+        s.voices.profiles = [SavedVoice(id: "0123456789abcdef", name: "Maximiliana Alexandra Featherstonehaugh-Montgomery", seconds: 46,
+                                        created: longValuesDate, updated: longValuesDate)]
+        return s
+    }
+
+    /// The long values the form takes directly: excluded apps and a paired phone.
+    static func fillLongValues(_ form: SettingsForm) {
+        form.historyApps.setApps(["com.example.a-really-long-bundle-identifier.for-an-enterprise-password-manager", "com.agilebits.onepassword7"])
+        let phone = PairedDevice(id: "9f3a1c52", name: "Maximiliana’s Samsung Galaxy Z Fold 7 Enterprise Edition (work profile)",
+                                 created: longValuesDate, lastSeen: longValuesDate)
+        form.devicesView.apply(.loaded([phone]), revoking: nil, problem: nil, activity: .hidden, keepProblem: nil,
+                               now: longValuesDate, locale: Locale(identifier: "en_US"), timeZone: TimeZone(identifier: "UTC")!)
+    }
+
+    static var settingsSizeScenarios: [Scenario] {
+        SettingsTab.allCases.flatMap { tab in
+            [false, true].map { full in
+                Scenario(name: "settings-long-\(tab.rawValue)-\(full ? "page" : "window")") {
+                    settingsWindow(longValueSettings, tab, full: full, prepare: fillLongValues)
+                }
+            }
+        } + [Scenario(name: "settings-long-saved-voices-page") { savedVoicesWindow(longValueSettings.voices) }]
     }
 }
