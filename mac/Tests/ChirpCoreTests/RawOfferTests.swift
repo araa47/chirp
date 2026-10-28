@@ -7,12 +7,24 @@ import Testing
 private final class FakeClock: @unchecked Sendable {
     private let lock = NSLock()
     private var parked: [(Duration, CheckedContinuation<Void, Never>)] = []
+    private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
     var sleepers: [(Duration, CheckedContinuation<Void, Never>)] { lock.withLock { parked } }
     var requested: [Duration] { sleepers.map(\.0) }
     var sleep: @Sendable (Duration) async -> Void {
-        { [self] d in await withCheckedContinuation { c in lock.withLock { parked.append((d, c)) } } }
+        { [self] d in await withCheckedContinuation { c in park { parked.append((d, c)) } } }
     }
-    func waitForSleepers(_ n: Int) async { while sleepers.count < n { await Task.yield() } }
+    /// Suspends until `n` sleeps have parked. It never spins: under load a `Task.yield()` loop starves the pool (#315).
+    func waitForSleepers(_ n: Int) async { await withCheckedContinuation { c in park { waiters.append((n, c)) } } }
+    /// Runs `change` under the lock, then wakes every waiter whose count has parked.
+    private func park(_ change: () -> Void) {
+        let ready = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            change()
+            let ready = waiters.filter { $0.0 <= parked.count }.map(\.1)
+            waiters.removeAll { $0.0 <= parked.count }
+            return ready
+        }
+        for c in ready { c.resume() }
+    }
     func fireAll() { let s = lock.withLock { let s = parked; parked = []; return s }; for (_, c) in s { c.resume() } }
 }
 
@@ -43,7 +55,7 @@ private final class Rig {
         await r.clock.waitForSleepers(1)
         #expect(r.clock.requested == [.seconds(5)])
         r.clock.fireAll()
-        while r.offer.isOpen { await Task.yield() }
+        #expect(await pollUntil(within: 60) { !r.offer.isOpen })
         #expect(!r.offer.hotkeyActive && r.unregistered == 1 && r.used == 0)
     }
 
@@ -92,7 +104,7 @@ private final class Rig {
         for _ in 0..<20 { await Task.yield() }
         #expect(r.offer.isOpen && r.offer.hotkeyActive)
         r.clock.sleepers[1].1.resume()
-        while r.offer.isOpen { await Task.yield() }
+        #expect(await pollUntil(within: 60) { !r.offer.isOpen })
     }
 
     @Test func reopeningReplacesTheRegistration() async {

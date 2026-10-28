@@ -341,8 +341,8 @@ import Testing
 @MainActor
 enum NSHostingViewSize {
     static func of<V: SwiftUI.View>(_ view: V) -> CGSize {
-        let host = NSHostingView(rootView: view)
-        return host.fittingSize
+        // Gone before the next one: a test that measures many hosts must not leave them all to one pool pop (#315).
+        autoreleasepool { NSHostingView(rootView: view).fittingSize }
     }
 }
 

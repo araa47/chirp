@@ -239,11 +239,23 @@ private struct FixedLinks: PairingLinkMaker {
 private final class ParkedClock: @unchecked Sendable {
     private let lock = NSLock()
     private var parked: [CheckedContinuation<Void, Never>] = []
+    private var waiters: [CheckedContinuation<Void, Never>] = []
     var count: Int { lock.withLock { parked.count } }
     var sleep: @Sendable (Duration) async -> Void {
-        { [self] _ in await withCheckedContinuation { c in lock.withLock { parked.append(c) } } }
+        { [self] _ in await withCheckedContinuation { c in park { parked.append(c) } } }
     }
-    func waitForSleeper() async { while count == 0 { await Task.yield() } }
+    /// Suspends until a sleep has parked. It never spins: under load a `Task.yield()` loop starves the pool (#315).
+    func waitForSleeper() async { await withCheckedContinuation { c in park { waiters.append(c) } } }
+    /// Runs `change` under the lock, then wakes the waiters once a sleep is parked.
+    private func park(_ change: () -> Void) {
+        let ready = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            change()
+            guard !parked.isEmpty else { return [] }
+            defer { waiters = [] }
+            return waiters
+        }
+        for c in ready { c.resume() }
+    }
     func fire() { let s = lock.withLock { let s = parked; parked = []; return s }; for c in s { c.resume() } }
 }
 
@@ -263,7 +275,7 @@ private final class ParkedClock: @unchecked Sendable {
             clock.fire()
             await Task.yield()
         }
-        while expired == 0 { await Task.yield() }
+        #expect(await pollUntil(within: 60) { expired > 0 })
         #expect(ticks == Array((0...120).reversed()) && expired == 1 && !timer.isRunning)
         #expect(PairingTimer.text(107) == "1:47" && PairingTimer.text(5) == "0:05")
     }

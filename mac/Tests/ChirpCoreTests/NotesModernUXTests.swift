@@ -176,7 +176,8 @@ import Testing
         let scenes = Snapshots.allScenarios.filter { canonical.contains($0.name) } + Snapshots.modernUXScenarios
         for scene in scenes where only.map({ scene.name.contains($0) }) ?? true {
             for appearance in Snapshots.appearances {
-                let png = try #require(Snapshots.png(scene, appearance: appearance.appearance), "Failed to render \(scene.name)")
+                let png = try #require(autoreleasepool { Snapshots.png(scene, appearance: appearance.appearance) },
+                                       "Failed to render \(scene.name)")
                 try png.write(to: output.appendingPathComponent("\(scene.name)-\(appearance.name).png"))
             }
         }

@@ -12,14 +12,17 @@ ISOLATED="NotesBudgetTests NotesLongRecorderTests NotesLayoutTests NotesLongSess
 SKIPPED="GeneratedSoundTests SnapshotTests"
 re() { echo "$*" | tr ' ' '\n' | paste -sd'|' -; }
 # Keep the build quiet, but show compiler errors when it fails.
-swift build --build-tests >/tmp/chirp-build 2>&1 || { grep -A12 'error:' /tmp/chirp-build || tail -100 /tmp/chirp-build; exit 1; }
-swift test list 2>/tmp/chirp-list > /tmp/chirp-tests || { cat /tmp/chirp-list; exit 1; }
+# CHIRP_MAC_SCRATCH (as in test.sh) builds outside the checkout, for running this locally.
+SCRATCH=${CHIRP_MAC_SCRATCH:+--scratch-path $CHIRP_MAC_SCRATCH}
+swift build --build-tests $SCRATCH >/tmp/chirp-build 2>&1 || { grep -A12 'error:' /tmp/chirp-build || tail -100 /tmp/chirp-build; exit 1; }
+swift test list $SCRATCH 2>/tmp/chirp-list > /tmp/chirp-tests || { cat /tmp/chirp-list; exit 1; }
 ./scripts/test.sh --skip-build --skip "$(re $ISOLATED $SKIPPED)"
 fail=0
 for suite in $ISOLATED; do
-    # `swift test list` prints Module.Suite/test(); escape the regex metacharacters for --filter.
+    # `swift test list` prints Module.Suite/test(); escape the regex metacharacters for --filter. Swift 6.4 matches
+    # the filter against that ID followed by /File.swift:line:column, so end it with (/|$) rather than $.
     for t in $(grep "\.$suite/" /tmp/chirp-tests | sed -E 's/[().]/\\&/g'); do
-        ./scripts/test.sh --skip-build --filter "^$t\$" >/tmp/chirp-one 2>&1 \
+        ./scripts/test.sh --skip-build --filter "^$t(/|\$)" >/tmp/chirp-one 2>&1 \
             && grep -q "passed after" /tmp/chirp-one || { echo "FAILED: $t"; tail -20 /tmp/chirp-one; fail=1; }
     done
 done
