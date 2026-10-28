@@ -7,7 +7,7 @@ import Testing
 @Suite struct OutcomePresentationTests {
     @Test func eachOutcomeHasItsWording() {
         let plain = FinalResult(text: "hello")
-        #expect(OutcomePresentation.of(.inserted(.ax), final: plain) == .init(status: "Inserted", linger: 1.2))
+        #expect(OutcomePresentation.of(.inserted(.ax), final: plain) == .init(status: "Inserted", linger: 0))
         #expect(OutcomePresentation.of(.inserted(.paste), final: plain).status == "Inserted")
         #expect(OutcomePresentation.of(.copied, final: plain) == .init(status: "Copied — ⌘V", indicator: .clipboard, linger: 3))
         #expect(OutcomePresentation.of(.insertedUnverified, final: plain).status == "Inserted? ⌘V if empty")
@@ -35,6 +35,25 @@ import Testing
         #expect(off.cleaned && !off.showUseRaw && off.linger == 1.8)
         #expect(!OutcomePresentation.of(.inserted(.ax), final: FinalResult(text: "hello")).cleaned)
         #expect(!OutcomePresentation.of(.refusedSecure, final: corrected).cleaned)
+    }
+
+    @Test func aSuccessfulInsertionNeverLingers() {
+        let finals = [FinalResult(text: "hello"),                                          // clean-up off
+                      FinalResult(text: "hello", raw: "hello", corrected: true),            // clean-up changed nothing
+                      FinalResult(text: "Hello.", raw: "hello", corrected: true)]           // cleaned
+        for final in finals {
+            for method in [InsertionMethod.ax, .paste] {
+                #expect(OutcomePresentation.of(.inserted(method), final: final).linger == 0)
+            }
+        }
+        // Show changes keeps the HUD only when there are changes to show.
+        #expect(OutcomePresentation.of(.inserted(.ax), final: finals[0], showChanges: true).linger == 0)
+        #expect(OutcomePresentation.of(.inserted(.ax), final: finals[1], showChanges: true).linger == 0)
+        #expect(OutcomePresentation.of(.inserted(.ax), final: finals[2], showChanges: true).linger > 0)
+        // Where the user has to act or be told something, the HUD stays.
+        for outcome in [InsertionOutcome.copied, .insertedUnverified, .refusedSecure] {
+            #expect(OutcomePresentation.of(outcome, final: finals[0]).linger > 0)
+        }
     }
 
     @Test func theKeptOriginalNoteIsBrief() {

@@ -11,6 +11,16 @@ public enum InsertionOutcome: Sendable, Equatable {
     case insertedUnverified
     case copied
     case refusedSecure
+
+    /// A short name for the diagnostics log.
+    public var logName: String {
+        switch self {
+        case .inserted(let method): method.rawValue
+        case .insertedUnverified: "unverified"
+        case .copied: "copied"
+        case .refusedSecure: "secure"
+        }
+    }
 }
 
 /// Chooses which insertion methods to try, in order. Pure, so it is unit-tested.
