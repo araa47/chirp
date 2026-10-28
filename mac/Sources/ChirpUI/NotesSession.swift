@@ -210,6 +210,8 @@ public final class NotesSession {
         // The inspector is remembered in the old layout preference ("split" showed the transcript beside the notes).
         window.showsInspector = settings.notesTab != "notes"
         window.onInspector = { settings.notesTab = $0 ? "split" : "notes" }
+        window.textSize.restore(settings.notesTextSize)
+        window.textSize.onChange = { settings.notesTextSize = Double($0) }
         model.onShowTranscript = { [weak self] in self?.window.setInspector(true) }
         model.tipSeen = settings.notesTipSeen
         model.onTipSeen = { settings.notesTipSeen = true }
