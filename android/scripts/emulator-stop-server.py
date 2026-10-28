@@ -156,7 +156,9 @@ async def observed(scope, receive, send):
                     notes['label_errors'] = notes.get('label_errors', []) + [labels['error']]
                 args.metadata.with_name('notes.json').write_text(json.dumps(notes))
             if kind == 'error': state['error'] = frame.get('code')
-            save()
+        # Only the stream that started an utterance is the check's: health calls and idle prewarm sockets
+        # must not overwrite its metadata between its last frame and the check reading it (#344).
+        if state['started']: save()
         await send(event)
     try:
         await app(scope, read, write)
