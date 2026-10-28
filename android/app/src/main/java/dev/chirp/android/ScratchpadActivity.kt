@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -175,7 +176,7 @@ internal fun ScratchpadScreen(model: ScratchpadModel, mic: () -> Unit, copy: () 
                     if (model.active && model.partial.isNotEmpty()) Text(model.partial, Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium, maxLines = 3)
                     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(model.status.shown(LocalContext.current.resources), Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
+                        Text(model.status.shown(LocalResources.current), Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
                         if (model.rawAvailable && rawSeconds > 0) TextButton(model::useRaw, Modifier.semantics {
                             contentDescription = rawAvailable
                         }) { Text(stringResource(R.string.quick_dictate_use_raw_seconds, rawSeconds), Modifier.clearAndSetSemantics { },

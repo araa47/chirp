@@ -197,7 +197,7 @@ class NotesRecorderTest {
         rig.wire.failure(); rig.idle()
         assertEquals(NotesRecorder.State.ERROR, rig.recorder.state)
         assertEquals(RecordingFailure.Connection(ConnectionFailure.Kind.OTHER), rig.recorder.error)
-        assertEquals(ConnectionFailure.status(ConnectionFailure.Kind.OTHER), rig.recorder.error!!.english)
+        assertEquals(ConnectionFailure.Kind.OTHER.english(), rig.recorder.error!!.english)
         assertTrue(rig.captures.single().stopped)
     }
 

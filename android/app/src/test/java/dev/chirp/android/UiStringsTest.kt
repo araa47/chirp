@@ -18,21 +18,23 @@ class UiStringsTest {
         Regex("""== ?1L?\) ?"[^"]*" else "[^"]*s""""),
     )
     /** A capitalised word and at least one more: a sentence for a person, not an id, key or wire value. */
-    private val sentence = Regex(""""[A-Z][a-z’']+( [A-Za-z’'…—·]+)+""")
+    private val sentence = Regex(""""[A-Z][a-z’']+[,:]?( [A-Za-z’'…—·$]+)+""")
     /** Lines that only build messages for developers: logs, failed checks, exceptions. */
-    private val developer = Regex("""Log\.|\berror\(|\brequire\(|\bcheck\(|\bthrow |Exception\(|@Deprecated""")
+    private val developer = Regex("""Log\.|\berror\(|\brequire\(|\bcheck\(|\bthrow |Exception\(|@Deprecated|"Bearer """)
     /** English kept on purpose, by file and a piece of the line, with the reason. */
     private val exempt = listOf(
         // Saved into the note and its Markdown export, and the Diagnostics text; NotesStatusTest keeps them equal to the resources.
         "NotesStatus.kt" to "",
         // Support reports copied as English.
-        "SessionTimings.kt" to "", "NotesTimings.kt" to "", "SetupActivity.kt" to "No crashes recorded",
+        "SessionTimings.kt" to "", "NotesTimings.kt" to "", "CrashLog.kt" to "No crashes recorded", "SetupActivity.kt" to "No crashes recorded",
         // Clipboard labels are metadata for other apps, not shown text.
         "" to "ClipData.newPlainText(", "HistoryScreen.kt" to "actions.copy(\"Chirp dictation",
         // History stores the app label with each entry.
         "QuickDictateActivity.kt" to "\"Quick dictate\"", "QuickDictateActivity.kt" to "\"Requesting app\"", "QuickDictateModel.kt" to "\"Quick dictate\"",
         // Rejected pairing links: exception messages, never shown.
         "Pairing.kt" to "",
+        // The default speaker name, written into the note's roster when a speaker is named.
+        "" to "\"Person $",
         // Stand-in for the server's own style names, which are not translated either.
         "CleanupStyles.kt" to "CorrectionProfile(\"custom\"",
         // The note's own text: the Markdown title and the library's name for an empty typed note.
