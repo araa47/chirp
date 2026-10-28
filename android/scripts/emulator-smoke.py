@@ -187,7 +187,13 @@ def tap_key(label):
 
 
 def editor_text():
-    return next(n.get('text', '') for n in nodes() if n.get('class') == 'android.widget.EditText')
+    # A dump taken while windows change can miss the editor (only the status bar is exposed): look again briefly (#344).
+    deadline = time.monotonic() + 10
+    while True:
+        text = next((n.get('text', '') for n in nodes() if n.get('class') == 'android.widget.EditText'), None)
+        if text is not None: return text
+        if time.monotonic() > deadline: raise AssertionError('No editor on screen')
+        time.sleep(.25)
 
 
 def typing_check():
