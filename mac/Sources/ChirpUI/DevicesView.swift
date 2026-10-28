@@ -138,6 +138,7 @@ public final class DevicesView: NSStackView {
         let name = NSTextField(labelWithString: title)
         name.font = MenuStyle.semiboldFont
         name.lineBreakMode = .byTruncatingTail
+        name.toolTip = title
         var lines: [NSView] = [name]
         if let detail {
             let field = NSTextField(labelWithString: detail)

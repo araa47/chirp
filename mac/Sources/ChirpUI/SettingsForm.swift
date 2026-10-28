@@ -613,6 +613,9 @@ public final class SettingsForm {
         soundError = error
         startFile.stringValue = start.map { "\($0.displayName) · \(SoundTiming.durationText($0.duration))" } ?? "None (uses Chirp)"
         stopFile.stringValue = stop.map { "\($0.displayName) · \(SoundTiming.durationText($0.duration))" } ?? "None (uses Chirp)"
+        // The fixed-width labels truncate a long name in the middle; the tooltip shows it whole.
+        startFile.toolTip = start.map { _ in startFile.stringValue }
+        stopFile.toolTip = stop.map { _ in stopFile.stringValue }
         startFile.textColor = start == nil ? .secondaryLabelColor : .labelColor
         stopFile.textColor = stop == nil ? .secondaryLabelColor : .labelColor
         removeStart.isEnabled = start != nil
@@ -697,6 +700,7 @@ public final class SettingsForm {
             structureNotes.state = s.structureNotes ? .on : .off
             autoReorganize.state = s.autoReorganize ? .on : .off
             exportFolder.stringValue = s.exportFolder.map { Self.displayPath($0) } ?? "Last used"
+            exportFolder.toolTip = s.exportFolder.map { Self.displayPath($0) }
             exportFolder.textColor = s.exportFolder == nil ? .secondaryLabelColor : .labelColor
             resetExport.isEnabled = s.exportFolder != nil
             launchUnavailable = s.launch == .unavailable
