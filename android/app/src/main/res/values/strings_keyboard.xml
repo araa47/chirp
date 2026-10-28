@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The keyboard strip, the floating mic panel, the in-keyboard history and the dictation options menu.
-     Dictation status lines (Listening…, Inserted, errors) still come from the dictation state as English text. -->
+     Dictation status lines (Listening…, Inserted, errors) are in strings_status.xml. -->
 <resources>
     <string name="strip_options">Dictation options</string>
     <string name="strip_mic_idle">Microphone: tap to dictate, hold to talk</string>
