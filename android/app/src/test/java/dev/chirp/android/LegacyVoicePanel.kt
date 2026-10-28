@@ -65,7 +65,7 @@ internal class LegacyVoicePanel(context: Context) : LinearLayout(context) {
     }
     fun show(statusText: String, text: String, stable: String = "", active: Boolean = false, finalizing: Boolean = false) {
         // Only a problem gets the line; idle and success states are the mic's and transcript's to say.
-        val problem = Cue.isError(statusText) || DictationAction.forStatus(statusText) != null
+        val problem = (StatusLine.entries + ConnectionFailure.Kind.entries).firstOrNull { it.resolve(resources) == statusText }?.let { it.error || it.action != null } == true
         status.text = statusText
         status.visibility = if (problem) VISIBLE else GONE
         status.setTextColor(if (problem) colors.onErrorContainer else colors.muted)

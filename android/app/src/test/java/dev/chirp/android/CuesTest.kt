@@ -40,9 +40,9 @@ class CuesTest {
     @Test fun `error statuses are recognised and normal ones are not`() {
         for (status in listOf("Didn't catch that", "Speech engine hiccup", "Chirp server is busy — try again", "Allow microphone in Chirp settings",
             "Dictation unavailable in password fields", "Chirp server took too long — try again", "Text field unavailable — try again",
-            ConnectionFailure.Kind.DNS.status, ConnectionFailure.Kind.DOWN.status, ConnectionFailure.Kind.TLS.status))
-            assertTrue(status, Cue.isError(status))
+            ConnectionFailure.Kind.DNS.english(), ConnectionFailure.Kind.DOWN.english(), ConnectionFailure.Kind.TLS.english()))
+            assertTrue(status, statusOf(status).error)
         for (status in listOf("Listening…", "Finishing…", "Polishing…", "Cancelled", "Inserted · tap mic to dictate again", "Tailscale connected"))
-            assertFalse(status, Cue.isError(status))
+            assertFalse(status, statusOf(status).error)
     }
 }

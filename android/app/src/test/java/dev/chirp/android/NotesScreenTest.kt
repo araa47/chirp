@@ -131,7 +131,7 @@ class NotesModelTest {
         val rig = NotesModelRig(context, paired = false)
         rig.model.toggle()
         assertEquals("Pair your computer in Chirp settings", rig.model.status)
-        assertEquals(DictationAction.PAIR, DictationAction.forStatus(rig.model.status))
+        assertEquals(DictationAction.PAIR, statusOf(rig.model.status).action)
         assertTrue(rig.wires.isEmpty())
     }
 

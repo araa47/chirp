@@ -81,7 +81,7 @@ class TailscalePromptTest {
 
     @Test fun `opening the keyboard with Tailscale off offers Turn on and recovers when the VPN comes up`() {
         keyboard()
-        prompted(DictationAction.TAILSCALE_OFF, "Turn on")
+        prompted("Tailscale is off", "Turn on")
         assertEquals("Tailscale is off. Turn on", strip.status.contentDescription.toString())
         strip.action.performClick()
         assertEquals(1, tailscale.connects)
@@ -100,14 +100,14 @@ class TailscalePromptTest {
         strip.status.performClick()
         assertEquals(1, tailscale.connects)
         advance(10000)
-        prompted(DictationAction.TAILSCALE_STALLED, "Open Tailscale")
+        prompted("Tailscale didn't connect", "Open Tailscale")
         strip.action.performClick()
         assertEquals(1, tailscale.opens)
     }
     @Test fun `missing Tailscale opens Chirp network setup`() {
         tailscale.installed = false
         keyboard()
-        prompted(DictationAction.TAILSCALE_MISSING, "Set up")
+        prompted("Tailscale isn't installed", "Set up")
         strip.action.performClick()
         val intent = shadowOf(host).nextStartedActivity
         assertEquals(SetupActivity::class.java.name, intent.component?.className)
@@ -131,12 +131,12 @@ class TailscalePromptTest {
         voice.touch(MotionEvent.ACTION_DOWN); advance(40); voice.touch(MotionEvent.ACTION_UP)
         stream.failure()
         assertFalse(voice.active)
-        prompted(DictationAction.TAILSCALE_OFF, "Turn on")
+        prompted("Tailscale is off", "Turn on")
         voice.beforeEdit(); collapsed()
         voice.hidden(); voice.shown(); collapsed()
         tailscale.set(true); collapsed()
         tailscale.set(false)
-        prompted(DictationAction.TAILSCALE_OFF, "Turn on")
+        prompted("Tailscale is off", "Turn on")
     }
     @Test fun `tailnet hosts are recognised without DNS`() {
         for (url in listOf("https://mac.example.ts.net/chirp", "https://MAC.Example.TS.NET", "https://100.64.0.1", "https://100.127.255.254",

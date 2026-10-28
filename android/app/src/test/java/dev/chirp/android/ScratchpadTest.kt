@@ -230,7 +230,7 @@ class ScratchpadTest {
         val rig = Rig(context, url = "https://mac.tail1234.ts.net/chirp", tailscale = TailscalePromptTest.FakeTailscale(connected = false))
         val actions = mutableListOf<DictationAction>(); screen(rig, actions)
         rig.model.toggle(); rig.wire.failure(); compose.waitForIdle()
-        assertTrue(rig.model.status.startsWith(DictationAction.TAILSCALE_OFF))
+        assertEquals("Tailscale is off", rig.model.status.english())
         compose.onNodeWithText("Turn on").performClick()
         assertEquals(listOf(DictationAction.TAILSCALE_ON), actions)
     }
@@ -242,8 +242,8 @@ class ScratchpadTest {
         assertTrue(unpaired.wires.isEmpty()); assertTrue(unpaired.captures.isEmpty())
         val silent = Rig(context, mic = false)
         silent.model.toggle()
-        assertEquals("Allow microphone in Chirp settings", silent.model.status)
-        assertEquals(DictationAction.MICROPHONE, DictationAction.forStatus(silent.model.status))
+        assertEquals("Allow microphone in Chirp settings", silent.model.status.english())
+        assertEquals(DictationAction.MICROPHONE, silent.model.status.action)
         assertTrue(silent.captures.isEmpty())
     }
 

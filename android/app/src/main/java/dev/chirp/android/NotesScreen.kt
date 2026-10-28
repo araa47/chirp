@@ -197,10 +197,11 @@ internal fun captureState(model: NotesModel): String = stringResource(when (mode
 
 @Composable
 internal fun NotesStatusStack(model: NotesModel, act: (DictationAction) -> Unit, modifier: Modifier = Modifier) {
-    val action = DictationAction.forStatus(model.status)
+    val res = androidx.compose.ui.platform.LocalContext.current.resources // SHIM-339
+    val action = StatusLine.entries.firstOrNull { it.resolve(res) == model.status }?.action // SHIM-339
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (model.retained) StatusBanner(StatusKind.Error, stringResource(R.string.debug_retention))
-        if (action != null) StatusBanner(StatusKind.Warning, model.status, action = action.label, onAction = { act(action) })
+        if (action != null) StatusBanner(StatusKind.Warning, model.status, action = stringResource(action.label), onAction = { act(action) })
         if (model.recovered != null) StatusBanner(StatusKind.Info, stringResource(R.string.notes_editor_recovered_title), body = stringResource(R.string.notes_editor_recovered_body))
         if (model.speakerModelControl.status != null) SpeakerModelStatus(model.speakerModelControl)
         // Naming is premature while the model is still preparing. Keep the actionable model status instead.

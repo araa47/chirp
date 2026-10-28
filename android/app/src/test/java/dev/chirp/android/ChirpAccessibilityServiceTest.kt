@@ -43,12 +43,12 @@ class ChirpAccessibilityServiceTest {
         var paired = true
         var pairingUrl = "https://mac.example.test"
         var vpn = TailscalePromptTest.FakeTailscale(connected = true)
-        val captures = mutableListOf<ChirpImeServiceTest.FakeCapture>()
-        val streams = mutableListOf<ChirpImeServiceTest.FakeTransport>()
+        internal val captures = mutableListOf<ChirpImeServiceTest.FakeCapture>()
+        internal val streams = mutableListOf<ChirpImeServiceTest.FakeTransport>()
         private val order = mutableListOf<String>()
         override fun loadPairing() = if (paired) Pairing.from(pairingUrl, "synthetic") else null
         override fun tailscale(): TailscaleControl = vpn
-        override fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (String?) -> Unit): Capture =
+        override fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (DictationStatus?) -> Unit): Capture =
             ChirpImeServiceTest.FakeCapture(frame, done, order).also { captures += it }
         override fun createTransport(client: okhttp3.OkHttpClient, pairing: Pairing, event: (ServerEvent) -> Unit, failure: () -> Unit): ImeTransport =
             ChirpImeServiceTest.FakeTransport(event, failure, order).also { streams += it }
@@ -303,11 +303,11 @@ class ChirpAccessibilityServiceTest {
         panel!!.hide.performClick(); advance()
         service.paired = true; service.pairingUrl = "https://mac.tail0000.ts.net"; service.vpn = TailscalePromptTest.FakeTailscale(connected = false)
         focus(); tapBubble()
-        assertTrue(shows(DictationAction.TAILSCALE_OFF)); assertEquals(listOf("Turn on"), errorActions())
+        assertTrue(shows("Tailscale is off")); assertEquals(listOf("Turn on"), errorActions())
         panel!!.hide.performClick(); advance()
         service.pairingUrl = "https://mac.example.test"; focus(); start()
         service.streams.last().failure(); advance()
-        assertTrue(shows(ConnectionFailure.Kind.OTHER.status)); assertEquals(listOf("Check again"), errorActions())
+        assertTrue(shows(ConnectionFailure.Kind.OTHER.english())); assertEquals(listOf("Check again"), errorActions())
         assertTrue(shadowOf(service).isForegroundStopped); assertTrue(service.captures.last().released)
         button("Check again").performClick(); advance()
         assertNotNull(shadowOf(app).nextStartedService)

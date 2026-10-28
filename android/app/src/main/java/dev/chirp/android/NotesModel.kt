@@ -423,8 +423,8 @@ internal class NotesModel(
 
     private fun tailscaleStatus(paired: Pairing): String? = when {
         !TailscaleControl.routes(paired.base) -> null
-        !tailscale.installed() -> DictationAction.TAILSCALE_MISSING
-        !tailscale.connected() -> DictationAction.TAILSCALE_OFF
+        !tailscale.installed() -> StatusLine.TAILSCALE_MISSING.resolve(app.resources) // SHIM-339
+        !tailscale.connected() -> StatusLine.TAILSCALE_OFF.resolve(app.resources) // SHIM-339
         else -> null
     }
 

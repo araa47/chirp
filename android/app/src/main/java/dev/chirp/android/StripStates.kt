@@ -79,16 +79,6 @@ internal fun elapsedSpoken(resources: android.content.res.Resources, millis: Lon
     }
 }
 
-internal fun dictationDisplayStatus(status: String): String = when {
-    status == "Tap mic" || status.startsWith("Tap mic ·") -> "Ready"
-    status == "kept original" -> "Kept what was heard"
-    status.startsWith("cleaned") -> "Polished" + status.removePrefix("cleaned")
-    status.startsWith("Inserted") -> "Finished" + status.removePrefix("Inserted")
-    status == ConnectionFailure.OFFLINE -> "Computer offline · Check again"
-    status.startsWith("Computer is loading") || status.startsWith("Computer loading") -> "Computer loading its model"
-    else -> status
-}
-
 internal fun actionSeconds(deadline: Long, now: Long): Int = ((deadline - now + 999) / 1000).toInt().coerceAtLeast(0)
 
 /** Text ticks silently; the stable accessible name announces the offer once. */

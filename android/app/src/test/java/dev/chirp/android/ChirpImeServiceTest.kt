@@ -64,7 +64,7 @@ class ChirpImeServiceTest {
             }
         } as InputConnection
     }
-    class FakeCapture(val frame: (ByteArray) -> Boolean, val done: (String?) -> Unit,
+    internal class FakeCapture(val frame: (ByteArray) -> Boolean, val done: (DictationStatus?) -> Unit,
                       val order: MutableList<String>) : Capture {
         var started = false
         var stopRequested = false
@@ -75,12 +75,12 @@ class ChirpImeServiceTest {
         override var limitSeconds = CaptureLimit.CAP_SECONDS
         override fun start() { started = true; order += "capture.start" }
         override fun stop() { stopRequested = true; if (!deferRelease) finish() }
-        fun finish(error: String? = null) {
+        fun finish(error: DictationStatus? = null) {
             if (released) return
             released = true; order += "capture.release"; done(error)
         }
     }
-    class FakeTransport(val event: (ServerEvent) -> Unit, val failure: () -> Unit,
+    internal class FakeTransport(val event: (ServerEvent) -> Unit, val failure: () -> Unit,
                         val order: MutableList<String>) : ImeTransport {
         var learnedPayload: LearnedPayload? = null
         override fun learned(payload: LearnedPayload?) { learnedPayload = payload }
@@ -102,7 +102,7 @@ class ChirpImeServiceTest {
         fun partial(seq: Long = 1, text: String = "synthetic") = event(ServerEvent.Partial(seq, text, ""))
         fun final(corrected: Boolean = false) = event(ServerEvent.Final("Synthetic.", "synthetic", corrected))
     }
-    class TestIme : LegacyVoiceImeService() {
+    internal class TestIme : LegacyVoiceImeService() {
         var editor = Editor()
         var info = EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT; initialSelStart = 0; initialSelEnd = 0 }
         var paired = true
@@ -127,7 +127,7 @@ class ChirpImeServiceTest {
             super.onCurrentInputMethodSubtypeChanged(newSubtype)
         }
         override fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit,
-                                   done: (String?) -> Unit): Capture = FakeCapture(frame, done, order).also { captures += it }
+                                   done: (DictationStatus?) -> Unit): Capture = FakeCapture(frame, done, order).also { captures += it }
         override fun createTransport(paired: Pairing, event: (ServerEvent) -> Unit,
                                      failure: () -> Unit): ImeTransport = FakeTransport(event, failure, order).also { streams += it }
     }

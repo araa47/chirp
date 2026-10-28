@@ -48,13 +48,13 @@ internal class MicrophoneInput : PcmInput {
 }
 
 /** One frame in memory, explicit stop/release before completion, and no content logging. */
-class PcmCapture internal constructor(
+internal class PcmCapture(
     private val frame: (ByteArray) -> Boolean,
     private val level: (Double) -> Unit,
-    private val done: (String?) -> Unit,
+    private val done: (DictationStatus?) -> Unit,
     private val input: PcmInput,
 ) : Capture {
-    constructor(frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (String?) -> Unit) : this(frame, level, done, MicrophoneInput())
+    constructor(frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (DictationStatus?) -> Unit) : this(frame, level, done, MicrophoneInput())
     private val running = AtomicBoolean(true)
     private val lock = Any()
     private var thread: Thread? = null
@@ -64,7 +64,7 @@ class PcmCapture internal constructor(
     override fun start() {
         check(thread == null)
         thread = Thread({
-            var error: String? = null
+            var error: DictationStatus? = null
             val samples = ShortArray(640)
             try {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
@@ -75,20 +75,20 @@ class PcmCapture internal constructor(
                     var count = 0
                     while (count < samples.size && running.get()) {
                         val read = input.read(samples, count, samples.size - count)
-                        if (read <= 0) { if (running.get() && !input.finished) error = "Microphone unavailable"; break }
+                        if (read <= 0) { if (running.get() && !input.finished) error = StatusLine.MICROPHONE_UNAVAILABLE; break }
                         count += read
                     }
                     if (!running.get() || count != samples.size) break
                     var peak = 0; var energy = 0.0
                     for (sample in samples) { peak = max(peak, abs(sample.toInt())); energy += sample.toDouble() * sample }
                     silentSamples = if (peak == 0) silentSamples + count else 0
-                    if (silentSamples >= 24000) { error = "No microphone signal"; break }
+                    if (silentSamples >= 24000) { error = StatusLine.NO_SIGNAL; break }
                     if (peak > 0) signalled = true
                     if (++frames % 5 == 0) level(sqrt(energy / count) / 32768.0)
                     if (signalled) {
                         val bytes = ByteArray(count * 2)
                         for (i in samples.indices) { bytes[i * 2] = samples[i].toByte(); bytes[i * 2 + 1] = (samples[i].toInt() shr 8).toByte() }
-                        if (!frame(bytes)) { error = "Computer unreachable — is Tailscale on?"; break }
+                        if (!frame(bytes)) { error = ConnectionFailure.Kind.OTHER; break }
                     }
                     total += count
                     if (detector?.feed((sqrt(energy / count) / 32768.0).toFloat(), total / 16000.0) == true) break
@@ -96,9 +96,9 @@ class PcmCapture internal constructor(
                     if (seconds >= limitSeconds - CaptureLimit.COUNTDOWN_SECONDS && seconds != announced) { announced = seconds; countdown?.invoke(limitSeconds - seconds) }
                     if (seconds >= limitSeconds - 1) break
                 }
-                if (!signalled && error == null && running.get()) error = "No microphone signal"
+                if (!signalled && error == null && running.get()) error = StatusLine.NO_SIGNAL
             } catch (_: Exception) {
-                if (running.get()) error = "Microphone unavailable — check permission in Chirp settings"
+                if (running.get()) error = StatusLine.MICROPHONE_BLOCKED
             } finally {
                 running.set(false); samples.fill(0)
                 synchronized(lock) {

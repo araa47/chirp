@@ -11,12 +11,6 @@ import kotlin.math.sin
 internal enum class Cue(val tones: List<Pair<Int, Int>>) {
     START(listOf(880 to 70)), STOP(listOf(660 to 70)),
     INSERTED(listOf(660 to 60, 990 to 90)), ERROR(listOf(330 to 160));
-    companion object {
-        private val errors = listOf("Allow microphone", "Pair your computer", "Pairing refused", "Didn't catch", "Speech engine", "Chirp server is busy",
-            "Dictation limit", "Dictation unavailable", "Clean-up prompt", "Chirp server took too long", "Connection too slow", "Computer unreachable",
-            "Text field unavailable", "Microphone permission", "Microphone unavailable", "No microphone signal")
-        fun isError(status: String) = ConnectionFailure.kind(status) != null || errors.any(status::startsWith)
-    }
 }
 
 /** Short generated tones (no bundled audio); silent unless the ringer is in normal mode. */

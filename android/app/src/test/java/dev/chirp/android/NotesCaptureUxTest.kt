@@ -56,7 +56,7 @@ class NotesCaptureUxTest {
         val rig = NotesModelRig(app, notesMac.copy(notesSpeakers = true, speakersModel = "downloading"), keys = keys)
         rig.idle()
         assertNotNull(rig.model.recovered)
-        rig.model.message = DictationAction.TAILSCALE_OFF
+        rig.model.message = "Tailscale is off"
         var action: DictationAction? = null
         val dark = mutableStateOf(false)
         compose.setContent { ChirpTheme(dark.value) {

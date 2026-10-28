@@ -35,7 +35,7 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
     private val tints = palette.tints
     /** The fixed record red (spec §C): Stop's pill colour, the same in every keyboard look. */
     private val record = chirpRoles(context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES).record.toArgb()
-    val status = context.label("Tap mic", 14f).apply {
+    val status = context.label(context.getString(R.string.status_tap_mic), 14f).apply {
         maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         compoundDrawablePadding = context.dp(6)
@@ -129,7 +129,7 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
         addView(history, LayoutParams(context.dp(48), LayoutParams.MATCH_PARENT))
         addView(options, LayoutParams(context.dp(OPTIONS_WIDTH), LayoutParams.MATCH_PARENT))
         addView(mic, LayoutParams(micWidth, LayoutParams.MATCH_PARENT))
-        show("Tap mic", "", false, false, false, false)
+        show(StatusLine.TAP_MIC, "", false, false, false, false)
         historyOpen(false)
     }
     private fun control(description: String) = MaterialButton(context).apply {
@@ -145,11 +145,12 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
         if (large) (parent.parent as? View)?.let { row -> row.layoutParams?.let { it.height = maxOf(it.height, context.dp(48)); row.layoutParams = it } }
         parent.addView(this, RelativeLayout.LayoutParams(idleWidth(), LayoutParams.MATCH_PARENT).apply { addRule(RelativeLayout.ALIGN_PARENT_END) })
     }
-    fun show(message: String, @Suppress("UNUSED_PARAMETER") text: String, active: Boolean, finishing: Boolean, undo: Boolean, retention: Boolean,
+    /** [decorate] adds the countdown or debug timings to whichever form of the line is shown. */
+    fun show(message: DictationStatus, @Suppress("UNUSED_PARAMETER") text: String, active: Boolean, finishing: Boolean, undo: Boolean, retention: Boolean,
              polishing: Boolean = false, style: String = "", notice: Boolean = false, undoable: Boolean = false, offline: Boolean = false, countdown: Boolean = false,
-             phone: String? = null, actionUntil: Long? = null) {
-        val recovery = DictationAction.forStatus(message)
-        val offlineRow = message == ConnectionFailure.OFFLINE
+             phone: String? = null, actionUntil: Long? = null, decorate: (String) -> String = { it }) {
+        val recovery = message.action
+        val offlineRow = message == StatusLine.OFFLINE
         val error = recovery != null || offlineRow
         val full = active || undo || undoable || error || retention || notice
         if (expanded != full) {
@@ -161,10 +162,10 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
         kind = when {
             polishing -> StripKind.POLISHING
             active && finishing -> StripKind.FINISHING
-            active && message.startsWith(CONNECTING) -> StripKind.CONNECTING
+            active && message == StatusLine.CONNECTING -> StripKind.CONNECTING
             active -> StripKind.LISTENING
-            error || notice && Cue.isError(message) -> StripKind.ERROR
-            undo || undoable || notice && POSITIVE.any(message::startsWith) -> StripKind.SUCCESS
+            error || notice && message.error -> StripKind.ERROR
+            undo || undoable || notice && message.positive -> StripKind.SUCCESS
             full -> StripKind.NOTICE
             else -> StripKind.IDLE
         }
@@ -179,8 +180,12 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
             } else { status.alpha = 1f; status.translationY = 0f }
             stage = nextStage
         }
-        // The final's "tap mic to dictate again" hint is gone: the chips are the actions that matter.
-        status.text = if (retention) context.getString(R.string.strip_debug_retention, message) else dictationDisplayStatus(recovery?.takeUnless { it.prompt }?.label ?: message.replace(HINT, ""))
+        // The shown form drops the final's "tap mic to dictate again" hint: the chips are the actions that matter.
+        // A fix that isn't a prompt replaces the line with its label; the debug banner keeps the full line.
+        val fix = recovery?.takeUnless { it.prompt }?.let { context.getString(it.label) }
+        status.text = if (retention) context.getString(R.string.strip_debug_retention, decorate(message.resolve(resources)).let { line ->
+            if (fix != null) context.getString(R.string.status_with_action, line, fix) else line })
+            else fix ?: decorate(message.shown(resources))
         status.visibility = if (full) VISIBLE else GONE
         val ink = if (retention) tints.solidError.text else tint?.text ?: palette.ink
         status.setTextColor(ink)
@@ -208,10 +213,10 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
         rawCountdown.show(undo, actionUntil)
         undoCountdown.show(undoable && !active, actionUntil)
         action.visibility = if (recovery?.prompt == true && !active) VISIBLE else GONE
-        action.text = recovery?.label ?: ""
-        action.contentDescription = recovery?.label ?: ""
+        action.text = recovery?.let { context.getString(it.label) } ?: ""
+        action.contentDescription = action.text
         // The same chip names a phone-recognised dictation; [phone] is its provider disclosure.
-        this.style.text = if (phone != null) PhoneFallback.CHIP else style
+        this.style.text = if (phone != null) context.getString(R.string.phone_chip) else style
         this.style.contentDescription = phone ?: context.getString(R.string.strip_style_description, style)
         this.style.visibility = if (polishing || phone != null) VISIBLE else GONE
         colourChips(tint, kind == StripKind.ERROR)
@@ -250,7 +255,7 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
         }
         mic.isEnabled = !finishing
         mic.contentDescription = if (polishing) context.getString(R.string.strip_polishing) else if (active) context.getString(R.string.strip_stop)
-            else if (offline) ConnectionFailure.OFFLINE_DESCRIPTION else context.getString(R.string.strip_mic_idle)
+            else if (offline) context.getString(R.string.status_offline_description) else context.getString(R.string.strip_mic_idle)
         // Stop is a filled record pill while it stops something; polishing keeps the accent (it isn't a stop control).
         transition(if (active) 1f else 0f, tint, offline && !active, active && !polishing)
         if (!active || finishing) level(0.0)
@@ -376,9 +381,6 @@ internal class KeyboardStrip(context: Context, private val now: () -> Long = Sys
     private fun idleWidth() = context.dp(48 + OPTIONS_WIDTH + if (PrivateSession.enabled) 76 else 0) + micWidth
     private companion object {
         const val OPTIONS_WIDTH = 36
-        const val CONNECTING = "Connecting"
-        const val HINT = " · tap mic to dictate again"
-        val POSITIVE = listOf("Inserted", "cleaned", "Used raw", "Dictation removed", "Tailscale connected")
     }
 }
 

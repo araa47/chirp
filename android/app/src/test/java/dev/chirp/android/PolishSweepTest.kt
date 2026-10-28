@@ -29,13 +29,13 @@ class PolishSweepTest {
 
     @Test fun `a microphone that fails to open offers mic settings and plays the error cue`() {
         listOf("Microphone unavailable", "Microphone unavailable — check permission in Chirp settings").forEach {
-            assertEquals(DictationAction.MICROPHONE, DictationAction.forStatus(it)); assertTrue(Cue.isError(it))
+            assertEquals(DictationAction.MICROPHONE, statusOf(it).action); assertTrue(statusOf(it).error)
         }
-        assertTrue(Cue.isError("No microphone signal"))
+        assertTrue(statusOf("No microphone signal").error)
     }
 
     @Test fun `errors point to Chirp settings, the screen that exists`() {
-        assertEquals(DictationAction.PAIR, DictationAction.forStatus("Pair your computer in Chirp settings"))
-        assertEquals(DictationAction.MICROPHONE, DictationAction.forStatus("Allow microphone in Chirp settings"))
+        assertEquals(DictationAction.PAIR, statusOf("Pair your computer in Chirp settings").action)
+        assertEquals(DictationAction.MICROPHONE, statusOf("Allow microphone in Chirp settings").action)
     }
 }

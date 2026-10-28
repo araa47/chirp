@@ -291,7 +291,7 @@ internal class NotesRecorder(
             { problem -> scope.launch { if (capture === made) captureEnded(problem) } })
         capture = made
         made.start()
-        if (!startSegment(segment)) segmentFailed(segment, ConnectionFailure.status(segment.transport.failureKind))
+        if (!startSegment(segment)) segmentFailed(segment, ConnectionFailure.status(segment.transport.failureKind).name) // SHIM-339
     }
 
     private fun startSegment(segment: Segment) =
@@ -302,7 +302,7 @@ internal class NotesRecorder(
         val buffer = PreReadyBuffer(send = { segment.transport.audio(it) }, maxBytes = PRE_READY_BYTES)
         val kept = if (keepAudio && audioSink != null) java.io.ByteArrayOutputStream() else null
         val transport = transportFactory({ event -> handle(segment, event) },
-            { segmentFailed(segment, ConnectionFailure.status(segment.transport.failureKind)) })
+            { segmentFailed(segment, ConnectionFailure.status(segment.transport.failureKind).name) }) // SHIM-339
         segment = Segment(transport, buffer, kept)
         return segment
     }
@@ -467,7 +467,7 @@ internal class NotesRecorder(
 
     /** A frame could not be sent (backpressure, a dead socket, Ready too late): the segment becomes a gap. */
     private fun lost(segment: Segment) {
-        segmentFailed(segment, if (segment.ready) "connection lost" else ConnectionFailure.status(segment.transport.failureKind, timedOut = true))
+        segmentFailed(segment, if (segment.ready) "connection lost" else ConnectionFailure.status(segment.transport.failureKind, timedOut = true).name) // SHIM-339
     }
 
     private fun segmentFailed(segment: Segment, reason: String) {

@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +68,7 @@ open class ScratchpadActivity : ComponentActivity(), AppShortcutHost {
     internal open val tailscale: TailscaleControl by lazy { AndroidTailscale(this) }
     internal val model: ScratchpadModel by viewModels { viewModelFactory { initializer { createModel() } } }
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) model.start() else model.status = "Microphone permission is needed to dictate — open mic settings"
+        if (granted) model.start() else model.status = StatusLine.MICROPHONE_NEEDED
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,13 +93,13 @@ open class ScratchpadActivity : ComponentActivity(), AppShortcutHost {
     }
     internal fun copy() {
         val text = model.field.text.takeIf { it.isNotBlank() } ?: return
-        val clip = ClipData.newPlainText("Chirp dictation", text)
+        val clip = ClipData.newPlainText(getString(R.string.bubble_clip_label), text)
         // Keeps the text out of clipboard previews and overlays where the system supports it.
         clip.description.extras = PersistableBundle().apply {
             putBoolean(if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE else "android.content.extra.IS_SENSITIVE", true)
         }
         getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip)
-        model.status = "Copied"
+        model.status = StatusLine.COPIED
     }
     internal fun share() {
         val text = model.field.text.takeIf { it.isNotBlank() } ?: return
@@ -112,7 +113,7 @@ open class ScratchpadActivity : ComponentActivity(), AppShortcutHost {
             DictationAction.MICROPHONE -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
             DictationAction.NETWORK, DictationAction.TAILSCALE_OPEN -> if (!tailscale.open()) setup("network")
             DictationAction.TAILSCALE_SETUP -> setup("network")
-            DictationAction.TAILSCALE_ON -> if (tailscale.connect()) model.status = "Connecting Tailscale…" else if (!tailscale.open()) setup("network")
+            DictationAction.TAILSCALE_ON -> if (tailscale.connect()) model.status = StatusLine.TAILSCALE_CONNECTING else if (!tailscale.open()) setup("network")
         }
     }
 
@@ -150,7 +151,7 @@ internal fun ScratchpadScreen(model: ScratchpadModel, mic: () -> Unit, copy: () 
             kotlinx.coroutines.delay(200)
         }
     }
-    val action = DictationAction.forStatus(model.status)
+    val action = model.status.action
     Surface(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
                 Column(Modifier.widthIn(max = 600.dp).fillMaxSize().padding(horizontal = 16.dp),
@@ -174,12 +175,12 @@ internal fun ScratchpadScreen(model: ScratchpadModel, mic: () -> Unit, copy: () 
                     if (model.active && model.partial.isNotEmpty()) Text(model.partial, Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium, maxLines = 3)
                     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(dictationDisplayStatus(model.status), Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
+                        Text(model.status.shown(LocalContext.current.resources), Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
                         if (model.rawAvailable && rawSeconds > 0) TextButton(model::useRaw, Modifier.semantics {
                             contentDescription = rawAvailable
                         }) { Text(stringResource(R.string.quick_dictate_use_raw_seconds, rawSeconds), Modifier.clearAndSetSemantics { },
                             style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum")) }
-                        if (action != null) TextButton({ act(action) }) { Text(action.label) }
+                        if (action != null) TextButton({ act(action) }) { Text(stringResource(action.label)) }
                     }
                     if (model.cleanupAvailable) StyleGroup(model)
                     MicButton(model, mic)

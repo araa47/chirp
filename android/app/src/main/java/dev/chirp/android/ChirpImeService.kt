@@ -24,9 +24,9 @@ open class ChirpImeService : LatinIME() {
             history = history, started = { history.close() }, learning = createLearning())
     }
     internal open fun createLearning() = EditLearning(this)
-    protected open fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (String?) -> Unit): Capture =
+    internal open fun createCapture(frame: (ByteArray) -> Boolean, level: (Double) -> Unit, done: (DictationStatus?) -> Unit): Capture =
         captureForBuild(this, frame, level, done)
-    protected open fun createTransport(client: okhttp3.OkHttpClient, pairing: Pairing, event: (ServerEvent) -> Unit, failure: () -> Unit): ImeTransport =
+    internal open fun createTransport(client: okhttp3.OkHttpClient, pairing: Pairing, event: (ServerEvent) -> Unit, failure: () -> Unit): ImeTransport =
         StreamTransport(client, pairing, dispatch = { callback -> handler.post { callback() } }, event = event, failure = failure)
 
     override fun onEvaluateFullscreenMode() = false

@@ -38,11 +38,11 @@ class SetupFlowTest {
         assertFalse(PAIRING_STEPS.contains("Mac"))
     }
     @Test fun `each recoverable dictation error has a specific action`() {
-        assertEquals(DictationAction.PAIR, DictationAction.forStatus("Pair your computer in Chirp settings"))
-        assertEquals(DictationAction.PAIR, DictationAction.forStatus("Pairing refused — pair again in Chirp settings"))
-        assertEquals(DictationAction.MICROPHONE, DictationAction.forStatus("Allow microphone in Chirp settings"))
-        assertEquals(DictationAction.NETWORK, DictationAction.forStatus("Computer unreachable — is Tailscale on?"))
-        assertNull(DictationAction.forStatus("Listening…"))
-        assertNull(DictationAction.forStatus("Inserted · tap mic to dictate again"))
+        assertEquals(DictationAction.PAIR, statusOf("Pair your computer in Chirp settings").action)
+        assertEquals(DictationAction.PAIR, statusOf("Pairing refused — pair again in Chirp settings").action)
+        assertEquals(DictationAction.MICROPHONE, statusOf("Allow microphone in Chirp settings").action)
+        assertEquals(DictationAction.NETWORK, statusOf("Computer unreachable — is Tailscale on?").action)
+        assertNull(statusOf("Listening…").action)
+        assertNull(statusOf("Inserted · tap mic to dictate again").action)
     }
 }

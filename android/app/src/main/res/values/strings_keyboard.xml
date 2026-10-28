@@ -17,7 +17,7 @@
     <string name="strip_level">Microphone level</string>
     <!-- %1$s is the dictation status line. -->
     <string name="strip_debug_retention">Debug retention on · %1$s</string>
-    <string name="strip_debug_retention_spoken">Debug retention on. </string>
+    <string name="strip_debug_retention_spoken">"Debug retention on. "</string>
     <!-- %1$s is a clean-up style name such as Polished. -->
     <string name="strip_style_description">Clean-up style: %1$s</string>
     <!-- The elapsed timer on its second and later segments: %1$s is the time (1:05), %2$d the segment. -->

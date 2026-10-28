@@ -38,8 +38,8 @@ class FloatingMicRenderTest {
         Shot("polished", PanelModel(FloatingState.POLISHED)),
         Shot("ready", PanelModel(FloatingState.READY_TO_COPY, text = "$heard. It waits here until you copy it.")),
         Shot("ready-copy-mode", PanelModel(FloatingState.READY_TO_COPY, text = "$heard.", copyMode = true)),
-        Shot("error", PanelModel(FloatingState.ERROR, status = ConnectionFailure.Kind.DOWN.status)),
-        Shot("error-tailscale", PanelModel(FloatingState.ERROR, status = DictationAction.TAILSCALE_OFF)),
+        Shot("error", PanelModel(FloatingState.ERROR, status = ConnectionFailure.Kind.DOWN)),
+        Shot("error-tailscale", PanelModel(FloatingState.ERROR, status = StatusLine.TAILSCALE_OFF)),
     )
 
     private fun Context.field(night: Boolean) = TextView(this).apply {
@@ -167,7 +167,7 @@ class FloatingMicRenderTest {
         panel.render(PanelModel(FloatingState.READY_TO_COPY, text = "Synthetic."))
         assertEquals(listOf("Copy", "Open in Scratchpad", "Done"), shown())
         assertTrue(panel.transcript.isTextSelectable)
-        panel.render(PanelModel(FloatingState.ERROR, status = BubbleFix.NO_MICROPHONE))
+        panel.render(PanelModel(FloatingState.ERROR, status = StatusLine.BUBBLE_NO_MICROPHONE))
         assertEquals(listOf("Allow"), listOf(panel.fix).filter { it.visibility == View.VISIBLE }.map { it.text.toString() })
         assertEquals(View.VISIBLE, panel.error.visibility); assertEquals(View.GONE, panel.done.visibility)
         panel.render(PanelModel(FloatingState.LISTENING, text = "synthetic"))
