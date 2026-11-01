@@ -1348,7 +1348,7 @@ public enum Snapshots {
         if ProcessInfo.processInfo.environment["CHIRP_SNAPSHOT_REVIEW"] == "303" { return modernUXScenarios }
         if ProcessInfo.processInfo.environment["CHIRP_SNAPSHOT_REVIEW"] == "332" { return settingsSizeScenarios }
         return hudScenarios + rippleScenarios + wordWaveScenarios + settingsScenarios + onboardingScenarios + menuScenarios
-            + localModelsScenarios + notesScenarios + pairingScenarios + historyScenarios + savedVoicesScenarios + islandScenarios
+            + localModelsScenarios + notesScenarios + pairingScenarios + historyScenarios + savedVoicesScenarios + islandScenarios + v2Scenarios
     }
 
     // MARK: rendering
