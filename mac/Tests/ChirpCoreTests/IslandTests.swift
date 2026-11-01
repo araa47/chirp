@@ -272,8 +272,10 @@ import Testing
         let dir = keep.map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.temporaryDirectory.appendingPathComponent("chirp-island-\(UUID().uuidString)")
         defer { if keep == nil { try? FileManager.default.removeItem(at: dir) } }
-        let files = try Snapshots.render(to: dir, scenarios: Snapshots.islandScenarios)
-        #expect(files.count == Snapshots.islandScenarios.count * 2)
+        // The island is drawn in both designs: Pond (today) and v2 (Graphite, behind the flag).
+        let files = try Snapshots.render(to: dir.appendingPathComponent("pond"), scenarios: Snapshots.islandScenarios, design: .pond)
+            + Snapshots.render(to: dir.appendingPathComponent("v2"), scenarios: Snapshots.islandScenarios, design: .v2)
+        #expect(files.count == Snapshots.islandScenarios.count * 4)
         #expect(Set(Snapshots.islandScenarios.map(\.name)).count == Snapshots.islandScenarios.count)
         for url in files {
             let data = try Data(contentsOf: url)
