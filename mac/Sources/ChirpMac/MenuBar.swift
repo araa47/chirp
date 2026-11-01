@@ -172,6 +172,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         inputs.chosenInputUID = settings.inputDeviceUID
         inputs.cleanupOn = settings.permitsCorrection(health: controller.health)
         inputs.showChanges = settings.showChangesAfterCleanup
+        inputs.notchOffered = ChirpDesign.current == .v2
+        inputs.showInNotch = settings.showInNotch
         inputs.styleID = settings.correctionProfile
         inputs.rawOfferOpen = controller.rawOffer.isOpen
         inputs.rawOfferKey = controller.rawOffer.hotkeyActive ? settings.useRawHotkey.title : nil
@@ -278,6 +280,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .insertDictation: #selector(insertDictation(_:))
         case .copyDictation: #selector(copyDictation(_:))
         case .openDictation: #selector(openDictation(_:))
+        case .toggleShowInNotch: #selector(toggleShowInNotch)
         }
     }
 
@@ -292,6 +295,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func useRaw() { controller.rawOffer.take() }
     @objc private func pickInput(_ sender: NSMenuItem) { settings.inputDeviceUID = sender.representedObject as? String }
     @objc private func toggleCleanup() { settings.correction = !settings.permitsCorrection(health: controller.health) }
+    @objc private func toggleShowInNotch() { settings.showInNotch.toggle() }
     @objc private func pickStyle(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         settings.correctionProfile = id

@@ -293,10 +293,10 @@ import Testing
         s.soundPack = .default
         let form = SettingsForm(s)
         let rows = form.view(for: .dictation).allDescendants(of: SettingsRow.self)
-        #expect(rows.filter(\.isHidden).count == 3)   // the fn help row and the two custom sound rows
+        #expect(rows.filter(\.isHidden).count == 4)   // the fn help row, the two custom sound rows and Show in the notch (v2 only)
         s.soundPack = .custom
         form.apply(s, full: true)
-        #expect(form.view(for: .dictation).allDescendants(of: SettingsRow.self).filter(\.isHidden).count == 1)
+        #expect(form.view(for: .dictation).allDescendants(of: SettingsRow.self).filter(\.isHidden).count == 2)
     }
 
     @Test func notesPageShowsTheLibrarySettingsAsStored() {

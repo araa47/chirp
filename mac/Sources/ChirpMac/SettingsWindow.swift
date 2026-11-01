@@ -94,6 +94,8 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
         s.privateSession = privateSession?.isActive ?? false
         s.spokenCommands = settings.spokenCommands
         s.wordWaveform = settings.wordWaveform
+        s.notchOffered = ChirpDesign.current == .v2
+        s.showInNotch = settings.showInNotch
         s.notesRetention = settings.notesRetention
         s.notesKeepAudio = settings.notesKeepAudio
         s.notesAllowRetranscribe = settings.notesAllowRetranscribe
@@ -449,6 +451,8 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
         form.spokenCommands.action = #selector(toggleSpokenCommands(_:))
         form.wordWaveform.target = self
         form.wordWaveform.action = #selector(toggleWordWaveform(_:))
+        form.showInNotch.target = self
+        form.showInNotch.action = #selector(toggleShowInNotch(_:))
         form.micButton.target = self
         form.micButton.action = #selector(grantMic)
         form.accessibilityButton.target = self
@@ -738,6 +742,7 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
     @objc private func togglePrivateSession(_ sender: NSButton) { privateSession?.setEnabled(sender.state == .on); refresh() }
     @objc private func toggleSpokenCommands(_ sender: NSButton) { settings.spokenCommands = sender.state == .on }
     @objc private func toggleWordWaveform(_ sender: NSButton) { settings.wordWaveform = sender.state == .on }
+    @objc private func toggleShowInNotch(_ sender: NSButton) { settings.showInNotch = sender.state == .on }
     @objc private func toggleOfferRaw(_ sender: NSButton) { settings.showRawAfterCleanup = sender.state == .on }
 
     @objc private func hotkeyChanged(_ sender: NSPopUpButton) {

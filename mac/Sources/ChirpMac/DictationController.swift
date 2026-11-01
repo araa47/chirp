@@ -20,7 +20,7 @@ final class DictationController {
     var routeToNotes: (_ dictationActive: Bool) -> Bool = { _ in false }
     static let blockedMessage = "Notes is recording — stop it to dictate"
 
-    let hud = HUDController()
+    let hud: DictationOverlay = OverlayRouter()
     private let mic = DictationMic(capture: AudioCapture(engine: SystemCaptureEngine(pickedDevice: { InputDevice.pickedID(uid: settings.inputDeviceUID) })))
     private let inserter = TextInserter(env: SystemInsertion.environment(), pasteboard: SystemPasteboard())
     private let autoEnter = AutoEnterSender(env: SystemInsertion.autoEnterEnvironment())
@@ -636,7 +636,7 @@ final class DictationController {
         // A successful insertion fades the HUD at once (and never brings one up just to fade it, as Insert Again would).
         if p.linger > 0 { hud.show(); hud.hide(after: p.linger) } else { hud.hide() }
         hud.announce(p.status)
-        if p.offersRawOutsideHUD, inserter.canUseRaw, !isPaused { rawOffer.open(avoiding: settings.hotkey) }
+        if p.offersRawOutsideHUD || (p.showUseRaw && !hud.acceptsClicks), inserter.canUseRaw, !isPaused { rawOffer.open(avoiding: settings.hotkey) }
         // How each dictation ended and how long the HUD stays for it: never the text.
         chirpLog.info("dictation outcome=\(outcome.logName, privacy: .public) cleaned=\(p.cleaned, privacy: .public) kept=\(p.keptOriginal, privacy: .public) hud_linger=\(p.linger, privacy: .public)")
         return p.linger > 0
