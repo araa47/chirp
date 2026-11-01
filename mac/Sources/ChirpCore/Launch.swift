@@ -11,8 +11,9 @@ public enum LaunchMode: Equatable, Sendable {
     /// Learn from my edits end to end on a test text field: dictate, edit, learn, and the next dictation applies it (#220).
     case learnSelftest
     /// Draw the UI to PNGs in a directory and exit, without starting the app (no onboarding, no TCC prompt).
-    /// `curated` draws only the set committed under `docs/screenshots/mac`.
-    case renderSnapshots(directory: String, curated: Bool = false)
+    /// `curated` draws only the set committed under `docs/screenshots/mac`; `designV2` (`--design v2`) draws the v2
+    /// design instead of Pond, whatever the stored preference says.
+    case renderSnapshots(directory: String, curated: Bool = false, designV2: Bool = false)
     case usage(exitCode: Int32)
 
     public static let usageText = """
@@ -22,7 +23,7 @@ public enum LaunchMode: Equatable, Sendable {
                ChirpMac --notes-selftest <audio> [--url URL] [--token-file PATH] [--expect WORD] [--fault drop@30,down@60-90] [--fast]
                ChirpMac --call-selftest --mic <audio> --remote <audio> [--url URL] [--token-file PATH] [--fast] [--live]
                ChirpMac --learn-selftest [--url URL] [--token-file PATH]
-               ChirpMac --render-snapshots <dir> [--curated]   draw the HUD, Settings and menu to PNGs (light and dark)
+               ChirpMac --render-snapshots <dir> [--curated] [--design pond|v2]   draw the HUD, Settings and menu to PNGs (light and dark)
         """
 
     /// `arguments` excludes the executable path. Launch Services may pass `-psn_*`; it is not a CLI flag.
@@ -33,7 +34,12 @@ public enum LaunchMode: Equatable, Sendable {
         if arguments.contains("--selftest") { return .selftest }
         if let i = arguments.firstIndex(of: "--render-snapshots") {
             guard i + 1 < arguments.count, !arguments[i + 1].hasPrefix("-") else { return .usage(exitCode: 64) }
-            return .renderSnapshots(directory: arguments[i + 1], curated: arguments.contains("--curated"))
+            var designV2 = false
+            if let d = arguments.firstIndex(of: "--design") {
+                guard d + 1 < arguments.count, ["pond", "v2"].contains(arguments[d + 1]) else { return .usage(exitCode: 64) }
+                designV2 = arguments[d + 1] == "v2"
+            }
+            return .renderSnapshots(directory: arguments[i + 1], curated: arguments.contains("--curated"), designV2: designV2)
         }
         if arguments.filter({ !$0.hasPrefix("-psn_") }) == ["--models"] { return .app }
         guard let flag = arguments.first(where: { $0.hasPrefix("-") && !$0.hasPrefix("-psn_") }) else {

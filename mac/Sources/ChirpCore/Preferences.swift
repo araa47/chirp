@@ -55,6 +55,13 @@ public final class Preferences: @unchecked Sendable {
             }
         }
     }
+    /// The v2 design (Graphite colours; later the notch island and Wake welcome). Off by default and hidden: there is
+    /// no Settings row. Dogfooders run `defaults write dev.chirp.mac designV2 -bool YES` and relaunch; the app reads
+    /// it once at launch (`ChirpMac/main.swift` sets `ChirpDesign.current`).
+    public var designV2: Bool {
+        get { defaults.bool(forKey: "designV2") }
+        set { defaults.set(newValue, forKey: "designV2") }
+    }
     #endif
     /// Show Chirp in the Dock and ⌘-Tab even with no Notes window open. Off by default.
     public var alwaysShowInDock: Bool {

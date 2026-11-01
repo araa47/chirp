@@ -3,7 +3,7 @@ import AppKit
 /// The building blocks of a Settings page in the grouped-form style of System Settings: a page title, then sections
 /// (a small heading above a rounded card), each card holding rows separated by hairlines. A row is a title with its
 /// control at the right and a help line under both, or (for wide controls) the title, the control and the help stacked.
-/// Plain AppKit, because the Command Line Tools toolchain has no SwiftUI macro plugins; the colours are the Pond tokens.
+/// Plain AppKit, because the Command Line Tools toolchain has no SwiftUI macro plugins; the colours are the design tokens.
 @MainActor
 enum SettingsLayout {
     /// The page's content width: the 520 pt detail column less a 20 pt gutter on each side.
@@ -12,31 +12,31 @@ enum SettingsLayout {
     /// Room for a control that fills a row: the page width less the card's insets.
     static let rowWidth: CGFloat = pageWidth - 2 * cardInset
 
-    static let card = ChirpColor.dynamic(ChirpColor.Pond.surface.light, ChirpColor.Pond.surface.dark)
-    static let pageBackground = ChirpColor.dynamic(ChirpColor.Pond.background.light, ChirpColor.Pond.background.dark)
-    static let sidebarBackground = ChirpColor.dynamic(ChirpColor.Pond.surfaceRaised.light, ChirpColor.Pond.surfaceRaised.dark)
-    static let ink = ChirpColor.dynamic(ChirpColor.Pond.ink.light, ChirpColor.Pond.ink.dark)
-    static let inkMuted = ChirpColor.dynamic(ChirpColor.Pond.inkMuted.light, ChirpColor.Pond.inkMuted.dark)
-    static let koiContainer = ChirpColor.dynamic(ChirpColor.Pond.koiContainer.light, ChirpColor.Pond.koiContainer.dark)
-    static let onKoiContainer = ChirpColor.dynamic(ChirpColor.Pond.onKoiContainer.light, ChirpColor.Pond.onKoiContainer.dark)
-    /// A small tonal tile (onboarding's feature icons): the pale koi container in light, and in dark a koi fill at 28% over the
-    /// surface (the solid dark container reads as a brown block there).
+    static let card = ChirpColor.dynamic(.surface)
+    static let pageBackground = ChirpColor.dynamic(.background)
+    static let sidebarBackground = ChirpColor.dynamic(.surfaceRaised)
+    static let ink = ChirpColor.dynamic(.ink)
+    static let inkMuted = ChirpColor.dynamic(.inkMuted)
+    static let koiContainer = ChirpColor.dynamic(.koiContainer)
+    static let onKoiContainer = ChirpColor.dynamic(.onKoiContainer)
+    /// A small tonal tile (onboarding's feature icons): the pale accent container in light, and in dark an accent fill at
+    /// 28% over the surface (Pond's solid dark container reads as a brown block there). Follows the current design.
     static let tonal = NSColor(name: "ChirpTonal") { appearance in
-        if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-            let c = ChirpColor.Pond.koi.dark
-            return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 0.28)
-        }
-        let c = ChirpColor.Pond.koiContainer.light
-        return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)
+        let (r, g, b, a) = tonalRGBA(dark: appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua, in: ChirpDesign.current)
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
     }
-    static let onTonal = ChirpColor.dynamic(ChirpColor.Pond.onKoiContainer.light, ChirpColor.Pond.onKoiContainer.dark)
+    nonisolated static func tonalRGBA(dark: Bool, in design: ChirpDesign) -> (Double, Double, Double, Double) {
+        let c = dark ? ChirpColor.Token.koi.pair(in: design).dark : ChirpColor.Token.koiContainer.pair(in: design).light
+        return (c.r, c.g, c.b, dark ? 0.28 : 1)
+    }
+    static let onTonal = ChirpColor.dynamic(.onKoiContainer)
     /// Selected sidebar rows and active onboarding steps use the koi container in both themes.
     static let selection = koiContainer
     static let onSelection = onKoiContainer
     /// The icon tile or step number inside the selected row: a koi tile in light, a pond-ink tile in dark.
-    static let selectionTile = ChirpColor.dynamic(ChirpColor.Pond.koi.light, ChirpColor.Pond.onKoi.dark)
-    static let onSelectionTile = ChirpColor.dynamic(ChirpColor.Pond.onKoi.light, ChirpColor.Pond.koi.dark)
-    static let onKoi = ChirpColor.dynamic(ChirpColor.Pond.onKoi.light, ChirpColor.Pond.onKoi.dark)
+    static let selectionTile = ChirpColor.dynamic(light: .koi, dark: .onKoi)
+    static let onSelectionTile = ChirpColor.dynamic(light: .onKoi, dark: .koi)
+    static let onKoi = ChirpColor.dynamic(.onKoi)
 }
 
 /// A page title ("General") above the sections.

@@ -4,6 +4,8 @@ import ChirpUI
 import Foundation
 
 let arguments = CommandLine.arguments
+// The design is read once, before any UI or colour exists: the colour providers read it nonisolated (see ChirpDesign).
+ChirpDesign.current = ChirpDesign.from(designV2: settings.designV2)
 switch LaunchMode.parse(Array(arguments.dropFirst())) {
 case .selftest:
     exit(await SelfTest.run(Array(arguments.dropFirst())))
@@ -13,7 +15,9 @@ case .callSelftest:
     exit(await CallAudioSelfTest.run(Array(arguments.dropFirst())))
 case .learnSelftest:
     exit(await LearnSelfTest.run(Array(arguments.dropFirst())))
-case .renderSnapshots(let directory, let curated):
+case .renderSnapshots(let directory, let curated, let designV2):
+    // The renderer draws the design the flag names, not the stored preference, so a dogfooder's PNGs match CI's.
+    ChirpDesign.current = ChirpDesign.from(designV2: designV2)
     // Draws offscreen only: no delegate, no run loop, no onboarding, no permission or pasteboard access.
     do {
         let files = try await MainActor.run {
