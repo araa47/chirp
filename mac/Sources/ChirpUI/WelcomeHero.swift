@@ -113,6 +113,10 @@ public struct WelcomeHero: View {
 
     public static let height: CGFloat = 150
 
+    /// When set, heroes created without their own `time` hold this frame (seconds into the demo cycle). The snapshot
+    /// renderer sets it so the setup window's hero is the same picture on every run; the app never does.
+    @MainActor public static var pinnedTime: Double?
+
     /// What VoiceOver reads: the hero is a picture of the orb, so it says what the orb is.
     public static func accessibilityText(reduceMotion: Bool, state: HeroOrbState?) -> String {
         if let state { return "Chirp’s orb, \(state.meaning), on a glass ribbon" }
@@ -128,7 +132,8 @@ public struct WelcomeHero: View {
             } else if let time {
                 frame(at: time, fixed: true)
             } else {
-                TimelineView(.animation) { context in
+                // 30 fps is plenty for a banner seen on one setup step, and halves the drawing cost.
+                TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
                     frame(at: context.date.timeIntervalSinceReferenceDate, fixed: false)
                 }
             }
@@ -149,7 +154,8 @@ public struct WelcomeHero: View {
     }
 }
 
-/// The ribbon and the orb on one canvas, plus the glyph that sits on the orb (check or slashed mic).
+/// The ribbon, the orb and the glyph on it (a check or a slashed mic), all drawn by one `Canvas`, so a frame costs one
+/// canvas redraw and no SwiftUI view diffing.
 private struct HeroCanvas: View {
     let state: HeroOrbState
     let time: Double
@@ -158,38 +164,34 @@ private struct HeroCanvas: View {
 
     var body: some View {
         let orb = HeroOrbFrame.make(state, time: time, elapsed: elapsed, moving: moving)
-        GeometryReader { geo in
-            let side = geo.size.height * 0.83
-            let x = geo.size.width * (1 - 0.09) - side
-            let y = geo.size.height * 0.13
-            ZStack(alignment: .topLeading) {
-                Canvas { context, size in
-                    HeroPaint.background(&context, size)
-                    HeroPaint.ribbon(&context, size, state: state, time: time, moving: moving)
-                    HeroPaint.orb(&context, CGRect(x: x, y: y, width: side, height: side), state: state, frame: orb)
+        Canvas { context, size in
+            let side = size.height * 0.83
+            let rect = CGRect(x: size.width * (1 - 0.09) - side, y: size.height * 0.13, width: side, height: side)
+            HeroPaint.background(&context, size)
+            HeroPaint.ribbon(&context, size, state: state, time: time, moving: moving)
+            HeroPaint.orb(&context, rect, state: state, frame: orb)
+            switch state {
+            case .done:
+                if let check = context.resolveSymbol(id: "check") {
+                    let pop = moving ? min(1, 0.3 + elapsed * 6) : 1
+                    context.drawLayer { layer in
+                        layer.translateBy(x: rect.midX, y: rect.midY)
+                        layer.scaleBy(x: pop, y: pop)
+                        layer.draw(check, at: .zero, anchor: .center)
+                    }
                 }
-                glyph(side: side, scale: orb.scale)
-                    .frame(width: side, height: side)
-                    .offset(x: x, y: y)
+            case .off:
+                if let mic = context.resolveSymbol(id: "mic") { context.draw(mic, at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center) }
+            default:
+                break
             }
+        } symbols: {
+            Image(systemName: "checkmark").font(.system(size: WelcomeHero.height * 0.83 * 0.34, weight: .heavy))
+                .foregroundStyle(.white).tag("check")
+            Image(systemName: "mic.slash").font(.system(size: WelcomeHero.height * 0.83 * 0.3, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85)).tag("mic")
         }
         .frame(height: WelcomeHero.height)
-    }
-
-    @ViewBuilder private func glyph(side: CGFloat, scale: Double) -> some View {
-        switch state {
-        case .done:
-            Image(systemName: "checkmark")
-                .font(.system(size: side * 0.34, weight: .heavy))
-                .foregroundStyle(.white)
-                .scaleEffect(moving ? min(1, 0.3 + elapsed * 6) : 1)
-        case .off:
-            Image(systemName: "mic.slash")
-                .font(.system(size: side * 0.3, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-        default:
-            Color.clear
-        }
     }
 }
 
@@ -286,11 +288,16 @@ private enum HeroPaint {
         context.drawLayer { layer in
             layer.opacity = f.opacity
             if f.grey { layer.addFilter(.grayscale(1)); layer.addFilter(.brightness(-0.1)) }
-            // Drop shadow under the sphere (and the listening glow).
-            layer.drawLayer { shadow in
-                shadow.addFilter(.shadow(color: rgb(deep, 0.75), radius: side * 0.21, x: 0, y: side * 0.2))
-                if state == .listening { shadow.addFilter(.shadow(color: rgb(accent, 0.38), radius: side * 0.25, x: 0, y: 0)) }
-                shadow.fill(Path(ellipseIn: body), with: .color(rgb(navy)))
+            // Soft shadow under the sphere (and the listening glow), drawn as radial gradients: a blur filter on
+            // every frame is far costlier than a gradient and looks the same at this size.
+            let shadowCenter = CGPoint(x: body.midX, y: body.midY + side * 0.2)
+            layer.fill(Path(ellipseIn: body.insetBy(dx: -side * 0.3, dy: -side * 0.3).offsetBy(dx: 0, dy: side * 0.2)),
+                       with: .radialGradient(Gradient(stops: [.init(color: rgb(deep, 0.55), location: 0.55), .init(color: .clear, location: 1)]),
+                                             center: shadowCenter, startRadius: 0, endRadius: d * 0.8))
+            if state == .listening {
+                layer.fill(Path(ellipseIn: body.insetBy(dx: -side * 0.35, dy: -side * 0.35)),
+                           with: .radialGradient(Gradient(stops: [.init(color: rgb(accent, 0.38), location: 0.6), .init(color: .clear, location: 1)]),
+                                                 center: CGPoint(x: body.midX, y: body.midY), startRadius: 0, endRadius: d * 0.85))
             }
             layer.clip(to: Path(ellipseIn: body))
             layer.fill(Path(ellipseIn: body), with: .radialGradient(

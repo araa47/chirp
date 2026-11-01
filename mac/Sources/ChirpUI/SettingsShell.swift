@@ -286,7 +286,8 @@ final class SettingsSidebarRow: NSView {
         self.tab = tab
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 8
+        // The selected row's pill: 8 in Pond, 10 in v2 (the proposal's control radius).
+        layer?.cornerRadius = ChirpDesign.current == .v2 ? 10 : 8
         layer?.cornerCurve = .continuous
         translatesAutoresizingMaskIntoConstraints = false
 

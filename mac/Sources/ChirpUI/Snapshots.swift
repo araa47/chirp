@@ -1469,6 +1469,9 @@ public enum Snapshots {
 
     private static func renderEach(_ scenarios: [Scenario], to directory: URL) throws -> [URL] {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // The v2 welcome hero runs on the clock; hold it on a fixed frame (listening, rings out) so renders repeat.
+        WelcomeHero.pinnedTime = 3.4
+        defer { WelcomeHero.pinnedTime = nil }
         var written: [URL] = []
         for scenario in scenarios {
             for (label, appearance) in appearances {

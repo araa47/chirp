@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import ChirpCore
 
 /// Everything the first-run window shows. The controller reads it from the system; the snapshots pass fixed values.
@@ -121,7 +122,15 @@ public final class OnboardingView: NSView {
         super.init(frame: NSRect(origin: .zero, size: Self.size))
         primary.bezelStyle = .rounded
         primary.keyEquivalent = "\r"
-        primary.bezelColor = .chirpKoi   // koi even where the bundle's AccentColor is not there (unbundled runs, snapshots)
+        // The accent even where the bundle's AccentColor is not there (unbundled runs, snapshots). v2 fills it with the
+        // plan's accent asset values (white label: 4.70:1 on #2F6FE0, 3.57:1 on #4B86E8), not the lighter text accent.
+        primary.bezelColor = ChirpDesign.current == .v2
+            ? NSColor(name: "ChirpV2Primary") { appearance in
+                appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                    ? NSColor(srgbRed: 0x4B / 255, green: 0x86 / 255, blue: 0xE8 / 255, alpha: 1)
+                    : NSColor(srgbRed: 0x2F / 255, green: 0x6F / 255, blue: 0xE0 / 255, alpha: 1)
+            }
+            : .chirpKoi
         back.bezelStyle = .rounded
         openNotes.bezelStyle = .rounded
         openNotes.setAccessibilityLabel("Finish setup and open Notes")
@@ -246,7 +255,10 @@ public final class OnboardingView: NSView {
 
     /// Welcome: the pond art, the two things Chirp does, and the keys.
     private func welcome(_ state: OnboardingState) {
-        let art = PondArt(pond, width: Self.contentWidth, height: 150)
+        // v2 swaps the pond art for the Wake hero (a glass ribbon and Chirp's orb); Pond keeps the artwork.
+        let art: NSView = ChirpDesign.current == .v2
+            ? WelcomeHeroView(width: Self.contentWidth, height: WelcomeHero.height)
+            : PondArt(pond, width: Self.contentWidth, height: 150)
         content.addArrangedSubview(art)
         content.setCustomSpacing(16, after: art)
         content.addArrangedSubview(titleLabel("Welcome to Chirp"))
@@ -456,6 +468,42 @@ final class PondArt: NSView {
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("not used") }
+}
+
+/// The v2 welcome hero in the setup window: the SwiftUI `WelcomeHero`, sized like the pond art it replaces. It reads
+/// Reduce Motion when it is created and again whenever the setting changes, and shows one still frame while it is on.
+@MainActor
+final class WelcomeHeroView: NSView {
+    private let host: NSHostingView<WelcomeHero>
+    private var observer: NSObjectProtocol?
+
+    init(width: CGFloat, height: CGFloat) {
+        host = NSHostingView(rootView: WelcomeHero(time: WelcomeHero.pinnedTime,
+                                                   reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion))
+        super.init(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        host.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(host)
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: width), heightAnchor.constraint(equalToConstant: height),
+            host.leadingAnchor.constraint(equalTo: leadingAnchor), host.trailingAnchor.constraint(equalTo: trailingAnchor),
+            host.topAnchor.constraint(equalTo: topAnchor), host.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        observer = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.host.rootView = WelcomeHero(time: WelcomeHero.pinnedTime,
+                                                  reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+            }
+        }
+        setAccessibilityElement(false)
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("not used") }
+
+    isolated deinit {
+        if let observer { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+    }
 }
 
 /// One shortcut key drawn as a keycap.

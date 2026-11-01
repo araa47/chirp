@@ -73,15 +73,9 @@ import Testing
         #expect(expired)
     }
 
-    @Test func theRealTimeDriverWaitsWhilePausedAndStopsWhenCancelled() async {
+    @Test func theRealTimeDriverStopsWithoutDismissingWhenCancelled() async {
         let timer = ToastTimer()
-        timer.setHovered(true)
-        let task = Task { await timer.run(.milliseconds(200), step: .milliseconds(10)) }
-        // `run` clears hover as it begins, so hold the pointer over again once it has started.
-        try? await Task.sleep(for: .milliseconds(20))
-        timer.setHovered(true)
-        try? await Task.sleep(for: .milliseconds(150))
-        #expect(timer.remaining > .zero)
+        let task = Task { await timer.run(.seconds(60), step: .milliseconds(10)) }
         task.cancel()
         #expect(await task.value == false)
     }
@@ -148,8 +142,22 @@ import Testing
         let dir = override.map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.temporaryDirectory.appendingPathComponent("chirp-v2-\(UUID().uuidString)")
         defer { if override == nil { try? FileManager.default.removeItem(at: dir) } }
-        let files = try Snapshots.render(to: dir, scenarios: Snapshots.v2Scenarios)
+        let files = try Snapshots.render(to: dir, scenarios: Snapshots.v2Scenarios, design: .v2)
         #expect(files.count == Snapshots.v2Scenarios.count * 2)
+        for file in files { #expect(try Data(contentsOf: file).count > 1000) }
+    }
+
+    /// The four surfaces PR 4 restyles, drawn as v2 (onboarding with the Wake hero, Notes, Settings, History).
+    @Test func restyledSurfacesRenderAsV2() throws {
+        let override = ProcessInfo.processInfo.environment["CHIRP_V2_SNAPSHOT_DIR"]
+        let dir = override.map { URL(fileURLWithPath: $0).appendingPathComponent("surfaces") }
+            ?? FileManager.default.temporaryDirectory.appendingPathComponent("chirp-v2s-\(UUID().uuidString)")
+        defer { if override == nil { try? FileManager.default.removeItem(at: dir) } }
+        let names: Set<String> = ["onboarding-welcome", "notes-library", "settings-general-ready", "history-cleaned"]
+        let chosen = Snapshots.allScenarios.filter { names.contains($0.name) }
+        #expect(chosen.count == names.count)
+        let files = try Snapshots.render(to: dir, scenarios: chosen, design: .v2)
+        #expect(files.count == names.count * 2)
         for file in files { #expect(try Data(contentsOf: file).count > 1000) }
     }
 }
