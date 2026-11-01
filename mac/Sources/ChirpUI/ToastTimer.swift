@@ -4,6 +4,10 @@ import SwiftUI
 /// reading or reaching for them, so the countdown stops while the pointer is over the toast or one of its buttons has
 /// keyboard focus, and picks up where it left off afterwards.
 ///
+/// The pause is part of the v2 design only: under Pond (the default) a toast keeps its fixed lifetime exactly as before
+/// (`run` is one plain sleep), so no behaviour ships with the flag off. `pausesOnHoverFocus` says which one this timer is;
+/// it defaults to the design in force when the toast's model is built (the design is fixed at launch).
+///
 /// The countdown is plain arithmetic (`tick`), so a test can drive it without a clock; `run()` is the real-time driver
 /// the toast views use (`.task(id: toast.serial)`).
 @MainActor @Observable
@@ -13,10 +17,13 @@ public final class ToastTimer {
     public private(set) var isHovered = false
     public private(set) var focusedCount = 0
 
-    public init() {}
+    /// Whether hovering the toast or focusing one of its buttons stops the countdown. False under Pond.
+    public let pausesOnHoverFocus: Bool
 
-    /// The countdown is stopped: the pointer is over the toast, or a button in it has keyboard focus.
-    public var isPaused: Bool { isHovered || focusedCount > 0 }
+    public init(pausesOnHoverFocus: Bool = ChirpDesign.current == .v2) { self.pausesOnHoverFocus = pausesOnHoverFocus }
+
+    /// The countdown is stopped: the pointer is over the toast, or a button in it has keyboard focus (v2 only).
+    public var isPaused: Bool { pausesOnHoverFocus && (isHovered || focusedCount > 0) }
 
     /// Starts a fresh countdown for a new toast. Hover and focus start clear: the old toast's views are gone, and a
     /// removed view sends no "pointer left" or "focus lost" to say so.
@@ -41,6 +48,12 @@ public final class ToastTimer {
     /// Counts down in real time and returns true when the time ran out (false if the task was cancelled first).
     public func run(_ duration: Duration, step: Duration = .milliseconds(100)) async -> Bool {
         begin(duration)
+        guard pausesOnHoverFocus else {
+            // Pond: the fixed lifetime the toasts always had.
+            do { try await Task.sleep(for: duration) } catch { return false }
+            remaining = .zero
+            return !Task.isCancelled
+        }
         var last = ContinuousClock.now
         while !Task.isCancelled {
             try? await Task.sleep(for: step)

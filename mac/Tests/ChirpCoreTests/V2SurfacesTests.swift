@@ -4,11 +4,11 @@ import Testing
 @testable import ChirpCore
 @testable import ChirpUI
 
-/// PR 4: the toast countdown that waits while hovered or focused (unflagged), and the Wake hero's pure frame maths.
+/// PR 4: the toast countdown that waits while hovered or focused (v2 only), and the Wake hero's pure frame maths.
 @MainActor
 @Suite struct ToastTimerTests {
     @Test func countsDownWhenNothingHoldsIt() {
-        let timer = ToastTimer()
+        let timer = ToastTimer(pausesOnHoverFocus: true)
         timer.begin(.seconds(6))
         #expect(timer.tick(.seconds(2)) == false)
         #expect(timer.remaining == .seconds(4))
@@ -17,7 +17,7 @@ import Testing
     }
 
     @Test func hoverPausesAndResumesWhereItLeftOff() {
-        let timer = ToastTimer()
+        let timer = ToastTimer(pausesOnHoverFocus: true)
         timer.begin(.seconds(6))
         timer.tick(.seconds(2))
         timer.setHovered(true)
@@ -31,7 +31,7 @@ import Testing
     }
 
     @Test func keyboardFocusPausesLikeHover() {
-        let timer = ToastTimer()
+        let timer = ToastTimer(pausesOnHoverFocus: true)
         timer.begin(.seconds(10))
         timer.setFocused(true)
         timer.tick(.seconds(30))
@@ -42,7 +42,7 @@ import Testing
     }
 
     @Test func staysPausedUntilEveryHoldIsReleased() {
-        let timer = ToastTimer()
+        let timer = ToastTimer(pausesOnHoverFocus: true)
         timer.begin(.seconds(6))
         timer.setHovered(true)
         timer.setFocused(true)
@@ -57,7 +57,7 @@ import Testing
     }
 
     @Test func aNewToastStartsFreshAndClear() {
-        let timer = ToastTimer()
+        let timer = ToastTimer(pausesOnHoverFocus: true)
         timer.begin(.seconds(6))
         timer.setHovered(true)
         timer.setFocused(true)
@@ -68,24 +68,57 @@ import Testing
     }
 
     @Test func theRealTimeDriverDismissesAfterTheDuration() async {
-        let timer = ToastTimer()
+        let timer = ToastTimer(pausesOnHoverFocus: true)
         let expired = await timer.run(.milliseconds(120), step: .milliseconds(20))
         #expect(expired)
     }
 
     @Test func theRealTimeDriverStopsWithoutDismissingWhenCancelled() async {
-        let timer = ToastTimer()
+        let timer = ToastTimer(pausesOnHoverFocus: true)
         let task = Task { await timer.run(.seconds(60), step: .milliseconds(10)) }
         task.cancel()
         #expect(await task.value == false)
     }
 
     @Test func modelsOwnTheirTimers() {
-        let history = HistoryModel()
-        let library = NotesLibraryModel()
-        history.toastTimer.setHovered(true)
-        #expect(history.toastTimer.isPaused)
-        #expect(!library.toastTimer.isPaused)
+        ChirpDesign.with(.v2) {
+            let history = HistoryModel()
+            let library = NotesLibraryModel()
+            history.toastTimer.setHovered(true)
+            #expect(history.toastTimer.isPaused)
+            #expect(!library.toastTimer.isPaused)
+        }
+    }
+
+    /// Flag off: no new behaviour. Hover and focus change nothing, and the driver is one plain sleep.
+    @Test func underPondHoverAndFocusNeverPause() {
+        let timer = ToastTimer(pausesOnHoverFocus: false)
+        timer.begin(.seconds(6))
+        timer.setHovered(true)
+        timer.setFocused(true)
+        #expect(!timer.isPaused)
+        #expect(timer.tick(.seconds(6)) == true)
+    }
+
+    @Test func theDesignPicksTheDefault() {
+        #expect(ToastTimer().pausesOnHoverFocus == false)
+        ChirpDesign.with(.v2) { #expect(ToastTimer().pausesOnHoverFocus) }
+        #expect(HistoryModel().toastTimer.pausesOnHoverFocus == false)
+        #expect(NotesLibraryModel().toastTimer.pausesOnHoverFocus == false)
+    }
+
+    @Test func underPondTheDriverDismissesAfterTheDurationEvenWhileHovered() async {
+        let timer = ToastTimer(pausesOnHoverFocus: false)
+        let task = Task { await timer.run(.milliseconds(80)) }
+        timer.setHovered(true)
+        #expect(await task.value)
+    }
+
+    @Test func underPondACancelledDriverDoesNotDismiss() async {
+        let timer = ToastTimer(pausesOnHoverFocus: false)
+        let task = Task { await timer.run(.seconds(60)) }
+        task.cancel()
+        #expect(await task.value == false)
     }
 }
 
