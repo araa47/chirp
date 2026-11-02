@@ -12,6 +12,8 @@ public enum MenuAction: Equatable, Sendable {
     /// `toggleNotes` starts, stops or resumes the recording; `newNote` always starts a new one; `openNote` carries a note id.
     case togglePrivateSession, toggleDictation, toggleNotes, newNote, showNotes, openNote(String), useRaw, pickInput(String?), toggleCleanup, pickStyle(String)
     case fixServer, showSettings, editStyles, showSetup, quit
+    /// v2 design only: the island in the notch, or the classic HUD.
+    case toggleShowInNotch
     /// Dictation history: the window, and one recent dictation's Insert Again, Copy and Show in History (its id).
     case showHistory, insertDictation(String), copyDictation(String), openDictation(String)
 
@@ -120,6 +122,9 @@ public struct MenuInputs: Sendable {
     public var chosenInputUID: String?
     public var cleanupOn = false
     public var showChanges = false
+    /// The v2 design is on, so "Show in Notch" is offered; `showInNotch` is its state.
+    public var notchOffered = false
+    public var showInNotch = true
     /// The 5-second "Use raw" window after a cleaned insertion is open; `rawOfferKey` is its hotkey when it has one.
     public var rawOfferOpen = false
     public var rawOfferKey: String?
@@ -256,6 +261,10 @@ public enum MenuContent {
 
         out.append(MenuEntry(title: "Private session", value: m.privateSession ? "On · up to 1 hour" : "Off",
                              action: .togglePrivateSession, mark: m.privateSession ? .on : .off))
+        if m.notchOffered {
+            out.append(MenuEntry(title: "Show in Notch", value: m.showInNotch ? "On" : "Off",
+                                 action: .toggleShowInNotch, mark: m.showInNotch ? .on : .off))
+        }
         out.append(cleanupMenu(m))
         out.append(microphoneMenu(m))
         out.append(.separator)

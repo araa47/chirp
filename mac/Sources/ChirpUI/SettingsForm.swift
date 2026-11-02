@@ -22,6 +22,9 @@ public struct SettingsState: Sendable {
     public var spokenCommands = false
     public var privateSession = false
     public var wordWaveform = false
+    /// Dictation: "Show in the notch", offered only under the v2 design (`notchOffered`). On by default.
+    public var notchOffered = false
+    public var showInNotch = true
     public var soundsEnabled = false
     public var soundPack: SoundPack = .default
     /// 0…1.
@@ -246,6 +249,9 @@ public final class SettingsForm {
     public let launch = NSButton(checkboxWithTitle: "Launch Chirp at login", target: nil, action: nil)
     /// Dictation: the HUD's word waveform.
     public let wordWaveform = NSButton(checkboxWithTitle: "Word waveform overlay", target: nil, action: nil)
+    /// Dictation: the v2 island in the notch instead of the classic HUD; its row exists only under the v2 design.
+    public let showInNotch = NSButton(checkboxWithTitle: "Show in the notch", target: nil, action: nil)
+    private var showInNotchRow: SettingsRow?
     /// Notes: how long the library keeps a note, what Recently Deleted holds, kept audio, the export folder and the
     /// smart-notes defaults. Presentational: each maps to a preference that already exists (or one folder path).
     public let notesRetention = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -423,6 +429,9 @@ public final class SettingsForm {
         let stopRow = row("Stop sound", Self.fileRow(stopFile, choose: chooseStop, remove: removeStop),
                           help: Self.help("Plays after you stop talking, up to \(SoundTiming.stopLimit) s."))
         customRows = [startRow, stopRow]
+        let notchRow = row(nil, showInNotch, help: Self.help("Dictation appears around the notch, or at the top of a screen without one. The word waveform keeps the classic HUD."))
+        notchRow.isHidden = true
+        showInNotchRow = notchRow
         for button in [openHistory, clearHistory] { button.bezelStyle = .rounded; button.controlSize = .small }
         historyStatus.font = MenuStyle.font
         historyStatus.textColor = .secondaryLabelColor
@@ -451,6 +460,7 @@ public final class SettingsForm {
                 row("Stop after", silence),
                 row("Microphone", microphone, help: Self.help("Follows the system default unless you pick one. Applies from the next dictation.")),
                 row(nil, wordWaveform, help: Self.help("Draws each word's audio above it as you speak, so you can see what was heard.")),
+                notchRow,
                 row(nil, spokenCommands, help: Self.help("Off by default. Say “new line” or “new paragraph” at the end of a dictation to insert line breaks.")),
                 row("Press Return", autoEnter, help: Self.help("Sends a chat message after inserting. Hold ⇧ when you stop to skip it. Chat apps are those set to the Chat style.")),
             ]),
@@ -688,6 +698,8 @@ public final class SettingsForm {
             launch.isEnabled = s.launch != .unavailable
             spokenCommands.state = s.spokenCommands ? .on : .off
             wordWaveform.state = s.wordWaveform ? .on : .off
+            showInNotch.state = s.showInNotch ? .on : .off
+            showInNotchRow?.isHidden = !s.notchOffered
             if let i = NotesRetention.allCases.firstIndex(of: s.notesRetention) { notesRetention.selectItem(at: i) }
             historyEnabled.state = s.historyEnabled ? .on : .off
             if let i = DictationRetention.allCases.firstIndex(of: s.historyRetention) { historyRetention.selectItem(at: i) }

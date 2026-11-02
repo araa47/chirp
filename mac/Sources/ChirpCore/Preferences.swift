@@ -62,6 +62,12 @@ public final class Preferences: @unchecked Sendable {
         get { defaults.bool(forKey: "designV2") }
         set { defaults.set(newValue, forKey: "designV2") }
     }
+    /// v2 design only: dictation shows in the notch (a floating pill on screens without one) instead of the classic
+    /// HUD. On by default; nothing reads it while `designV2` is off.
+    public var showInNotch: Bool {
+        get { defaults.object(forKey: "showInNotch") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "showInNotch") }
+    }
     #endif
     /// Show Chirp in the Dock and ⌘-Tab even with no Notes window open. Off by default.
     public var alwaysShowInDock: Bool {

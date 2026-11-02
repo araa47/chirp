@@ -2,6 +2,40 @@ import AppKit
 import ChirpUI
 import SwiftUI
 
+/// What `DictationController` drives while dictating: one shared `HUDModel` and when it is on screen. The classic HUD
+/// (`HUDController`) and the v2 notch island (`NotchController`) both conform; `OverlayRouter` picks one per show.
+@MainActor
+protocol DictationOverlay: AnyObject {
+    var model: HUDModel { get }
+    func show()
+    /// Fades out, then orders out and clears the model.
+    func hide()
+    /// Hide after a delay unless something else is shown first.
+    func hide(after seconds: Double)
+    /// Keeps it on screen: cancels a scheduled or running hide.
+    func cancelHide()
+    /// Has VoiceOver speak a status change.
+    func announce(_ text: String)
+    /// What is on screen takes clicks: false for the island, so a shown Use raw also needs the ⌃⌥Z offer.
+    var acceptsClicks: Bool { get }
+}
+
+extension DictationOverlay {
+    /// Every overlay never takes focus, so it would otherwise stay silent: post the announcement app-wide.
+    func announce(_ text: String) {
+        guard !text.isEmpty else { return }
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+    }
+}
+
+/// An overlay the router can swap out mid-dictation without clearing the model the other one now shows.
+@MainActor
+protocol OverlaySurface: DictationOverlay {
+    /// Orders out at once and cancels any pending hide, leaving the shared model as it is.
+    func retire()
+}
+
 private final class HUDPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -11,8 +45,8 @@ private final class HUDPanel: NSPanel {
 /// The surface is `.glassEffect()` on macOS 26 and otherwise a real `NSVisualEffectView` (HUD material, so it follows
 /// light and dark), masked to a rounded rectangle; the SwiftUI content sits on top and the panel follows the content's size with a short animation.
 @MainActor
-final class HUDController {
-    let model = HUDModel()
+final class HUDController: OverlaySurface {
+    let model: HUDModel
     private var panel: HUDPanel?
     private var hideTask: Task<Void, Never>?
     private var size = CGSize(width: HUDViewMetrics.width, height: 44)
@@ -24,6 +58,11 @@ final class HUDController {
     private static let appearScale: CGFloat = 0.94
 
     private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+    /// The Use raw button is clickable.
+    let acceptsClicks = true
+
+    init(model: HUDModel = HUDModel()) { self.model = model }
 
     private func makePanel() -> HUDPanel {
         let p = HUDPanel(contentRect: NSRect(origin: .zero, size: size),
@@ -122,8 +161,10 @@ final class HUDController {
         if let p = panel, p.isVisible { p.alphaValue = 1 }
     }
 
+    func hide() { hide(animated: true) }
+
     /// Fades the HUD out (and shrinks it a little unless Reduce Motion is on), then orders it out and clears the model.
-    func hide(animated: Bool = true) {
+    func hide(animated: Bool) {
         hideTask?.cancel()
         generation += 1
         let token = generation
@@ -153,11 +194,12 @@ final class HUDController {
         }
     }
 
-    /// Has VoiceOver speak a status change; the HUD never takes focus, so it would otherwise stay silent.
-    func announce(_ text: String) {
-        guard !text.isEmpty else { return }
-        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
-                             userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+    func retire() {
+        hideTask?.cancel()
+        generation += 1
+        guard let p = panel, p.isVisible else { return }
+        p.orderOut(nil)
+        p.alphaValue = 1
     }
 
     /// The content changed size (text grew, a badge appeared): follow it, animated unless Reduce Motion is on.
