@@ -163,7 +163,8 @@ final class SettingsCard: NSView {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         wantsLayer = true
-        layer?.cornerRadius = ChirpRadius.row
+        // Pond keeps the 10 pt row radius; v2 rounds custom-drawn cards to 18.
+        layer?.cornerRadius = ChirpDesign.current == .v2 ? ChirpRadius.card : ChirpRadius.row
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
         stack.orientation = .vertical

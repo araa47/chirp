@@ -169,6 +169,8 @@ public final class NotesLibraryModel {
     public var renaming: UUID?
     public var renameText = ""
     public var toast: NotesToast?
+    /// Counts the toast down; hovering it or focusing one of its buttons pauses the countdown.
+    public let toastTimer = ToastTimer()
     private var toastSerial = 0
     /// View ▸ Bigger/Smaller Text: this window's content size (the editor, transcript, library and banners).
     public let textSize = ChirpTextSize()

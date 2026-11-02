@@ -381,6 +381,7 @@ private struct HistoryToastView: View {
                     .pondFont(.callout, weight: .semibold)
                     .foregroundStyle(Color.chirp.koi)
                     .keyboardShortcut("z", modifiers: .command)
+                    .toastFocus(model.toastTimer)
             }
         }
         .padding(.horizontal, 18)
@@ -389,9 +390,9 @@ private struct HistoryToastView: View {
         .overlay(Capsule().strokeBorder(NotesInk.tertiary.opacity(0.35)))
         .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
         .padding(.bottom, 22)
+        .toastHover(model.toastTimer)
         .task(id: toast.serial) {
-            try? await Task.sleep(for: .seconds(6))
-            if !Task.isCancelled, model.toast?.serial == toast.serial { model.toast = nil }
+            if await model.toastTimer.run(.seconds(6)), model.toast?.serial == toast.serial { model.toast = nil }
         }
         .accessibilityElement(children: .contain)
     }

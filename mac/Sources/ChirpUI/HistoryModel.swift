@@ -105,6 +105,8 @@ public struct HistoryToast: Equatable, Sendable {
     public var unavailable = false
     public var retention = DictationRetention.default
     public var toast: HistoryToast?
+    /// Counts the toast down; hovering it or focusing Undo pauses the countdown.
+    public let toastTimer = ToastTimer()
     /// Shown for a moment after Copy / Insert Again ("Copied").
     public var flash: String?
     private var toastSerial = 0

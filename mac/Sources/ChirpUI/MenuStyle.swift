@@ -8,10 +8,11 @@ public enum MenuStyle {
     public static let semiboldFont = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
     public static let secondaryFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
 
-    /// The Pond status colours as dynamic AppKit colours: lily = ready, moon = loading or attention, record = error.
-    public static let lily = ChirpColor.dynamic(ChirpColor.Pond.lily.light, ChirpColor.Pond.lily.dark)
-    public static let moon = ChirpColor.dynamic(ChirpColor.Pond.moon.light, ChirpColor.Pond.moon.dark)
-    public static let record = ChirpColor.dynamic(ChirpColor.Pond.record.light, ChirpColor.Pond.record.dark)
+    /// The status colours as dynamic AppKit colours that follow the current design: lily = ready, moon = loading or
+    /// attention, record = error.
+    public static let lily = ChirpColor.dynamic(.lily)
+    public static let moon = ChirpColor.dynamic(.moon)
+    public static let record = ChirpColor.dynamic(.record)
 
     public static func color(_ dot: MenuDot) -> NSColor {
         switch dot {
