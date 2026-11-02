@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ChirpUI
 
-/// The Pond tokens' contrast, computed the WCAG way (as `HUDColorsTests` does for the HUD): every
+/// The Pond and Graphite tokens' contrast, computed the WCAG way (as `HUDColorsTests` does for the HUD): every
 /// text-capable token must read on the surfaces it lands on, in both light and dark.
 @Suite struct ChirpThemeTests {
     private func luminance(_ c: ChirpColor.RGB) -> Double {
@@ -14,45 +14,81 @@ import Testing
         return (max(x, y) + 0.05) / (min(x, y) + 0.05)
     }
 
-    @Test func textTokensMeetWCAGAAOnBackgroundAndSurface() {
-        let surfaces = [(ChirpColor.Pond.background.light, ChirpColor.Pond.background.dark),
-                        (ChirpColor.Pond.surface.light, ChirpColor.Pond.surface.dark)]
-        let textTokens = [(ChirpColor.Pond.ink.light, ChirpColor.Pond.ink.dark),
-                          (ChirpColor.Pond.inkMuted.light, ChirpColor.Pond.inkMuted.dark),
-                          (ChirpColor.Pond.koi.light, ChirpColor.Pond.koi.dark),
-                          (ChirpColor.Pond.moon.light, ChirpColor.Pond.moon.dark),
-                          (ChirpColor.Pond.lily.light, ChirpColor.Pond.lily.dark)]
-        for surface in surfaces {
-            for token in textTokens {
-                #expect(contrast(token.0, surface.0) >= 4.5, "\(token.0) on light \(surface.0)")
-                #expect(contrast(token.1, surface.1) >= 4.5, "\(token.1) on dark \(surface.1)")
+    /// Both tables, Pond and the v2 Graphite one, meet the same bars.
+    @Test(arguments: ChirpDesign.allCases)
+    func textTokensMeetWCAGAAOnBackgroundAndSurface(design: ChirpDesign) {
+        typealias T = ChirpColor.Token
+        for surface in [T.background, .surface].map({ $0.pair(in: design) }) {
+            for token in [T.ink, .inkMuted, .koi, .moon, .lily].map({ $0.pair(in: design) }) {
+                #expect(contrast(token.light, surface.light) >= 4.5, "\(design): \(token.light) on light \(surface.light)")
+                #expect(contrast(token.dark, surface.dark) >= 4.5, "\(design): \(token.dark) on dark \(surface.dark)")
             }
         }
     }
 
-    @Test func koiFillsKeepTheirTextReadable() {
-        #expect(contrast(ChirpColor.Pond.onKoi.light, ChirpColor.Pond.koi.light) >= 4.5)
-        #expect(contrast(ChirpColor.Pond.onKoi.dark, ChirpColor.Pond.koi.dark) >= 4.5)
-        #expect(contrast(ChirpColor.Pond.onKoiContainer.light, ChirpColor.Pond.koiContainer.light) >= 4.5)
-        #expect(contrast(ChirpColor.Pond.onKoiContainer.dark, ChirpColor.Pond.koiContainer.dark) >= 4.5)
+    @Test(arguments: ChirpDesign.allCases)
+    func koiFillsKeepTheirTextReadable(design: ChirpDesign) {
+        let (koi, onKoi) = (ChirpColor.Token.koi.pair(in: design), ChirpColor.Token.onKoi.pair(in: design))
+        let (container, onContainer) = (ChirpColor.Token.koiContainer.pair(in: design), ChirpColor.Token.onKoiContainer.pair(in: design))
+        #expect(contrast(onKoi.light, koi.light) >= 4.5)
+        #expect(contrast(onKoi.dark, koi.dark) >= 4.5)
+        #expect(contrast(onContainer.light, container.light) >= 4.5)
+        #expect(contrast(onContainer.dark, container.dark) >= 4.5)
     }
 
-    /// The dark sidebar selection uses koiContainer; its warm ink dims for the snippet and meta lines but
-    /// stays readable at body-text contrast (#303: the meta line is text people read, not a 3:1 UI mark).
-    @Test func sidebarSelectionInkStaysReadableOnTheKoiPill() {
+    /// The dark sidebar selection uses koiContainer; its ink dims for the snippet and meta lines but
+    /// stays readable at body-text contrast (#303: the meta line is text people read, not a 3:1 UI mark). Graphite's
+    /// dark pair is derived (not in the prototype), so this is the test that proves it.
+    @Test(arguments: ChirpDesign.allCases)
+    func sidebarSelectionInkStaysReadableOnTheKoiPill(design: ChirpDesign) {
         func blend(_ a: ChirpColor.RGB, over b: ChirpColor.RGB, alpha: Double) -> ChirpColor.RGB {
             (r: a.r * alpha + b.r * (1 - alpha), g: a.g * alpha + b.g * (1 - alpha), b: a.b * alpha + b.b * (1 - alpha))
         }
-        let koi = ChirpColor.Pond.koiContainer.dark
-        #expect(contrast(ChirpColor.Pond.onKoiContainer.dark, koi) >= 4.5)
-        #expect(contrast(blend(ChirpColor.Pond.onKoiContainer.dark, over: koi, alpha: RowInk.snippetOnPill), koi) >= 4.5)
-        #expect(contrast(blend(ChirpColor.Pond.onKoiContainer.dark, over: koi, alpha: RowInk.metaOnPill), koi) >= 4.5)
+        for dark in [false, true] {
+            let pill = ChirpColor.Token.koiContainer.pair(in: design), ink = ChirpColor.Token.onKoiContainer.pair(in: design)
+            let (koi, on) = dark ? (pill.dark, ink.dark) : (pill.light, ink.light)
+            #expect(contrast(on, koi) >= 4.5, "\(design) dark=\(dark)")
+            #expect(contrast(blend(on, over: koi, alpha: RowInk.snippetOnPill), koi) >= 4.5, "\(design) dark=\(dark)")
+            #expect(contrast(blend(on, over: koi, alpha: RowInk.metaOnPill), koi) >= 4.5, "\(design) dark=\(dark)")
+        }
     }
 
     /// `record` is the record/stop dot, not body text: WCAG AA for UI components is 3:1.
-    @Test func recordDotStandsOutEnough() {
-        #expect(contrast(ChirpColor.Pond.record.light, ChirpColor.Pond.background.light) >= 3)
-        #expect(contrast(ChirpColor.Pond.record.dark, ChirpColor.Pond.background.dark) >= 3)
+    @Test(arguments: ChirpDesign.allCases)
+    func recordDotStandsOutEnough(design: ChirpDesign) {
+        let (record, background) = (ChirpColor.Token.record.pair(in: design), ChirpColor.Token.background.pair(in: design))
+        #expect(contrast(record.light, background.light) >= 3)
+        #expect(contrast(record.dark, background.dark) >= 3)
+    }
+
+    /// The numbers the ship plan's section 5 quotes for Graphite, so a hand edit to the table shows up here.
+    @Test func graphiteMatchesThePlannedContrast() {
+        let g = ChirpColor.Graphite.self
+        #expect(abs(contrast(g.ink.light, g.background.light) - 17.05) < 0.01)
+        #expect(abs(contrast(g.inkMuted.light, g.background.light) - 6.97) < 0.01)
+        #expect(abs(contrast(g.koi.light, g.background.light) - 5.70) < 0.01)
+        #expect(abs(contrast(g.koi.dark, g.background.dark) - 6.82) < 0.01)
+        #expect(abs(contrast(g.onKoi.light, g.koi.light) - 6.46) < 0.01)
+        #expect(abs(contrast(g.onKoi.dark, g.koi.dark) - 6.97) < 0.01)
+    }
+
+    /// The PR 5 accent asset (light #2F6FE0, dark #4B86E8): macOS draws white labels on the accent, so white must
+    /// read on it (4.5 in light; 3:1 UI-component level in dark). The prototype's #5B9BFF would fail as a fill.
+    @Test func theGraphiteAccentFillCarriesWhiteLabels() {
+        let white: ChirpColor.RGB = (1, 1, 1)
+        #expect(contrast(white, ChirpColor.hex(0x2F6FE0)) >= 4.5)
+        #expect(contrast(white, ChirpColor.hex(0x4B86E8)) >= 3)
+        #expect(contrast(white, ChirpColor.hex(0x5B9BFF)) < 3)
+    }
+
+    /// The HUD's accent (revised words, the word waveform) on its opaque stand-in surface, in either design.
+    @Test(arguments: ChirpDesign.allCases)
+    func theHUDAccentReadsOnTheHUDSurface(design: ChirpDesign) {
+        let (action, surface) = (HUDColors.actionRGB(in: design), HUDColors.surfaceRGB(in: design))
+        #expect(contrast(action.light, surface.light) >= 4.5)
+        #expect(contrast(action.dark, surface.dark) >= 4.5)
+        #expect(contrast(HUDColors.errorDark, surface.dark) >= 4.5)
+        #expect(contrast(HUDColors.errorLight, surface.light) >= 4.5)
     }
 
     @Test func ripplePeriodShrinksAsSpeechPeaks() {

@@ -706,8 +706,10 @@ public enum HUDColors {
     public static let badgeRGB: RGB = (0.72, 0.07, 0.07)
 
     /// The koi accent (revised words, the word waveform's tint); the "Use raw" chip sets its own text on `koiContainer`.
+    /// These are Pond's values; `actionRGB(in:)` gives either design's, and `action` follows the current one.
     public static let actionLight: RGB = ChirpColor.Pond.koi.light
     public static let actionDark: RGB = ChirpColor.Pond.koi.dark
+    public static func actionRGB(in design: ChirpDesign) -> ChirpColor.Pair { ChirpColor.Token.koi.pair(in: design) }
 
     private static func dynamic(light: RGB, dark: RGB) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
@@ -716,15 +718,22 @@ public enum HUDColors {
         })
     }
     /// The opaque stand-in for the HUD material (Increase Contrast, snapshots), a touch translucent like the material.
+    /// These are Pond's neutral greys; v2 keeps the light one and takes the Graphite popover in dark (`surfaceRGB(in:)`).
     public static let surfaceLight: RGB = (0.97, 0.97, 0.98)
     public static let surfaceDark: RGB = (0.16, 0.16, 0.18)
+    public static func surfaceRGB(in design: ChirpDesign) -> ChirpColor.Pair {
+        switch design {
+        case .pond: (light: surfaceLight, dark: surfaceDark)
+        case .v2: (light: surfaceLight, dark: ChirpColor.Graphite.surface.dark)
+        }
+    }
     public static let surface = Color(nsColor: NSColor(name: nil) { appearance in
-        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let c = dark ? surfaceDark : surfaceLight
+        let pair = surfaceRGB(in: ChirpDesign.current)
+        let c = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? pair.dark : pair.light
         return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 0.94)
     })
     public static let error = dynamic(light: errorLight, dark: errorDark)
-    public static let action = dynamic(light: actionLight, dark: actionDark)
+    public static let action = Color(nsColor: ChirpColor.dynamic(.koi))
     public static let badge = Color(red: badgeRGB.r, green: badgeRGB.g, blue: badgeRGB.b)
     /// A word the recogniser just revised, for the brief crossfade.
     public static let change = action

@@ -201,14 +201,15 @@ enum NotesEditorStyle {
 /// and the Decision/Question callouts (a tinted block with its icon, like Android's).
 @MainActor
 enum NotesEditorDecorations {
-    static let lily = named("ChirpNotesLily", ChirpColor.Pond.lily)
-    static let moon = named("ChirpNotesMoon", ChirpColor.Pond.moon)
-    static let moonFill = named("ChirpNotesMoonFill", ChirpColor.Pond.moonFill)
+    static let lily = named("ChirpNotesLily", .lily)
+    static let moon = named("ChirpNotesMoon", .moon)
+    static let moonFill = named("ChirpNotesMoonFill", .moonFill)
 
     /// A dynamic colour with a name of its own: text attributes compare colours, and two dynamic colours sharing a
-    /// name would merge into one run (a Question label drawn in the Decision green).
-    static func named(_ name: String, _ c: (light: ChirpColor.RGB, dark: ChirpColor.RGB)) -> NSColor {
+    /// name would merge into one run (a Question label drawn in the Decision green). Follows the current design.
+    static func named(_ name: String, _ token: ChirpColor.Token) -> NSColor {
         NSColor(name: name) { appearance in
+            let c = token.pair(in: ChirpDesign.current)
             let v = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? c.dark : c.light
             return NSColor(srgbRed: v.r, green: v.g, blue: v.b, alpha: 1)
         }
