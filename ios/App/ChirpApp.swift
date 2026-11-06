@@ -90,7 +90,7 @@ struct DictationCommands: Commands {
             Button("Copy Result") { model.copy() }
                 .keyboardShortcut("c", modifiers: [.command, .shift]).disabled(model.phase != .finished)
             Button("Use Raw Transcript") { model.useRaw() }
-                .keyboardShortcut("z", modifiers: [.command, .shift]).disabled(!model.canUseRaw)
+                .keyboardShortcut("z", modifiers: [.control, .option]).disabled(!model.canUseRaw)   // ⌘⇧Z is the system's Redo: it never reached this item
             Divider()
             Button("Start Keyboard Session") { Task { do { try await model.armSession() } catch { model.show(error) } } }
                 .keyboardShortcut("k", modifiers: [.command, .shift]).disabled(model.armed || !model.paired || model.working)

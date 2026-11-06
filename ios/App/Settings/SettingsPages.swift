@@ -283,9 +283,10 @@ struct KeyboardPage: View {
 struct ShortcutsPage: View {
     @ObservedObject private var hardware = HardwareShortcutController.shared
 
-    // The bindings in NotesLibraryView and LiveNotesView: ⌘N is New note, as on the Mac and Android (A2-7).
+    // The Notes menu (NotesCommands, every tab) and the note's own keys: ⌘N is New note, as on the Mac and Android (A2-7).
     static let notesShortcuts: [(title: String, keys: String)] = [
         ("New note", "⌘N"),
+        ("New note and record", "⌃⌥N"),
         ("Record / Stop note", "⇧⌘R"),
         ("Pause / Resume note", "⇧⌘P"),
         ("Edit by voice", "⇧⌘E"),
@@ -308,7 +309,7 @@ struct ShortcutsPage: View {
                 shortcut("Start or stop dictation", "⌘↩")
                 shortcut("Cancel dictation", "⌘.")
                 shortcut("Copy result", "⇧⌘C")
-                shortcut("Use raw transcript", "⇧⌘Z")
+                shortcut("Use raw transcript", "⌃⌥Z")
                 shortcut("Start keyboard session", "⇧⌘K")
                 shortcut("End session", "⇧⌘E")
             }
@@ -316,7 +317,7 @@ struct ShortcutsPage: View {
                 shortcut("Notes, Dictate, History, Settings", "⌘1–4")
             }
             SettingsItem {
-                Text("Notes shortcuts work in Notes. Dictation and Go shortcuts work in every Chirp tab. Hold ⌘ to see the available shortcuts.").font(.footnote).foregroundStyle(Color.chirp.inkMuted)
+                Text("New note, Record, Pause and the Dictation and Go shortcuts work in every Chirp tab; the others work in Notes. Hold ⌘ to see the available shortcuts.").font(.footnote).foregroundStyle(Color.chirp.inkMuted)
                 LearnMore(title: "Global shortcut", label: "Set one key for it") {
                     Text("From any app with a hardware keyboard: start a session in Chirp, then press ⌘Space, type Toggle dictation and press Return. Do it again to stop. The text is copied, so press ⌘V to paste.")
                     Text("For one key: in the Shortcuts app, make a shortcut with Chirp’s Toggle Chirp dictation action. Then go to Settings → Accessibility → Keyboards & Typing → Full Keyboard Access, turn it on, open Commands and give that shortcut a key combination.")
