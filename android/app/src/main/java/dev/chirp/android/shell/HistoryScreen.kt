@@ -58,15 +58,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal enum class HistoryDay(@StringRes val label: Int) {
-    Today(R.string.history_today), Yesterday(R.string.history_yesterday), Earlier(R.string.history_earlier)
-}
-
-/** Calendar day in [zone], not a 24-hour window: a dictation from 23:50 is Yesterday at 00:10. */
-internal fun historyDay(now: Long, time: Long, zone: ZoneId = ZoneId.systemDefault()): HistoryDay {
+/** A group's header, as on iOS: "Today", "Yesterday", the weekday within the week, then "27 October" ("27 October 2025" in another year). */
+internal fun historyGroupLabel(resources: android.content.res.Resources, now: Long, time: Long, zone: ZoneId = ZoneId.systemDefault()): String {
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     val day = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
-    return when { !day.isBefore(today) -> HistoryDay.Today; day == today.minusDays(1) -> HistoryDay.Yesterday; else -> HistoryDay.Earlier }
+    val locale = resources.configuration.locales[0]
+    return when (val days = java.time.temporal.ChronoUnit.DAYS.between(day, today)) {
+        in Long.MIN_VALUE..0L -> resources.getString(R.string.history_today)
+        1L -> resources.getString(R.string.history_yesterday)
+        in 2L..6L -> day.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, locale)
+        else -> day.format(DateTimeFormatter.ofPattern(if (day.year == today.year && days < 365) "d MMMM" else "d MMMM yyyy", locale))
+    }
 }
 
 internal fun historyMatches(entry: HistoryEntry, query: String): Boolean =
@@ -212,10 +214,14 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
         }
     }
     val icons = rememberAppIcons()
+    val resources = LocalResources.current
     val actions = DetailActions(copy = { label, text -> copyPrivately(context, label, text) },
         share = { text -> context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null)) },
-        delete = ::delete, teach = { teach = it })
-    Surface(Modifier.fillMaxSize()) {
+        delete = ::delete, teach = { teach = it },
+        // Add to note names nothing new: it appends to the latest note (the long-press menu names it), or saves a new one.
+        addToNote = { entry -> latest?.let { addToNote(entry, it) } ?: addToNote(entry, newNote = true) })
+    // The pond background with white rows, as iOS.
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
             // Off or empty there is nothing to show beside the list: one centred column instead.
             val wide = maxWidth >= LIST_DETAIL
@@ -225,7 +231,7 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
                     Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(stringResource(R.string.history_title), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
-                            Text(stringResource(R.string.history_subtitle), style = MaterialTheme.typography.bodyMedium,
+                            Text(stringResource(if (enabled) R.string.history_subtitle else R.string.history_subtitle_off), style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Box {
@@ -235,7 +241,8 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
                             }
                         }
                     }
-                    if (enabled || !entries.isNullOrEmpty()) DockedSearchBar(inputField = {
+                    // Search only when there is something to search, as on iOS.
+                    if (!entries.isNullOrEmpty()) DockedSearchBar(inputField = {
                         SearchBarDefaults.InputField(query, { query = it }, { }, expanded = false, onExpandedChange = { },
                             modifier = Modifier.focusRequester(searchFocus), placeholder = { Text(stringResource(R.string.history_search)) }, leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
                             trailingIcon = if (query.isEmpty()) null else ({ IconButton({ query = "" }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.history_clear_search)) } }))
@@ -248,9 +255,9 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
                         shown.isEmpty() -> EmptyHistory(R.drawable.ic_history, stringResource(R.string.history_empty), stringResource(R.string.history_empty_body, history.retention.label(LocalResources.current)))
                         else -> LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            shown.groupBy { historyDay(now(), it.time, zone) }.forEach { (day, group) ->
-                                item(key = day.name) {
-                                    Text(stringResource(day.label), Modifier.padding(start = 8.dp, top = 16.dp, bottom = 8.dp).semantics { heading() },
+                            shown.groupBy { historyGroupLabel(resources, now(), it.time, zone) }.forEach { (day, group) ->
+                                item(key = day) {
+                                    Text(day, Modifier.padding(start = 8.dp, top = 16.dp, bottom = 8.dp).semantics { heading() },
                                         style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                                 }
                                 items(group, key = { "${it.id}/$restores" }) { entry ->
@@ -263,7 +270,7 @@ internal fun HistoryScreen(store: DictationHistory? = null, now: () -> Long = Sy
                     }
                 }
                 if (twoPane) Box(Modifier.weight(.55f).fillMaxHeight().padding(16.dp).clip(MaterialTheme.shapes.extraLarge)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)) {
+                    .background(MaterialTheme.colorScheme.surface)) {
                     if (current != null) Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
                         HistoryDetail(current, now(), zone, actions)
                     } else Text(if (shown.isNotEmpty()) stringResource(R.string.history_select_prompt) else "", Modifier.align(Alignment.Center).padding(24.dp),
@@ -309,7 +316,8 @@ private fun rememberAppIcons(): Map<String, Drawable> {
 /** Snackbar text for Add to note, resolved in composition so the coroutine never reads resources. */
 private class AddToNoteMessages(val unreadable: String, val savedNew: String, val added: String, val off: String, val failed: String)
 
-private class DetailActions(val copy: (String, String) -> Unit, val share: (String) -> Unit, val delete: (HistoryEntry) -> Unit, val teach: (HistoryEntry) -> Unit)
+private class DetailActions(val copy: (String, String) -> Unit, val share: (String) -> Unit, val delete: (HistoryEntry) -> Unit, val teach: (HistoryEntry) -> Unit,
+                            val addToNote: (HistoryEntry) -> Unit)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -335,7 +343,7 @@ private fun HistoryRow(entry: HistoryEntry, meta: String, icon: Drawable?, selec
                     .semantics { customActions = listOfNotNull(
                         latest?.let { target -> CustomAccessibilityAction(requireNotNull(addLabel)) { addToNote(target); true } },
                         CustomAccessibilityAction(saveAsNewLabel) { saveAsNew(); true }, CustomAccessibilityAction(deleteLabel) { delete(); true }) },
-                colors = ListItemDefaults.colors(containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer))
+                colors = ListItemDefaults.colors(containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface))
             DropdownMenu(menu, { menu = false }) {
                 if (latest != null) DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_notes_tab), null) },
                     text = { Text(requireNotNull(addLabel)) }, onClick = { menu = false; addToNote(latest) })
@@ -360,11 +368,6 @@ private fun AppIcon(app: String?, icon: Drawable?) {
     }
 }
 
-@Composable
-private fun ButtonIcon(@DrawableRes icon: Int) {
-    Icon(painterResource(icon), null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HistoryDetail(entry: HistoryEntry, now: Long, zone: ZoneId, actions: DetailActions) {
@@ -373,21 +376,34 @@ private fun HistoryDetail(entry: HistoryEntry, now: Long, zone: ZoneId, actions:
         Text(listOfNotNull(entry.app, time, if (entry.partial) stringResource(R.string.history_partial) else null).joinToString(" · "), style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         SelectionContainer { Text(entry.text, style = MaterialTheme.typography.bodyLarge) }
+        // The words before clean-up: a moon label over a gold bar, as on iOS (moon is the AI/polish colour).
         entry.raw?.let { raw ->
-            Text(stringResource(R.string.history_before_cleanup), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
-            SelectionContainer { Text(raw, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-        Text(historyAge(LocalResources.current, now, entry.time).second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton({ actions.copy("Chirp dictation", entry.text) }) { ButtonIcon(R.drawable.ic_copy); Text(stringResource(R.string.history_copy)) }
-            entry.raw?.let { raw -> OutlinedButton({ actions.copy("Chirp dictation (raw)", raw) }) { Text(stringResource(R.string.history_copy_raw)) } }
-            if (!entry.partial) OutlinedButton({ actions.teach(entry) }) { Text(stringResource(R.string.learning_teach)) }
-            OutlinedButton({ actions.share(entry.text) }) { ButtonIcon(R.drawable.ic_share); Text(stringResource(R.string.history_share)) }
-            TextButton({ actions.delete(entry) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                ButtonIcon(R.drawable.ic_delete); Text(stringResource(R.string.history_delete))
+            val roles = dev.chirp.android.ui.LocalChirpRoles.current
+            Text(stringResource(R.string.history_before_cleanup), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall, color = roles.moon)
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                Box(Modifier.width(3.dp).fillMaxHeight().background(roles.moonFill))
+                SelectionContainer(Modifier.padding(start = 10.dp)) { Text(raw, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
+        Text(historyAge(LocalResources.current, now, entry.time).second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // One row of uniform capsules, as iOS: Copy · Copy original · Share · Add to note · Teach Chirp · Delete (in record red).
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DetailChip(stringResource(R.string.history_copy), R.drawable.ic_copy) { actions.copy("Chirp dictation", entry.text) }
+            entry.raw?.let { raw -> DetailChip(stringResource(R.string.history_copy_raw), R.drawable.ic_copy) { actions.copy("Chirp dictation (raw)", raw) } }
+            DetailChip(stringResource(R.string.history_share), R.drawable.ic_share) { actions.share(entry.text) }
+            DetailChip(stringResource(R.string.history_add_to_note), R.drawable.ic_notes_tab) { actions.addToNote(entry) }
+            if (!entry.partial) DetailChip(stringResource(R.string.learning_teach), R.drawable.ic_sparkle) { actions.teach(entry) }
+            DetailChip(stringResource(R.string.history_delete), R.drawable.ic_delete, destructive = true) { actions.delete(entry) }
+        }
     }
+}
+
+@Composable
+private fun DetailChip(label: String, @DrawableRes icon: Int, destructive: Boolean = false, onClick: () -> Unit) {
+    val tint = if (destructive) dev.chirp.android.ui.LocalChirpRoles.current.record else MaterialTheme.colorScheme.primary
+    AssistChip(onClick, { Text(label) }, Modifier.heightIn(min = 48.dp), leadingIcon = { Icon(painterResource(icon), null, Modifier.size(18.dp)) }, shape = CircleShape, border = null,
+        colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            labelColor = if (destructive) tint else MaterialTheme.colorScheme.onSurface, leadingIconContentColor = tint))
 }
 
 @Composable

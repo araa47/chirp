@@ -87,11 +87,11 @@ class ShellRenderTest {
         shots("history-list", width)
         compose.runOnIdle { history.clear(); tab.value = ShellTab.Notes }
         compose.runOnIdle { tab.value = ShellTab.History }
-        compose.waitUntil(5000) { compose.onAllNodesWithText("No dictations yet").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Nothing yet").fetchSemanticsNodes().isNotEmpty() }
         shots("history-empty", width)
         compose.runOnIdle { history.disable(); tab.value = ShellTab.Notes }
         compose.runOnIdle { tab.value = ShellTab.History }
-        compose.waitUntil(5000) { compose.onAllNodesWithText("Dictation history is off").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("History is off").fetchSemanticsNodes().isNotEmpty() }
         shots("history-off", width)
     }
 

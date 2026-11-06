@@ -30,8 +30,9 @@ credential or personal text is included.
   Regenerate with `./gradlew -Pchirp.updateScreenshots testDebugUnitTest --tests '*SettingsRenderTest*'`.
 - `history-{list,empty,off}-{cover,inner}-{light,dark}.png`: the History tab, titled "Dictation history" with
   one line saying what it holds. Flat list rows lead with the target app's icon (PackageManager by label, with a
-  neutral glyph fallback), long-press names the latest note and offers a new-note alternative, and search, day groups,
-  the raw comparison, private Copy and swipe-delete Undo are unchanged. Rendered by `ShellRenderTest`.
+  neutral glyph fallback) on white over the pond background, as on iOS; day groups are Today, Yesterday, the
+  weekday, then the date. Long-press names the latest note and offers a new-note alternative; search shows once
+  there is something to search; "Nothing yet" and "History is off" match iOS. Rendered by `ShellRenderTest`.
 - `history-note-actions-{cover,inner,large}-{light,dark}.png`: the History long-press menu names the latest
   destination and offers **Save as new note**. Popup renders cover phone and tablet widths, a wrapped title,
   and Android font scale 200% (`large`). Rendered by `HistoryActionsRenderTest`; regenerate with
