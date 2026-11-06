@@ -162,7 +162,7 @@ final class ChirpKeyboardViewController: KeyboardInputViewController {
     override func textDidChange(_ textInput: (any UITextInput)?) {
         super.textDidChange(textInput)
         // Another field took focus: open its layout (number pad, e-mail keys…) as Apple's keyboard does.
-        if textDocumentProxy.documentIdentifier != documentID { finishWatch(); applyFieldLayout() }
+        if textDocumentProxy.chirpDocumentIdentifier != documentID { finishWatch(); applyFieldLayout() }
         if !applying { invalidateOwnership(); render() }
     }
     override func selectionDidChange(_ textInput: (any UITextInput)?) {
@@ -191,7 +191,7 @@ final class ChirpKeyboardViewController: KeyboardInputViewController {
     /// The host field's keyboard type picks the first layout; autocorrect follows the field and the layout.
     private func applyFieldLayout() {
         let proxy = textDocumentProxy
-        documentID = proxy.documentIdentifier
+        documentID = proxy.chirpDocumentIdentifier
         let layout = TypingLayout(keyboardTypeRawValue: (proxy.keyboardType ?? .default).rawValue)
         TypingKeyboard.apply(layout, to: self)
         autocomplete?.allowsAutocorrect = layout.allowsAutocorrect && proxy.autocorrectionType != .no
@@ -211,7 +211,8 @@ final class ChirpKeyboardViewController: KeyboardInputViewController {
 
     private func context() -> CursorContext {
         let proxy = textDocumentProxy
-        return CursorContext(documentID: proxy.documentIdentifier,
+        // No identifier (the field is going away): a fresh one, so nothing owned is ever matched against it.
+        return CursorContext(documentID: proxy.chirpDocumentIdentifier ?? UUID(),
                              before: proxy.documentContextBeforeInput,
                              after: proxy.documentContextAfterInput, selection: proxy.selectedText,
                              hasText: proxy.hasText)

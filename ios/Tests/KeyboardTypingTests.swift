@@ -25,6 +25,12 @@ import UIKit
         func deleteBackward() { if !text.isEmpty { text.removeLast() } }
     }
 
+    /// The keyboard reads the host's document identifier without trapping when the system has none.
+    @Test func documentIdentifierReadsTheHostsWithoutBridgingTrap() {
+        let proxy = FakeProxy()
+        #expect(proxy.chirpDocumentIdentifier == proxy.documentIdentifier)
+    }
+
     @MainActor struct Rig {
         let controller: KeyboardInputViewController
         let proxy: FakeProxy
