@@ -166,11 +166,12 @@ public enum HardwareShortcutValidation {
     /// Chirp's own menu shortcuts (`DictationCommands`, `NavigationCommands`, Notes), which the app keeps working.
     public static let chirpShortcuts: [(key: Int, modifiers: HardwareShortcut.Modifiers, owner: String)] = [
         (0x28, .command, "Start Dictation"), (0x37, .command, "Cancel Dictation"),
-        (0x06, [.command, .shift], "Copy Result"), (0x1D, [.command, .shift], "Use Raw Transcript"),
-        (0x0E, [.command, .shift], "Start Keyboard Session"), (0x08, [.command, .shift], "End Session"),
+        (0x06, [.command, .shift], "Copy Result"), (0x1D, [.control, .option], "Use Raw Transcript"),
+        (0x0E, [.command, .shift], "the keyboard session"),
         (0x1E, .command, "Notes"), (0x1F, .command, "Dictate"), (0x20, .command, "History"), (0x21, .command, "Settings"),
-        (0x11, .command, "New Note"), (0x09, .command, "Search notes"), (0x15, [.command, .shift], "recording a note"),
-        (0x13, [.command, .shift], "pausing a note"), (0x17, [.command, .option], "the transcript"),
+        (0x11, .command, "New Note"), (0x11, [.control, .option], "New note and record"), (0x09, .command, "Search notes"),
+        (0x15, [.command, .shift], "recording a note"), (0x13, [.command, .shift], "pausing a note"),
+        (0x08, [.command, .shift], "Edit by voice"), (0x17, [.command, .option], "the transcript"),
     ]
 
     /// `modifiers` are the flags held with `key`; a modifier key's own code makes a modifier-only shortcut.

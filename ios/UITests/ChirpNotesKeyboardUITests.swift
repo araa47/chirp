@@ -93,7 +93,7 @@ final class ChirpNotesKeyboardUITests: XCTestCase {
     }
 
     /// On the Notes tab the dictation key drives Notes, as in the Mac's Notes window: a press records, the next pauses
-    /// and the next resumes. With a field focused and nothing recording it still dictates into the field.
+    /// and the next resumes, whatever field has focus (the Mac's Notes window takes the key the same way).
     @MainActor func testDictationKeyDrivesNotesOnTheNotesTab() throws {
         let app = launch()
         // Paired, so the key can dictate away from Notes (Notes' synthetic server needs no pairing).
@@ -109,6 +109,18 @@ final class ChirpNotesKeyboardUITests: XCTestCase {
         pressDictationKey()
         XCTAssertTrue(waitFor(status, "label == 'Recording'"), "A third press did not resume")
         screenshot("Dictation key: recording on Notes")
+        app.buttons["chirp.notes.stop"].tap()
+        XCTAssertTrue(waitFor(status, "label == 'Stopped'"))
+
+        // The editor focused: the key still records the note instead of dictating into the editor.
+        let editor = app.textViews["chirp.notes.editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        XCTAssertTrue(waitFor(editor, "hasKeyboardFocus == true", timeout: 5), "The editor did not take the keyboard")
+        pressDictationKey()
+        XCTAssertTrue(waitFor(status, "label == 'Recording'"), "With the editor focused the key did not record")
+        XCTAssertFalse(element("chirp.hwkey.listening", app).exists, "The key must not dictate into the Notes editor")
+        screenshot("Dictation key: recording with the editor focused")
         app.buttons["chirp.notes.stop"].tap()
         XCTAssertTrue(waitFor(status, "label == 'Stopped'"))
 

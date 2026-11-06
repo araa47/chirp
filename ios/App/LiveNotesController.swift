@@ -613,19 +613,18 @@ final class LiveNotesController: ObservableObject {
         requestedSelection = recordingID ?? document.id
     }
 
-    /// The dictation key on the Notes tab: a press records (the note on screen, else a new one), the next pauses and
-    /// the next resumes; Stop is ⌘⇧R or the button. While a field has focus and nothing records, the key dictates into
-    /// the field as everywhere else. Returns false when the key is not Notes' here.
-    func hotkeyPress(fieldFocused: Bool) -> Bool {
-        guard notesTabShown else { return false }
-        switch captureState {
-        case .recording: Task { await pause() }
-        case .paused: Task { await resume() }
-        case .starting, .stopping: break   // a press while Notes connects or finishes does nothing
-        case .idle, .stopped, .error:
-            guard !fieldFocused else { return false }
-            guard !isActive else { return true }
-            Task { await keyRecordOrStop() }
+    /// The dictation key on the Notes tab, routed like the Mac's Notes window (`NotesHotkeyRouter`): a press records
+    /// (the note on screen, else a new one), the next pauses and the next resumes; Stop is ⌘⇧R or the button. A focused
+    /// field (the editor, the title, search) does not change that, as on the Mac, where the Notes window takes the key
+    /// whatever has focus in it. A dictation already under way keeps the key. Returns false when the key is not Notes'.
+    func hotkeyPress(dictationActive: Bool) -> Bool {
+        guard case .notes(let action) = NotesHotkeyRouter.route(notesFrontmost: notesTabShown, dictationActive: dictationActive,
+                                                                notes: captureState) else { return false }
+        switch action {
+        case .start: if !isActive { Task { await keyRecordOrStop() } }
+        case .stop: Task { await stop() }
+        case .togglePause: if captureState == .paused { Task { await resume() } } else { Task { await pause() } }
+        case .ignore: break   // a press while Notes connects or finishes does nothing
         }
         return true
     }

@@ -52,7 +52,7 @@ final class HardwareShortcutController: ObservableObject {
 
     /// Opens Dictate for a dictation with no field to land in.
     var showDictate: (() -> Void)?
-    /// Offers a press to Notes first (with whether a text field has focus); true when Notes took it.
+    /// Offers a press to Notes first (with whether a dictation is under way); true when Notes took it.
     var notesKey: ((Bool) -> Bool)?
 
     private weak var model: SessionCoordinator?
@@ -208,10 +208,11 @@ final class HardwareShortcutController: ObservableObject {
         }
     }
 
-    /// A press with no dictation under way goes to Notes when the Notes tab is on screen (record, pause, resume).
+    /// A press goes to Notes when the Notes tab is on screen (record, pause, resume), whatever field has focus, as in
+    /// the Mac's Notes window; a dictation under way keeps the key.
     private func notesTook() -> Bool {
-        guard !active, !busy, let notesKey else { return false }
-        return notesKey(Self.focusedField() != nil)
+        guard let notesKey else { return false }
+        return notesKey(active || busy)
     }
 
     private func start() {

@@ -173,6 +173,12 @@ struct HardwareShortcutValidationTests {
         #expect(reason(0x28, .command) == .inUse("Start Dictation"))
         #expect(reason(0x37, .command) == .inUse("Cancel Dictation"))
         #expect(reason(0x1F, .command) == .inUse("Dictate"))
+        #expect(reason(e, [.command, .shift]) == .inUse("Edit by voice"))
+        #expect(reason(0x1D, [.control, .option]) == .inUse("Use Raw Transcript"))
+        #expect(reason(0x0E, [.command, .shift]) == .inUse("the keyboard session"))
+        #expect(reason(0x11, [.control, .option]) == .inUse("New note and record"))
+        let bindings = HardwareShortcutValidation.chirpShortcuts.map { "\($0.key)-\($0.modifiers.rawValue)" }
+        #expect(Set(bindings).count == bindings.count, "two Chirp shortcuts share keys")
         for rejection in [HardwareShortcutValidation.Rejection.noModifier, .shiftOnly, .shiftAlone, .escape, .reserved("x"), .inUse("y")] {
             #expect(!rejection.reason.isEmpty)
         }
