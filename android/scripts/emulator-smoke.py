@@ -236,7 +236,9 @@ def typing_check():
 
 def crash_check():
     crash = adb('logcat', '-b', 'crash', '-d').decode(errors='replace')
-    assert not re.search(r'dev\.chirp\.|Process: dev\.chirp\.android|>>> dev\.chirp\.android <<<', crash), 'Chirp crash in release'
+    # The app's own frames and process only: the UI probe (dev.chirp.smoke.UiHierarchy) logs its failed lookups here
+    # too, and an earlier check's probe crash on the same emulator made release fail with "Chirp crash".
+    assert not re.search(r'dev\.chirp\.android', crash), 'Chirp crash in release'
 
 
 def main():
