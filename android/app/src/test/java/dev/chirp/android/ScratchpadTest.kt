@@ -92,7 +92,8 @@ class ScratchpadTest {
         val rig = Rig(context); screen(rig)
         mic().assertIsEnabled()
         compose.onNodeWithText("Tap the mic to dictate").assertExists()
-        compose.onNodeWithContentDescription("Copy").assertIsNotEnabled(); compose.onNodeWithContentDescription("Share").assertIsNotEnabled()
+        // Copy, Share and Save as note appear under the text once there is some, as on iOS.
+        compose.onNodeWithText("Copy").assertDoesNotExist(); compose.onNodeWithText("Share").assertDoesNotExist()
         compose.onNodeWithText("Nothing is saved. This text is gone when you leave.").assertExists()
     }
 
@@ -115,8 +116,18 @@ class ScratchpadTest {
         assertTrue(rig.wire.closed)
         compose.onNodeWithText("Finished").assertExists()
         compose.onNodeWithText("hello wor").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Copy").assertIsEnabled(); compose.onNodeWithContentDescription("Share").assertIsEnabled()
+        compose.onNodeWithText("Copy").assertIsEnabled(); compose.onNodeWithText("Share").assertIsEnabled()
+        compose.onNodeWithText("Before clean-up").assertDoesNotExist()
         assertTrue(rig.capture.released)
+    }
+
+    @Test fun `Cancel under the mic discards the utterance and the clock runs while listening`() {
+        val rig = Rig(context); screen(rig)
+        mic().performClick(); rig.wire.ready(); compose.waitForIdle()
+        compose.onNodeWithText("0:00", substring = true).assertExists()
+        compose.onNodeWithText("Cancel").performClick(); compose.waitForIdle()
+        assertFalse(rig.model.active)
+        compose.onNodeWithText("Cancel").assertDoesNotExist()
     }
 
     @Test fun `text stays editable while idle and is read only while dictating`() {
@@ -176,7 +187,10 @@ class ScratchpadTest {
     @Test fun `cleaned final reports it and an unavailable clean-up keeps the original`() {
         val rig = Rig(context); screen(rig)
         rig.speak(); rig.wire.final("Clean text.", "clean uh text", corrected = true); compose.waitForIdle()
-        compose.onNodeWithText("Finished").assertExists(); assertEquals("Clean text.", rig.model.field.text)
+        compose.onNodeWithText("Polished").assertExists(); assertEquals("Clean text.", rig.model.field.text)
+        // The words before clean-up, behind a disclosure.
+        compose.onNodeWithText("Before clean-up").performClick()
+        compose.onNodeWithText("clean uh text").assertExists()
         rig.speak(); rig.wire.event(ServerEvent.Final("Raw text.", "raw text", false, "unavailable")); compose.waitForIdle()
         compose.onNodeWithText("Kept what was heard").assertExists()
     }
@@ -319,10 +333,8 @@ class ScratchpadTest {
 
     @Test fun `save as note puts the whole text into the notes library once`() {
         val rig = Rig(context); screen(rig)
-        compose.onNodeWithContentDescription("More options").performClick()
-        compose.onNodeWithText("Save as note").assertIsNotEnabled()
+        compose.onNodeWithText("Save as note").assertDoesNotExist()
         rig.model.field = TextFieldValue("Whole page of dictated text."); compose.waitForIdle()
-        compose.onNodeWithContentDescription("More options").performClick()
         compose.onNodeWithText("Save as note").performClick()
         compose.waitUntil(5000) { rig.notes!!.entries().isNotEmpty() }
         assertEquals(listOf("Whole page of dictated text."), rig.notes!!.entries().map { it.title })
@@ -333,7 +345,6 @@ class ScratchpadTest {
     @Test fun `save as note says so when the library is off`() {
         val rig = Rig(context, notes = NotesSessions(context, SoftwareHistoryKeys()).also { it.disable() }); screen(rig)
         rig.model.field = TextFieldValue("Text with nowhere to go."); compose.waitForIdle()
-        compose.onNodeWithContentDescription("More options").performClick()
         compose.onNodeWithText("Save as note").performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("Notes are off — turn on Keep notes on this phone in Settings → Notes").fetchSemanticsNodes().isNotEmpty() }
         assertTrue(rig.notes!!.entries().isEmpty())

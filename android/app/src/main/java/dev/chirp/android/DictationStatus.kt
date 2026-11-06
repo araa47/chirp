@@ -83,6 +83,7 @@ internal enum class StatusLine(
     COPIED(R.string.status_copied),
     PAD_IDLE(R.string.status_pad_idle),
     PAD_FINISHED(R.string.status_finished),
+    PAD_POLISHED(R.string.status_pad_polished, positive = true),
     PAD_KEPT(R.string.status_kept_heard),
     STOP_FIRST(R.string.status_stop_first),
     NOTE_SAVED(R.string.status_note_saved),

@@ -40,10 +40,11 @@ credential or personal text is included.
   `pair-{failed,checking,connected}-*`: the four-page wizard. The welcome page carries the approved full-bleed
   pond art edge to edge and introduces Notes as well as dictation; every page keeps one koi primary button and
   the segmented progress. Rendered by `VoiceUiTest`.
-- `scratchpad-{idle,listening,text}-{light,dark}.png`: the Scratchpad as a borderless blank page — Copy/Share
-  in the top bar, "Save as note" and Clear in the overflow, the style choices as one connected group above the
-  large mic (Ripple rings while listening, Stop in `record`), and the one privacy line only while the page is
-  blank. Rendered by `ScratchpadRenderTest` with animator scale 0 (the settled ripple).
+- `scratchpad-{idle,listening,use-raw,text}-{light,dark}.png`: the Scratchpad laid out like iOS's Dictate tab — the
+  text on a white card over the pond background, Copy · Share · Save as note (and Use raw while offered) under it,
+  the status line in `record` with its clock while listening and "Polished" with a **Before clean-up** disclosure
+  after clean-up, Cancel under the large mic, and the one privacy line only while the page is blank. Rendered by
+  `ScratchpadRenderTest` with animator scale 0 (the settled ripple).
 
 Regenerate the Robolectric artifacts from `android/`:
 

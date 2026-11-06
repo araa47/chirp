@@ -102,8 +102,14 @@ internal class ScratchpadModel(
         val words = rawWords ?: return
         field = ScratchpadText.insert(before, words, store.spokenCommands)
         rawHistoryId?.let { id -> io { history.usedRaw(id) } }
-        clearRaw(); status = StatusLine.PAD_KEPT
+        clearRaw(); beforeCleanup = null; status = StatusLine.USED_RAW
     }
+    /** The last final's words before clean-up changed them, for the "Before clean-up" view (iOS Dictate); memory only. */
+    var beforeCleanup by mutableStateOf<String?>(null)
+        private set
+    /** When the current utterance started listening (elapsedRealtime), for the status clock; null otherwise. */
+    var listeningSince by mutableStateOf<Long?>(null)
+        private set
     private fun clearRaw() { rawBase = null; rawInserted = null; rawWords = null; rawUntil = null; rawHistoryId = null }
     var field by mutableStateOf(TextFieldValue(""))
     var status by mutableStateOf<DictationStatus>(StatusLine.PAD_IDLE)
@@ -143,6 +149,7 @@ internal class ScratchpadModel(
     private fun sync() {
         val current = session
         active = current != null; stopping = current?.stopping == true; polishing = current?.polishing == true
+        if (!active || stopping) listeningSince = null
     }
     private fun tailscaleStatus(paired: Pairing): DictationStatus? = when {
         !TailscaleControl.routes(paired.base) -> null
@@ -168,7 +175,7 @@ internal class ScratchpadModel(
 
     fun start() {
         if (active) return
-        clearRaw()
+        clearRaw(); beforeCleanup = null
         if (!micGranted()) { status = StatusLine.ALLOW_MICROPHONE; return }
         val paired = pairing().also { this.paired = it != null } ?: run { status = StatusLine.NOT_PAIRED; return }
         privateUtterance = PrivateSession.enabled
@@ -183,6 +190,7 @@ internal class ScratchpadModel(
                 status = if (text == ConnectionFailure.Kind.OTHER) tailscaleStatus(paired) ?: text else text
                 if (event != null) partial = event.text
                 sync()
+                if (text == StatusLine.LISTENING && listeningSince == null) listeningSince = android.os.SystemClock.elapsedRealtime()
             },
             level = { level = it },
             retention = { retained = it; store.health = store.health?.copy(debugRetention = it) },
@@ -197,7 +205,9 @@ internal class ScratchpadModel(
                     rawUntil = deadline
                     scope.launch { kotlinx.coroutines.delay(5000); if (rawUntil == deadline) clearRaw() }
                 }
-                status = if (result.correctionError != null) StatusLine.PAD_KEPT else StatusLine.PAD_FINISHED
+                val polished = result.corrected && result.raw != result.text
+                beforeCleanup = result.raw.takeIf { polished }
+                status = if (result.correctionError != null) StatusLine.PAD_KEPT else if (polished) StatusLine.PAD_POLISHED else StatusLine.PAD_FINISHED
             },
             ended = { session = null; partial = ""; level = 0.0; sync(); client?.let(ChirpNetwork::release) },
         )
@@ -214,7 +224,7 @@ internal class ScratchpadModel(
     fun pause() { if (active && !stopping) cancel() }
 
     fun clear() {
-        if (!active) { clearRaw(); field = TextFieldValue(""); status = StatusLine.PAD_IDLE }
+        if (!active) { clearRaw(); beforeCleanup = null; field = TextFieldValue(""); status = StatusLine.PAD_IDLE }
     }
 
     /** Text handed over by the floating mic's "Open in Scratchpad": it becomes the page, or a new paragraph after what is there. */
