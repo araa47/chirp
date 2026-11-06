@@ -66,6 +66,7 @@
     <string name="notes_connection_computer">Computer</string>
     <string name="notes_connection_phone">Phone</string>
     <string name="notes_connection_offline">Offline</string>
+    <string name="notes_connection_not_paired">Not paired</string>
 
     <!-- Setup status line (SetupState.status). -->
     <string name="setup_status_initial">Pair with your computer to begin</string>

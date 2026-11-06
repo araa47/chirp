@@ -33,5 +33,6 @@ internal data class NotesConnectionStatus(@StringRes val label: Int, val connect
 internal fun notesConnectionStatus(paired: Boolean, reachable: Boolean?, tailscaleOff: Boolean, phone: Boolean) = when {
     paired && reachable != false && !tailscaleOff -> NotesConnectionStatus(R.string.notes_connection_computer, true)
     !paired && phone -> NotesConnectionStatus(R.string.notes_connection_phone, false)
+    !paired -> NotesConnectionStatus(R.string.notes_connection_not_paired, false)
     else -> NotesConnectionStatus(R.string.notes_connection_offline, false)
 }

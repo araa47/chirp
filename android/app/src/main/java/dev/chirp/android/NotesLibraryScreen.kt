@@ -67,6 +67,9 @@ internal fun notesGroup(now: Long, time: Long, zone: ZoneId = ZoneId.systemDefau
     }
 }
 
+/** Days until a note in Recently Deleted is deleted for good: 30 after it was deleted, never negative (iOS `RecentlyDeletedCopy`). */
+internal fun notesDaysLeft(deletedAt: Long, now: Long): Int = (NotesSessions.TRASH_DAYS - ((now - deletedAt).coerceAtLeast(0) / 86_400_000L).toInt()).coerceAtLeast(0)
+
 @Composable
 internal fun notesDuration(seconds: Double): String {
     val count = if (seconds < 60) seconds.toInt().coerceAtLeast(0) else (seconds / 60).toInt()
@@ -120,6 +123,10 @@ internal fun NotesLibraryScreen(
     var selected by rememberSaveable { mutableStateOf(if (initialDetail) live.document.uid else null) }
     var trash by rememberSaveable { mutableStateOf(false) }
     var selection by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    // Select mode from the ⋮ menu stays on with nothing chosen yet; a long-press enters it with that row chosen.
+    var picking by rememberSaveable { mutableStateOf(false) }
+    val selecting = picking || selection.isNotEmpty()
+    fun clearSelection() { selection = emptyList(); picking = false }
     var setupDismissed by rememberSaveable { mutableStateOf(SettingsStore(context).tryItDismissed) }
     var enabled by remember { mutableStateOf(library?.enabled == true) }
     var menu by remember { mutableStateOf(false) }
@@ -166,15 +173,15 @@ internal fun NotesLibraryScreen(
     fun open(id: String) { focus.clearFocus(); reader.keepSession(); selected = id }
     fun close() { shownModel.keepSession(); selected = null }
     BackHandler(selected != null) { close() }
-    BackHandler(trash) { trash = false; selection = emptyList() }
-    BackHandler(selection.isNotEmpty()) { selection = emptyList() }
+    BackHandler(trash) { trash = false; clearSelection() }
+    BackHandler(selecting) { clearSelection() }
     fun delete(ids: List<String>) {
         val deletable = ids.filterNot { recording && it == liveId }
         if (deletable.isEmpty()) return
         deletable.forEach { RetranscribeGate.owner?.cancelRetranscribeFor(it); RetranscribeGate.rebuilds.remove(it) }
         if (selected in deletable) close()
         reader.keepSession(); live.keepSession()
-        selection = emptyList()
+        clearSelection()
         scope.launch {
             val deleted = withContext(Dispatchers.IO) { deletable.filter { library?.trash(it) == true } }
             if (deleted.isEmpty()) return@launch
@@ -195,7 +202,7 @@ internal fun NotesLibraryScreen(
     }
     fun newNote() {
         focus.clearFocus(); reader.newNote()
-        trash = false; selection = emptyList(); query = ""
+        trash = false; clearSelection(); query = ""
         selected = reader.document.uid; typedSelection = selected
     }
     AppShortcutActions(
@@ -207,7 +214,7 @@ internal fun NotesLibraryScreen(
                 pendingNew || pendingRecord != null -> { pendingNew = false; pendingRecord = null; true }
                 emptyTrash -> { emptyTrash = false; true }
                 menu -> { menu = false; true }
-                selection.isNotEmpty() -> { selection = emptyList(); true }
+                selecting -> { clearSelection(); true }
                 trash -> { trash = false; true }
                 selected != null -> { close(); true }
                 else -> false
@@ -237,7 +244,7 @@ internal fun NotesLibraryScreen(
         dismissButton = { TextButton({ pendingNew = false; pendingRecord = null }) { Text(stringResource(R.string.notes_action_cancel)) } })
     if (emptyTrash) AlertDialog(onDismissRequest = { emptyTrash = false }, title = { Text(stringResource(R.string.notes_library_empty_trash_title)) },
         text = { Text(stringResource(R.string.notes_library_empty_trash_message)) },
-        confirmButton = { TextButton({ emptyTrash = false; scope.launch { withContext(Dispatchers.IO) { library?.emptyTrash() } }; selection = emptyList() }) { Text(stringResource(R.string.notes_library_delete_permanently)) } },
+        confirmButton = { TextButton({ emptyTrash = false; scope.launch { withContext(Dispatchers.IO) { library?.emptyTrash() } }; clearSelection() }) { Text(stringResource(R.string.notes_library_delete_permanently)) } },
         dismissButton = { TextButton({ emptyTrash = false }) { Text(stringResource(R.string.notes_action_cancel)) } })
     val shown = if (trash) rows.filter { it.deleted && (query.isBlank() || it.title.contains(query.trim(), true) || it.snippet.contains(query.trim(), true)) }
         else if (query.isNotBlank()) hits.map { it.entry } else rows.filterNot { it.deleted }
@@ -251,19 +258,18 @@ internal fun NotesLibraryScreen(
                 listPane = { AnimatedPane(Modifier.preferredWidth(320.dp)) {
                     Scaffold(containerColor = MaterialTheme.colorScheme.background, modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                         topBar = { Column {
-                            LargeTopAppBar(title = { Text(if (selection.isNotEmpty()) pluralStringResource(R.plurals.notes_library_selected, selection.size, selection.size) else stringResource(if (trash) R.string.notes_library_trash else R.string.notes_library_title),
-                                fontFamily = if (selection.isEmpty()) FontFamily.Serif else FontFamily.Default, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                navigationIcon = { if (trash || selection.isNotEmpty()) IconButton({ if (selection.isNotEmpty()) selection = emptyList() else trash = false }) {
-                                    Icon(painterResource(if (selection.isNotEmpty()) R.drawable.ic_close else R.drawable.ic_arrow_back), stringResource(if (selection.isNotEmpty()) R.string.notes_library_clear_selection else R.string.notes_library_back)) } },
+                            LargeTopAppBar(title = { Text(if (selecting) pluralStringResource(R.plurals.notes_library_selected, selection.size, selection.size) else stringResource(if (trash) R.string.notes_library_trash else R.string.notes_library_title),
+                                fontFamily = if (!selecting) FontFamily.Serif else FontFamily.Default, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                navigationIcon = { if (trash || selecting) IconButton({ if (selecting) clearSelection() else trash = false }) {
+                                    Icon(painterResource(if (selecting) R.drawable.ic_close else R.drawable.ic_arrow_back), stringResource(if (selecting) R.string.notes_library_clear_selection else R.string.notes_library_back)) }
+                                    // The connection chip leads the bar, as on iOS; the library's actions sit in the dock below.
+                                    else ConnectionChip(state, connection) },
                                 actions = {
-                                    if (selection.isNotEmpty()) {
-                                        if (trash) TextButton({ val ids = selection; selection = emptyList(); scope.launch { withContext(Dispatchers.IO) { ids.forEach { library?.restore(it) } } } }) { Text(stringResource(R.string.notes_library_restore)) }
-                                        else IconButton({ delete(selection) }) { Icon(painterResource(R.drawable.ic_delete), stringResource(R.string.notes_library_delete_selected)) }
-                                    } else {
-                                        if (!trash) {
-                                            IconButton(::newNote) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.notes_library_new_note)) }
-                                            ConnectionChip(state, connection)
-                                        }
+                                    if (selecting) {
+                                        if (trash) TextButton(enabled = selection.isNotEmpty(), onClick = { val ids = selection; clearSelection(); scope.launch { withContext(Dispatchers.IO) { ids.forEach { library?.restore(it) } } } }) { Text(stringResource(R.string.notes_library_restore)) }
+                                        else IconButton({ delete(selection) }, enabled = selection.isNotEmpty()) { Icon(painterResource(R.drawable.ic_delete), stringResource(R.string.notes_library_delete_selected)) }
+                                    } else if (!trash) {
+                                        // Recently Deleted has no ⋮: Empty Recently Deleted sits under its rows, as on iOS.
                                         Box {
                                             IconButton({ menu = true }) { Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.notes_library_options)) }
                                             DropdownMenu(menu, { menu = false }) {
@@ -271,9 +277,14 @@ internal fun NotesLibraryScreen(
                                                 if (!trash && recording) DropdownMenuItem({ Column { Text(stringResource(R.string.notes_library_record_new)); Text(stringResource(R.string.notes_library_record_new_detail),
                                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
                                                     { menu = false; start(null) }, leadingIcon = { Icon(painterResource(R.drawable.ic_record), null) })
-                                                if (!trash) DropdownMenuItem({ Text(stringResource(R.string.notes_library_trash)) }, { menu = false; trash = true; selected = null; selection = emptyList() },
+                                                if (!trash) DropdownMenuItem({ Text(stringResource(R.string.notes_library_trash)) }, { menu = false; trash = true; selected = null; clearSelection() },
                                                     leadingIcon = { Icon(painterResource(R.drawable.ic_delete), null) })
-                                                else DropdownMenuItem({ Text(stringResource(R.string.notes_library_empty_trash)) }, { menu = false; emptyTrash = true }, enabled = shown.isNotEmpty())
+                                                // Long-press a row does the same; the menu makes choosing several notes discoverable.
+                                                if (!trash) DropdownMenuItem({ Text(stringResource(R.string.notes_library_select)) }, { menu = false; selected = null; picking = true },
+                                                    enabled = shown.isNotEmpty(), leadingIcon = { Icon(painterResource(R.drawable.ic_check_circle), null) })
+                                                if (!trash) DropdownMenuItem({ Text(stringResource(R.string.notes_editor_settings)) }, { menu = false
+                                                    context.startActivity(android.content.Intent(context, SetupActivity::class.java).putExtra("section", "notes")) },
+                                                    leadingIcon = { Icon(painterResource(R.drawable.ic_settings), null) })
                                             }
                                         }
                                     }
@@ -284,21 +295,25 @@ internal fun NotesLibraryScreen(
                                 trailingIcon = if (query.isEmpty()) null else ({ IconButton({ query = "" }) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.notes_library_clear_search)) } })) },
                                 expanded = false, onExpandedChange = {}, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)) { }
                         } },
-                        floatingActionButton = { if (!trash && selection.isEmpty()) FlowRow(Modifier.widthIn(max = width - 32.dp).onSizeChanged { captureHeight = it.height },
+                        floatingActionButton = { if (!trash && !selecting) FlowRow(Modifier.widthIn(max = width - 32.dp).onSizeChanged { captureHeight = it.height },
                             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                            SmallFloatingActionButton(dictate, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.onSurface,
+                            // The dock matches iOS: New note and Dictate as quiet koi circles, then Record as the one strong capsule.
+                            val quiet = MaterialTheme.colorScheme.primaryContainer
+                            SmallFloatingActionButton(::newNote, shape = CircleShape, containerColor = quiet, contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                elevation = FloatingActionButtonDefaults.elevation(0.dp)) { Icon(painterResource(R.drawable.ic_edit), stringResource(R.string.notes_library_new_note)) }
+                            SmallFloatingActionButton(dictate, shape = CircleShape, containerColor = quiet, contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp)) { Icon(painterResource(R.drawable.ic_mic), stringResource(R.string.notes_library_dictate)) }
                             // The strongest affordance follows the microphone: Record when idle; while a note holds it, open that note — never silently stop it.
                             ExtendedFloatingActionButton(onClick = { if (recording) open(liveId) else start(null) },
-                                icon = { Icon(painterResource(if (recording) R.drawable.ic_note else R.drawable.ic_record), null) },
+                                icon = { Icon(painterResource(if (recording) R.drawable.ic_note else R.drawable.ic_record_circle), null) },
                                 text = { Text(stringResource(if (!recording) R.string.notes_library_record else if (live.paused) R.string.notes_library_open_paused else R.string.notes_library_open_recording)) },
-                                modifier = Modifier.semantics { contentDescription = primaryDescription },
+                                modifier = Modifier.semantics { contentDescription = primaryDescription }, shape = CircleShape,
                                 containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary, elevation = FloatingActionButtonDefaults.elevation(0.dp))
                         } },
                     ) { padding ->
                         // Reserve the actual controls, including a wrapped action row at large text sizes.
                         val largeText = LocalDensity.current.fontScale >= 1.5f
-                        val captureInset = if (!trash && selection.isEmpty()) with(LocalDensity.current) { captureHeight.toDp() } + 16.dp else 0.dp
+                        val captureInset = if (!trash && !selecting) with(LocalDensity.current) { captureHeight.toDp() } + 16.dp else 0.dp
                         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(bottom = captureInset).testTag("notes-library-list"), if (trash) trashList else list,
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)) {
                             // Pinned in the list flow, not the top bar: it stays in reach while scrolling and never
@@ -306,7 +321,7 @@ internal fun NotesLibraryScreen(
                             val recordingHeader: @Composable () -> Unit = {
                                 Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(bottom = 12.dp)) {
                                     Text(stringResource(if (live.paused) R.string.notes_library_section_paused else R.string.notes_library_section_recording), Modifier.padding(start = 8.dp, bottom = 8.dp),
-                                        style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Serif)
+                                        style = ChirpTokens.sectionHeader, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     RecordingNoteCard(live, { open(liveId) })
                                 }
                             }
@@ -328,20 +343,26 @@ internal fun NotesLibraryScreen(
                                     }
                                 }
                             }
-                            if (trash) item(key = "trash-info") { Text(stringResource(R.string.notes_library_trash_info),
-                                Modifier.padding(horizontal = 8.dp, vertical = 16.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             val grouped = shown.filterNot { !trash && recording && it.id == liveId }.groupBy { if (trash) deletedGroup else notesGroup(currentTime, it.updatedAt) }
                             grouped.forEach { (group, entries) ->
-                                item(key = "group-$group") { Text(group.text(), Modifier.padding(start = 8.dp, top = 24.dp, bottom = 8.dp).semantics { heading() },
-                                    style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Serif, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                if (!trash) item(key = "group-$group") { Text(group.text(), Modifier.padding(start = 8.dp, top = 24.dp, bottom = 8.dp).semantics { heading() },
+                                    style = ChirpTokens.sectionHeader, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 items(entries, key = { "${if (trash) "trash" else "note"}-${it.id}-$restoreVersion" }) { entry ->
                                     val select = {
                                         selection = if (entry.id in selection) selection - entry.id else selection + entry.id
                                     }
                                     NoteLibraryRow(entry, query, hits.firstOrNull { it.entry.id == entry.id }?.snippet ?: entry.snippet,
-                                        selected == entry.id || entry.id in selection, selection.isNotEmpty(), trash,
-                                        click = { if (trash || selection.isNotEmpty()) select() else open(entry.id) }, longClick = select,
+                                        selected == entry.id || entry.id in selection, selecting, trash,
+                                        click = { if (trash || selecting) select() else open(entry.id) }, longClick = select,
                                         delete = { delete(listOf(entry.id)) }, restore = { scope.launch { withContext(Dispatchers.IO) { library?.restore(entry.id) } } }, now = currentTime)
+                                }
+                            }
+                            if (trash && shown.isNotEmpty()) item(key = "trash-info") {
+                                Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                                    Text(stringResource(R.string.notes_library_trash_info), Modifier.padding(horizontal = 8.dp),
+                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (!selecting) TextButton({ emptyTrash = true }, Modifier.padding(top = 16.dp).heightIn(min = 48.dp),
+                                        colors = ButtonDefaults.textButtonColors(contentColor = LocalChirpRoles.current.record)) { Text(stringResource(R.string.notes_library_empty_trash)) }
                                 }
                             }
                             if (shown.isEmpty() && !(recording && !trash && query.isBlank()) && (query.isBlank() || searched == query)) item(key = "empty") {
@@ -400,19 +421,26 @@ private fun ConnectionChip(state: SetupState?, click: () -> Unit) {
     val label = stringResource(status.label)
     val color = if (status.connected) LocalChirpRoles.current.lily else MaterialTheme.colorScheme.onSurfaceVariant
     val description = stringResource(R.string.notes_library_connection, label)
-    AssistChip(click, label = { Text(label) }, leadingIcon = { Box(Modifier.size(7.dp).clip(CircleShape).background(color)) },
-        modifier = Modifier.semantics { contentDescription = description },
-        colors = AssistChipDefaults.assistChipColors(labelColor = color), border = AssistChipDefaults.assistChipBorder(true))
+    TextButton(click, Modifier.padding(start = 4.dp).heightIn(min = 48.dp).semantics { contentDescription = description },
+        contentPadding = PaddingValues(horizontal = 8.dp), colors = ButtonDefaults.textButtonColors(contentColor = color)) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Text(label, Modifier.padding(start = 6.dp), style = MaterialTheme.typography.titleSmall)
+    }
 }
 
 @Composable
 private fun SetupCard(progress: dev.chirp.android.shell.SetupProgress, fix: () -> Unit, dismiss: () -> Unit) {
-    Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
-        Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp), verticalAlignment = Alignment.Top) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), shape = ChirpTokens.group, color = scheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, scheme.surfaceContainer)) {
+        Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 16.dp, end = 4.dp), verticalAlignment = Alignment.Top) {
+            // At large text the glyph gives its column to the words, as on iOS.
+            if (LocalDensity.current.fontScale < 1.5f) Icon(painterResource(R.drawable.ic_chirp_notification), null, Modifier.padding(top = 10.dp, end = 12.dp).size(28.dp), tint = scheme.primary)
             Column(Modifier.weight(1f).padding(top = 8.dp)) {
                 Text(stringResource(R.string.notes_library_setup_title), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.notes_library_setup_next, stringResource(progress.missing!!.next)), Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(fix, contentPadding = PaddingValues(vertical = 8.dp)) { Text(stringResource(progress.missing!!.action)) }
+                Text(stringResource(R.string.notes_library_setup_next, stringResource(progress.missing!!.next)), Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                FilledTonalButton(fix, Modifier.padding(top = 12.dp), colors = ButtonDefaults.filledTonalButtonColors(containerColor = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer)) {
+                    Text(stringResource(progress.missing!!.action))
+                }
             }
             IconButton(dismiss) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.notes_library_setup_dismiss)) }
         }
@@ -432,7 +460,10 @@ internal fun LibraryEmpty(title: String, body: String, glyph: Boolean, modifier:
         Text(title, Modifier.padding(top = 16.dp), style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif), textAlign = TextAlign.Center)
         Text(body, Modifier.widthIn(max = 290.dp).padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         actions()
-        if (glyph && title == stringResource(R.string.notes_library_blank_title)) Text(stringResource(R.string.notes_library_blank_footer), Modifier.padding(top = 24.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (glyph && title == stringResource(R.string.notes_library_blank_title)) Row(Modifier.padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(painterResource(R.drawable.ic_lock), null, Modifier.padding(end = 6.dp).size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.notes_library_blank_footer), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -449,7 +480,7 @@ private fun RecordingNoteCard(model: NotesModel, click: () -> Unit) {
     val state = captureState(model)
     Surface(Modifier.fillMaxWidth().combinedClickable(onClickLabel = stringResource(if (paused) R.string.notes_library_open_paused_recording else R.string.notes_library_open_the_recording), onClick = click)
         .semantics(mergeDescendants = true) { role = Role.Button; stateDescription = state },
-        shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
+        shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (paused) Icon(painterResource(R.drawable.ic_pause), null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -457,8 +488,9 @@ private fun RecordingNoteCard(model: NotesModel, click: () -> Unit) {
                 else Ripple(0f, Modifier.size(28.dp).clearAndSetSemantics { }, animate = false)
                 Text(model.displayTitle, Modifier.weight(1f), fontFamily = FontFamily.Serif, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Text(stringResource(R.string.notes_library_recording_state, state, model.elapsedText.text()), style = ChirpTokens.timer,
+            if (paused) Text(stringResource(R.string.notes_library_recording_state, state, model.elapsedText.text()), style = ChirpTokens.timer,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else Text(model.elapsedText.text(), style = ChirpTokens.timer, color = LocalChirpRoles.current.record)
             Text(preview.ifBlank { stringResource(if (paused) R.string.notes_library_preview_paused else R.string.notes_library_preview_recording) }, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -479,31 +511,43 @@ private fun NoteLibraryRow(entry: NotesIndexEntry, query: String, snippet: Strin
         backgroundContent = { Box(Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(scheme.errorContainer).padding(20.dp), Alignment.CenterEnd) {
             Icon(painterResource(R.drawable.ic_delete), stringResource(R.string.notes_library_delete_note), tint = scheme.onErrorContainer)
         } }) {
-        Surface(shape = RoundedCornerShape(10.dp), color = if (selected) scheme.secondaryContainer else scheme.surface,
+        Surface(shape = RoundedCornerShape(10.dp), color = if (selected) scheme.primaryContainer else scheme.surface,
             modifier = Modifier.fillMaxWidth().testTag("note-library-row").combinedClickable(onClick = click, onLongClick = longClick).semantics(mergeDescendants = true) {
                 if (selecting) { role = Role.Checkbox; stateDescription = selectedState }
                 customActions = if (trash) listOf(CustomAccessibilityAction(restoreLabel) { restore(); true }) else listOf(CustomAccessibilityAction(deleteLabel) { delete(); true }, CustomAccessibilityAction(selectLabel) { longClick(); true })
-            }.then(if (selected && !selecting) Modifier.border(1.5.dp, scheme.secondary, RoundedCornerShape(10.dp)) else Modifier)) {
+            }) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (selecting) { Checkbox(selected, null); Spacer(Modifier.width(12.dp)) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // The title takes the whole row; age and facts wrap below, so narrow screens and 200% text never squeeze it.
-                    Text(highlightedNote(entry.title, query), fontFamily = FontFamily.Serif, style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(highlightedNote(snippet, query), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(historyAge(LocalResources.current, now, entry.updatedAt).first, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                        if (entry.duration >= 1) Text(notesDuration(entry.duration), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                        if (entry.openTodos > 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(painterResource(R.drawable.ic_checklist), null, Modifier.size(18.dp), tint = scheme.onSurfaceVariant)
-                            Text(pluralStringResource(R.plurals.notes_library_open_tasks, entry.openTodos, entry.openTodos), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                        }
-                        if (entry.recovered) Text(stringResource(R.string.notes_library_recovered), style = MaterialTheme.typography.bodyMedium, color = LocalChirpRoles.current.moon)
-                        if (RetranscribeGate.progress?.noteId == entry.id) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                        else if (entry.audioBytes > 0) Icon(painterResource(R.drawable.ic_mic), stringResource(R.string.notes_library_kept_audio), Modifier.size(14.dp), tint = scheme.onSurfaceVariant)
+                    val age = if (trash) entry.deletedAt?.let { pluralStringResource(R.plurals.notes_library_days_left, notesDaysLeft(it, now), notesDaysLeft(it, now)) }
+                        else historyAge(LocalResources.current, now, entry.updatedAt).first
+                    val title = @Composable { modifier: Modifier -> Text(highlightedNote(entry.title, query), modifier, fontFamily = FontFamily.Serif,
+                        style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    // As on iOS: the age sits at the end of the title line; at large text it moves under the title so the title is never squeezed.
+                    if (trash || LocalDensity.current.fontScale >= 1.5f) title(Modifier)
+                    else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        title(Modifier.weight(1f))
+                        Text(age.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 1)
                     }
+                    Text(highlightedNote(snippet, query), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    // "3 min · ☐ 2 open", then Recovered and the kept-audio mark: iOS's footnote meta line.
+                    val meta = MaterialTheme.typography.bodySmall
+                    val facts = buildList {
+                        if (trash || LocalDensity.current.fontScale >= 1.5f) age?.let { add(it) }
+                        if (!trash && entry.duration >= 1) add(notesDuration(entry.duration))
+                        if (!trash && entry.openTodos > 0) add(pluralStringResource(R.plurals.notes_library_open_tasks, entry.openTodos, entry.openTodos))
+                    }
+                    val retranscribing = !trash && RetranscribeGate.progress?.noteId == entry.id
+                    if (facts.isNotEmpty() || entry.recovered || retranscribing || (!trash && entry.audioBytes > 0))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                            if (facts.isNotEmpty()) Text(facts.joinToString(" · "), style = meta, color = scheme.onSurfaceVariant)
+                            if (entry.recovered) Text(stringResource(R.string.notes_library_recovered), style = meta, color = LocalChirpRoles.current.moon)
+                            if (retranscribing) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                            else if (!trash && entry.audioBytes > 0) Icon(painterResource(R.drawable.ic_waveform), stringResource(R.string.notes_library_kept_audio), Modifier.size(14.dp), tint = scheme.onSurfaceVariant)
+                        }
                 }
-                if (trash && !selecting) TextButton(restore) { Text(restoreLabel) }
+                if (trash && !selecting) FilledTonalButton(restore, Modifier.padding(start = 12.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer)) { Text(restoreLabel) }
             }
         }
     }

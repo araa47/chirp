@@ -35,14 +35,14 @@ import java.time.ZoneOffset
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [37])
 class NotesConnectionStatusTest {
-    @Test fun `connection chip distinguishes Mac offline and phone fallback`() {
+    @Test fun `connection chip distinguishes offline, not paired and phone fallback`() {
         fun label(paired: Boolean, reachable: Boolean?, tailscaleOff: Boolean, phone: Boolean) =
             RuntimeEnvironment.getApplication().getString(notesConnectionStatus(paired, reachable, tailscaleOff, phone).label)
         assertEquals("Computer", label(true, true, false, false))
         assertTrue(notesConnectionStatus(true, true, false, false).connected)
         assertEquals("Offline", label(true, false, false, true))
         assertEquals("Offline", label(true, true, true, false))
-        assertEquals("Offline", label(false, null, false, false))
+        assertEquals("Not paired", label(false, null, false, false))
         assertEquals("Phone", label(false, null, false, true))
     }
 }
