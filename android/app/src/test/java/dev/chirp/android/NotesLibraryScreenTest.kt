@@ -198,7 +198,7 @@ class NotesLibraryScreenTest {
         displayed("Note deleted")
         trash()
         compose.onNodeWithText("Restore").performClick()
-        displayed("Nothing recently deleted")
+        displayed("Nothing in Recently Deleted")
         compose.runOnIdle { assertFalse(library.open(id)!!.entry.deleted) }
     }
 
@@ -217,6 +217,22 @@ class NotesLibraryScreenTest {
         compose.onNodeWithText("2 notes deleted").assertExists()
         assertTrue(live.model.state.active)
         compose.runOnIdle { assertTrue(library.open(id)!!.entry.deleted) }
+    }
+
+    @Test fun `Select in the menu starts choosing with nothing chosen, like iOS`() {
+        note("Garden plans", "- Buy seeds")
+        show()
+        compose.onNodeWithContentDescription("Library options").performClick()
+        compose.onNodeWithText("Notes settings").assertExists()
+        compose.onNodeWithText("Select").performClick()
+        compose.onNodeWithText("0 selected").assertExists()
+        compose.onNodeWithContentDescription("Delete selected notes").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Record new note").assertDoesNotExist()
+        open("Garden plans")
+        compose.onNodeWithText("1 selected").assertExists()
+        compose.onNodeWithContentDescription("Clear selection").performClick()
+        compose.onNodeWithText("1 selected").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Record new note").assertExists()
     }
 
     @Test fun `while a note records the primary action opens it and a new recording stays deliberate`() {
@@ -391,7 +407,7 @@ class NotesLibraryScreenTest {
         note("Ideas for the studio", "- A long table by the window\n- [ ] Find a reading lamp", 25)
         val deleted = note("An earlier draft", "A few thoughts worth returning to.", 50)
         library.trash(deleted); time = now
-        compose.onNodeWithText("0 open tasks").assertDoesNotExist()
+        compose.onNodeWithText("☐ 0 open", substring = true).assertDoesNotExist()
         compose.onNodeWithText("0 sec").assertDoesNotExist()
         val listBottom = compose.onNodeWithTag("notes-library-list").fetchSemanticsNode().boundsInRoot.bottom
         val fabTop = compose.onNodeWithContentDescription("Record new note").fetchSemanticsNode().boundsInRoot.top
@@ -436,7 +452,9 @@ class NotesLibraryScreenTest {
         shot("multi-select")
         back()
         trash(); compose.onNodeWithText("Search Recently Deleted").assertIsDisplayed(); shot("recently-deleted")
-        compose.onNodeWithContentDescription("Library options").performClick()
+        compose.onNodeWithContentDescription("Library options").assertDoesNotExist()
+        compose.onNodeWithText("28 days left", substring = true).assertExists()
+        compose.onNodeWithTag("notes-library-list").performScrollToNode(hasText("Empty Recently Deleted"))
         compose.onNodeWithText("Empty Recently Deleted").performClick()
         compose.onNodeWithText("Delete permanently").assertIsDisplayed()
         shot("empty-trash")

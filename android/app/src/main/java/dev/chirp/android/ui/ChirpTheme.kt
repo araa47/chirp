@@ -91,6 +91,8 @@ internal object ChirpTokens {
     }
     /** A note title: the device serif (spec §C), for note titles and library section headers. */
     val noteTitle = TextStyle(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif)
+    /** A library section header ("Today", "Recording"): iOS's `ChirpType.sectionHeader`, title3 serif semibold. */
+    val sectionHeader = TextStyle(fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif)
     /** Timer readouts: tabular digits, so the numbers don't jitter as they tick. */
     val timer = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, fontFeatureSettings = "tnum")
     val timerSmall = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, fontFeatureSettings = "tnum")

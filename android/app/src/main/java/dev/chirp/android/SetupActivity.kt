@@ -260,6 +260,7 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
             "input" -> openSettings(SettingsPage.HowYouDictate, outside = false)
             "try" -> { state.tryIt = true; open(ShellTab.Notes, outside = false) }
             "connection" -> openSettings(SettingsPage.Connection)
+            "notes" -> openSettings(SettingsPage.Notes)
             "network" -> { state.reachable = false; openSettings(SettingsPage.Connection) }
             "history" -> { state.historyEntry = null; open(ShellTab.History, outside = true) }
         }

@@ -248,6 +248,8 @@
     <string name="notes_library_delete_selected">Delete selected notes</string>
     <string name="notes_library_new_note">New note</string>
     <string name="notes_library_options">Library options</string>
+    <!-- Library ⋮ menu: start choosing notes to delete together (long-press a row does the same). -->
+    <string name="notes_library_select">Select</string>
     <string name="notes_library_record_new">Record new note</string>
     <string name="notes_library_record_new_detail">Stops the current recording first</string>
     <string name="notes_library_empty_trash">Empty Recently Deleted</string>
@@ -265,9 +267,14 @@
     <string name="notes_library_section_paused">Paused</string>
     <string name="notes_library_section_recording">Recording</string>
     <string name="notes_library_enable_detail">Keep your notes on this phone, automatically.</string>
-    <string name="notes_library_trash_info">Notes are kept here for 30 days. Restore them any time before then.</string>
-    <string name="notes_library_trash_empty_title">Nothing recently deleted</string>
-    <string name="notes_library_trash_empty_detail">Deleted notes appear here for 30 days.</string>
+    <string name="notes_library_trash_info">Notes are kept here for 30 days.</string>
+    <string name="notes_library_trash_empty_title">Nothing in Recently Deleted</string>
+    <string name="notes_library_trash_empty_detail">Deleted notes stay here for 30 days.</string>
+    <!-- Under a note in Recently Deleted: how long until it is deleted for good. -->
+    <plurals name="notes_library_days_left">
+        <item quantity="one">%1$d day left</item>
+        <item quantity="other">%1$d days left</item>
+    </plurals>
     <string name="notes_library_blank_title">Your notes will live here</string>
     <string name="notes_library_blank_detail">Tap New note to type, or Record to turn a conversation into notes.</string>
     <string name="notes_library_blank_footer">Notes stay on this phone.</string>
@@ -288,7 +295,7 @@
     <!-- %1$s is the capture state (Recording, Paused…), %2$s the elapsed time. -->
     <string name="notes_library_recording_state">%1$s · %2$s</string>
     <string name="notes_library_preview_paused">Resume when you’re ready.</string>
-    <string name="notes_library_preview_recording">Your notes are taking shape.</string>
+    <string name="notes_library_preview_recording">Listening…</string>
     <string name="notes_library_row_selected">Selected</string>
     <string name="notes_library_row_not_selected">Not selected</string>
     <string name="notes_library_row_delete">Delete</string>
@@ -296,8 +303,8 @@
     <string name="notes_library_delete_note">Delete note</string>
     <!-- %1$d is how many unticked to-dos the note has. -->
     <plurals name="notes_library_open_tasks">
-        <item quantity="one">%1$d open task</item>
-        <item quantity="other">%1$d open tasks</item>
+        <item quantity="one">☐ %1$d open</item>
+        <item quantity="other">☐ %1$d open</item>
     </plurals>
     <string name="notes_library_recovered">Recovered</string>
     <string name="notes_library_kept_audio">Kept audio</string>

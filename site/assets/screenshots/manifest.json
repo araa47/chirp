@@ -214,7 +214,7 @@
     ]
   },
   "android/notes-library-cover-detail-dark.png": {
-    "sha256": "e1f9e193673a7ca5df01246d63bd4bb1671b792ca6e02fd109c396bcc1927c19",
+    "sha256": "7ca75620de924feb8d4414fd1111d00a3a4112d251ac28160810484dbee51644",
     "width": 411,
     "height": 891,
     "variants": [
@@ -231,7 +231,7 @@
     ]
   },
   "android/notes-library-cover-detail-light.png": {
-    "sha256": "995dbc504ad06f1aa02a67ad998dd824c39bb9af5c4b018daf609f51ef8cfdc5",
+    "sha256": "63674dad544500d9b9e7940fb3e0bf792f3ca75eabdf5ecc7ccec49a4a7a8488",
     "width": 411,
     "height": 891,
     "variants": [
@@ -248,7 +248,7 @@
     ]
   },
   "android/notes-library-cover-recording-dark.png": {
-    "sha256": "88616a6c05547eac3f08ad13cfb5be0573fa34a6ed909a957e428f1bfacc6fb2",
+    "sha256": "367e9964d15019bc414066f30b79679d756a501cac564d866f0bbe958fcc76f3",
     "width": 411,
     "height": 891,
     "variants": [
@@ -265,7 +265,7 @@
     ]
   },
   "android/notes-library-cover-recording-light.png": {
-    "sha256": "e6aa359fcf343c871091c24ffe2c41fec6a026b03bae5d5b0cf6c279a04b5a5b",
+    "sha256": "b7945f20a0259c29b1cd3647fe7ff3b0b2d53c8ca679c7ee9a8c4a6e6e726eea",
     "width": 411,
     "height": 891,
     "variants": [
