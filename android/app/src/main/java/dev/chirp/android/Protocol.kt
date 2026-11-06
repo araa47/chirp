@@ -22,7 +22,9 @@ data class Health(val ready: Boolean, val debugRetention: Boolean, val correctio
                   val notesSpeakers: Boolean = false, val speakersModel: String? = null, val speakersModelBytes: Long? = null,
                   val speakerVoices: Boolean = false, val speakersVoices: SpeakersVoicesHealth? = null,
                   val operationDeadlines: OperationDeadlines = OperationDeadlines(),
-                  val notesRetranscribe: Boolean = false, val notesContext: Boolean = false, val speechModel: String? = null)
+                  val notesRetranscribe: Boolean = false, val notesContext: Boolean = false, val speechModel: String? = null,
+                  /** The name this phone was paired under (`chirp-server pair --name`); null for the shared token or an older server. */
+                  val device: String? = null)
 
 /** Effective server budgets in seconds; each absent or invalid value uses the caller's legacy timeout. */
 data class OperationDeadlines(private val seconds: Map<String, Double> = emptyMap()) {
@@ -133,6 +135,7 @@ object Protocol {
                     SpeakersVoicesHealth(v.getBoolean("enabled"), v.getInt("count"), v.optString("model").take(128)) else null
             }, OperationDeadlines.decode(json.optJSONObject("operation_deadlines")),
             json.optBoolean("notes_retranscribe") || json.optJSONArray("capabilities")?.let { a -> (0 until a.length()).any { a.optString(it) == "notes_retranscribe" } } == true,
-            json.optBoolean("notes_context"), json.text("speech_model"))
+            json.optBoolean("notes_context"), json.text("speech_model"),
+            json.optString("device").take(64).takeIf { name -> name.isNotBlank() && name != "null" && name.none { it.isISOControl() } })
     }
 }

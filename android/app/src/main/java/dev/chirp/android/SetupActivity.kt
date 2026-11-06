@@ -196,6 +196,9 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
                         checkConnection = { testPairing(save = false) },
                         changePairing = ::openPairing,
                         forgetPairing = ::forgetPairing,
+                        pairing = PairingActions(scan = ::scan, pasteLink = ::editLink, retry = { if (state.link.isBlank()) scan() else testPairing(save = true) },
+                            grantNetwork = { networkPermission.launch(LOCAL_NETWORK_PERMISSION) }, openTailscale = { tailscale.open() }),
+                        paired = { state.connected = false; openSettings(SettingsPage.Connection, outside = false) },
                         showSetup = ::showSetup,
                         allowWifi = { networkPermission.launch(LOCAL_NETWORK_PERMISSION) },
                         floatingMicSettings = ::openAccessibility,
@@ -249,10 +252,14 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
         state.entryStep = PAGE_WELCOME; state.pairFromShell = true
         state.shellOpen = false; state.step = PAGE_WELCOME; state.connected = false; state.pairIssue = null
     }
-    /** Opens the pair page on its own: from the shell (Pair Mac, Change pairing), a pairing link or a recovery action. Back leaves it. */
+    /**
+     * Pairing from the app (Change pairing, the setup card, a pairing link, a recovery action) opens Settings → Connection →
+     * Pair, as on iOS; Back returns to Connection. Before onboarding finishes, it is onboarding's own pair page.
+     */
     private fun openPairing() {
-        if (state.shellOpen) { state.entryStep = PAGE_PAIR; state.pairFromShell = true }
-        state.shellOpen = false; state.step = PAGE_PAIR; state.connected = false; state.pairIssue = null
+        state.connected = false; state.pairIssue = null
+        if (state.shellOpen || store.onboarded) { openSettings(SettingsPage.Pair, outside = false); return }
+        state.shellOpen = false; state.step = PAGE_PAIR
     }
     private fun open(tab: ShellTab, outside: Boolean) { state.tab = tab; state.exitOnBack = outside; state.pairFromShell = false; state.shellOpen = true }
     private fun openSettings(page: SettingsPage?, outside: Boolean = true) { state.settingsPage = page; state.settingsRequest++; open(ShellTab.Settings, outside) }

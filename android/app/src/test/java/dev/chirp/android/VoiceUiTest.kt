@@ -30,7 +30,7 @@ class VoiceUiTest {
     private val syntheticLink = "chirp://pair?url=https%3A%2F%2Fmac.example.test%2Fchirp&token=synthetic%2Btoken%3D"
     private class Calls { val seen = mutableListOf<String>()
         fun actions(state: SetupState? = null) = OnboardingActions(grantMic = { seen += "mic" }, keyboardSettings = { seen += "enable" }, picker = { seen += "select" },
-            appSettings = { seen += "permissions" }, scan = { seen += "scan" }, pasteLink = { state?.link = it; seen += "paste" }, retry = { seen += "retry" }, finish = { seen += "finish" }, chooseMode = { state?.inputMode = it }) }
+            appSettings = { seen += "permissions" }, scan = { seen += "scan" }, pasteLink = { state?.link = it; seen += "paste" }, retry = { seen += "retry" }, finish = { seen += "finish" }, skipPairing = { seen += "skip" }, chooseMode = { state?.inputMode = it }) }
 
     private fun fontScaled(scale: Float, content: @Composable () -> Unit) = fontScaled(mutableFloatStateOf(scale), content)
     private fun fontScaled(scale: State<Float>, content: @Composable () -> Unit) =
@@ -41,8 +41,13 @@ class VoiceUiTest {
         compose.setContent { ChirpTheme { Onboarding(state, calls.actions(state)) } }
         compose.onNodeWithContentDescription("Step 1 of 5").assertIsDisplayed()
         compose.onNodeWithText("Welcome to Chirp").assertIsDisplayed()
+        // Welcome's three lines and "Skip setup", as on iOS.
+        compose.onNodeWithText("Dictate into any app").assertIsDisplayed()
+        compose.onNodeWithText("Skip setup").assertExists()
+        compose.onNodeWithText("Back").assertDoesNotExist()
         compose.onNodeWithText("Get started").performClick()
         compose.onNodeWithText("How you’ll dictate").assertIsDisplayed()
+        compose.onNodeWithText("Back").assertExists()
         compose.onNodeWithText("Continue").assertIsNotEnabled()
         compose.runOnIdle { state.inputMode = InputMode.KEYBOARD }
         compose.onNodeWithText("Continue").performClick()
@@ -84,7 +89,7 @@ class VoiceUiTest {
         compose.runOnIdle { state.micDenied = true }
         compose.onNodeWithText("Open Settings").performClick()
         compose.runOnIdle { state.step = PAGE_PAIR; state.pairIssue = PairIssue.Unreachable }
-        compose.onNodeWithText("Couldn’t reach your computer").assertIsDisplayed()
+        compose.onNodeWithText("Couldn’t pair with your computer").assertIsDisplayed()
         compose.onNodeWithText("Try again").performClick()
         compose.runOnIdle { state.pairIssue = PairIssue.ScannerUnavailable }
         compose.onNodeWithText("Paste link instead").assertIsDisplayed()
@@ -102,15 +107,32 @@ class VoiceUiTest {
         compose.onNodeWithContentDescription("Private Chirp pairing link").performTextInput(syntheticLink)
         compose.runOnIdle { assertEquals(syntheticLink, state.link); assertEquals(listOf("paste", "paste", "paste"), calls.seen) }
     }
-    @Test fun `a saved pairing shows the connected host and engine and Finish`() {
+    @Test fun `a saved pairing stays on Pair your computer with the connected host and engine and Continue`() {
         val state = connectedState(); val calls = Calls()
         compose.setContent { ChirpTheme { Onboarding(state, calls.actions()) } }
-        compose.onNodeWithText("Connected · mac.example.test").assertIsDisplayed()
+        compose.onNodeWithText("Pair your computer").assertIsDisplayed()
+        compose.onNodeWithText("Connected to mac.example.test").assertIsDisplayed()
         compose.onNodeWithText("Parakeet · clean-up on your computer", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Scan code").assertDoesNotExist()
-        compose.onNodeWithText("Finish").performClick()
+        compose.onNodeWithText("Skip for now").assertDoesNotExist()
+        compose.onNodeWithText("Continue").performClick()
         assertEquals(listOf("finish"), calls.seen)
     }
+    @Test fun `Skip for now moves on from every page and Skip setup ends it, as on iOS`() {
+        val state = SetupState(); val calls = Calls()
+        compose.setContent { ChirpTheme { Onboarding(state, calls.actions(state)) } }
+        compose.runOnIdle { state.step = PAGE_CHOICE }
+        compose.onNodeWithText("Skip for now").performClick()
+        compose.runOnIdle { assertEquals("skipping the choice skips its setup page", PAGE_MIC, state.step) }
+        compose.onNodeWithText("Skip for now").performClick()
+        compose.runOnIdle { assertEquals(PAGE_PAIR, state.step) }
+        compose.onNodeWithText("Back").performClick()
+        compose.runOnIdle { assertEquals(PAGE_MIC, state.step) }
+        compose.runOnIdle { state.step = PAGE_WELCOME }
+        compose.onNodeWithText("Skip setup").performClick()
+        assertEquals(listOf("skip"), calls.seen)
+    }
+
     @Test fun `back returns one page at a time and stops at the page onboarding opened on`() {
         val state = SetupState().apply { step = PAGE_MIC; entryStep = PAGE_KEYBOARD }
         compose.setContent { ChirpTheme { Onboarding(state) } }
@@ -147,7 +169,7 @@ class VoiceUiTest {
         compose.runOnIdle { state.step = PAGE_PAIR; state.pairIssue = PairIssue.Unreachable; state.wifiPermissionNeeded = true }
         compose.onNodeWithText("Scan code").assertIsDisplayed()
         compose.runOnIdle { state.connected = true; state.paired = true; state.host = "mac.example.test" }
-        compose.onNodeWithText("Finish").assertIsDisplayed()
+        compose.onNodeWithText("Continue").assertIsDisplayed()
     }
     private fun connectedState() = SetupState().apply {
         step = PAGE_PAIR; paired = true; connected = true; reachable = true; host = "mac.example.test"

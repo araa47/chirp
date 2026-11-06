@@ -61,6 +61,12 @@ private fun SettingsRow(title: String, summary: String?, @DrawableRes icon: Int?
 
 private fun Modifier.row() = fillMaxWidth().heightIn(min = 56.dp)
 
+/** A read-only row: title, summary and the ⓘ behind it (Settings → Connection → This device). */
+@Composable
+internal fun InfoRow(title: String, summary: String, infoTitle: String, infoBody: String, modifier: Modifier = Modifier) {
+    SettingsRow(title, summary, null, modifier.row().semantics(mergeDescendants = true) { }) { InfoIcon(infoTitle, infoBody) }
+}
+
 /** ⓘ: the paragraph behind a row (spec §D Settings), so the row itself keeps to one line. */
 @Composable
 private fun InfoIcon(title: String, body: String) {

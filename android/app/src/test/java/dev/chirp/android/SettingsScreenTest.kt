@@ -48,7 +48,7 @@ class SettingsScreenTest {
     /** Every control reachable by the label it has, one page per category; each must exist somewhere in that page's tree. */
     private val tree = linkedMapOf<SettingsPage?, List<String>>(
         null to listOf("Connection", "How you dictate", "Dictation", "Keyboard", "Feedback & look", "Notes", "Privacy & history", "About"),
-        SettingsPage.Connection to listOf("Check connection", "Change pairing", "Forget pairing", "Use this phone's recogniser"),
+        SettingsPage.Connection to listOf("Check connection", "Change pairing", "This device", "Forget pairing", "Use this phone's recogniser"),
         SettingsPage.Dictation to listOf("Clean-up", "Styles", "Stop dictation", "Spoken commands",
             "Press Send after dictating", "Learn from my edits", "Learned"),
         SettingsPage.HowYouDictate to listOf("Use Chirp Keyboard", "Keep my keyboard", "Other ways to dictate"),
@@ -64,7 +64,8 @@ class SettingsScreenTest {
         val (state, history, updates) = settingsFixture()
         show(state, history, updates)
         tree.getValue(null).forEach(::assertOnce)
-        for (page in SettingsPage.entries) {
+        // Pair is a sub-page of Connection, not a row on the list (its own test is below).
+        for (page in SettingsPage.entries - SettingsPage.Pair) {
             open(page)
             assertTrue(compose.onAllNodes(hasText(context.getString(page.title)).and(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))).fetchSemanticsNodes().isNotEmpty())
             for (label in tree.getValue(page)) {
@@ -249,6 +250,31 @@ class SettingsScreenTest {
         open(SettingsPage.Dictation)
         compose.onNodeWithText("Clean-up is off on your computer").assertIsDisplayed()
         compose.onNode(hasText("Clean-up") and isToggleable()).assertDoesNotExist()
+    }
+
+    @Test fun `Change pairing is a Settings sub-page whose Back returns to Connection, as on iOS`() {
+        val (state, history, updates) = settingsFixture()
+        var scans = 0; var done = 0
+        show(state, history, updates, SettingsActions(pairing = PairingActions(scan = { scans++ }), paired = { done++ }), initialPage = SettingsPage.Pair)
+        compose.onNodeWithText("Change pairing").assertIsDisplayed()
+        compose.onNodeWithText("Pair a Phone, or run", substring = true).assertExists()
+        compose.onNodeWithText("Scan code").performClick()
+        assertEquals(1, scans)
+        compose.onNodeWithText("Paste link instead").assertExists()
+        // Saved and answering: it hands back to Connection.
+        compose.runOnIdle { state.connected = true }
+        compose.waitForIdle()
+        assertEquals(1, done)
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Check connection").assertExists()
+    }
+
+    @Test fun `This device names the pairing, or the shared token`() {
+        val (state, history, updates) = settingsFixture()
+        show(state, history, updates, initialPage = SettingsPage.Connection)
+        compose.onNodeWithText("Paired with your computer’s shared token").assertExists()
+        compose.runOnIdle { state.health = state.health?.copy(device = "Pixel Fold") }
+        compose.onNodeWithText("Pixel Fold").assertExists()
     }
 
     @Test fun `stop dictation no longer promises 119 seconds`() {

@@ -83,7 +83,7 @@ class LauncherRoutingTest {
         activity.fix(HomeFix.TailscaleOn)
         assertEquals(1, activity.fake.connects); assertEquals("Connecting Tailscale…", activity.state.status.resolve(activity.resources))
         activity.fix(HomeFix.Pair)
-        assertFalse(activity.state.shellOpen); assertEquals(PAGE_PAIR, activity.state.step); assertTrue(activity.state.pairFromShell)
+        assertTrue(activity.state.shellOpen); assertEquals(dev.chirp.android.settings.SettingsPage.Pair, activity.state.settingsPage)
         activity.state.micDenied = true
         activity.fix(HomeFix.Microphone)
         assertEquals(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, shadowOf(activity).nextStartedActivity.action)

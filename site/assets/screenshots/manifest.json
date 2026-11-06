@@ -44,7 +44,7 @@
     ]
   },
   "android/keepkb-choice-cover-dark.png": {
-    "sha256": "a32ec59eaaa582e2ced15d7b9db11d016e2403e2fc5e69f62c45ef08a39f7905",
+    "sha256": "c51915e5a78010460687c966989dd54a1b733bfb618a5c5f7313275b3a8d68a5",
     "width": 411,
     "height": 891,
     "variants": [
@@ -61,7 +61,7 @@
     ]
   },
   "android/keepkb-choice-cover-light.png": {
-    "sha256": "a0dd046f6f52b0c204705c67caa3539f1bdc64caa005016d01a1dff36d948855",
+    "sha256": "e12926e372f6e338043c8e9b6dc0761c5c90ca199d0290eb2b632d6fb6276fd1",
     "width": 411,
     "height": 891,
     "variants": [
@@ -78,7 +78,7 @@
     ]
   },
   "android/keepkb-floating-cover-dark.png": {
-    "sha256": "0216f96d192c1b6cb62fd3f129a4d78f9680a8831d5400c1c12377246b7f6aa7",
+    "sha256": "54be109c725ae225ef86d7e506e15fdb6f74aa462889ce6f523101974283b1d0",
     "width": 411,
     "height": 891,
     "variants": [
@@ -95,7 +95,7 @@
     ]
   },
   "android/keepkb-floating-cover-light.png": {
-    "sha256": "226d7856b975fbb07144093aec225bf917eeec6f9ca1b4c4524afb599a3fef9c",
+    "sha256": "bd5bd39415cc6511941a063ed462b7aa45673db3a96fb1c278c80b014351c128",
     "width": 411,
     "height": 891,
     "variants": [
@@ -316,7 +316,7 @@
     ]
   },
   "android/onboarding-pair-dark.png": {
-    "sha256": "64adef7dcbcd2259b3844388d49f5fc350f99d72a630c0ee7a42f098ade2659e",
+    "sha256": "634dba33b6799d65e804a2d56f5eff586418f5a407719b9e666945639b526025",
     "width": 411,
     "height": 891,
     "variants": [
@@ -333,7 +333,7 @@
     ]
   },
   "android/onboarding-pair-light.png": {
-    "sha256": "d1c9a3d5ffaae4eda18b383dce8b1ea65fb2e4c35e01553396902f6c09899063",
+    "sha256": "c95654275564373fa6ed9fcbb031234a1b82e14a7766dfd7293c7fb1633f41b8",
     "width": 411,
     "height": 891,
     "variants": [

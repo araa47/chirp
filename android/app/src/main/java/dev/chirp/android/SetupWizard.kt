@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 
@@ -48,11 +49,16 @@ internal fun Onboarding(state: SetupState, actions: OnboardingActions = Onboardi
     PredictiveBackHandler(enabled = page > state.entryStep) { events ->
         try { events.collect { backProgress = it.progress }; state.step = page - 1 } finally { backProgress = 0f }
     }
-    Surface(Modifier.fillMaxSize()) {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
             // No horizontal padding here: the welcome page's pond art bleeds edge to edge; each page pads its own text.
             Column(Modifier.widthIn(max = 560.dp).fillMaxSize().padding(top = 16.dp, bottom = 16.dp)) {
                 PageIndicator(page)
+                // Back under the progress bar on every page after the first, as on iOS (predictive back does the same).
+                if (page > state.entryStep) TextButton({ state.step = page - 1 }, Modifier.padding(start = 12.dp).heightIn(min = 48.dp)) {
+                    Icon(painterResource(R.drawable.ic_arrow_back), null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.onboarding_back))
+                }
                 AnimatedContent(page, Modifier.weight(1f).fillMaxWidth().graphicsLayer {
                     val scale = 1f - .08f * backProgress; scaleX = scale; scaleY = scale; alpha = 1f - .3f * backProgress
                 }, transitionSpec = {
@@ -69,12 +75,12 @@ internal fun Onboarding(state: SetupState, actions: OnboardingActions = Onboardi
 @Composable
 private fun PageIndicator(page: Int) {
     val step = stringResource(R.string.setup_step, page + 1, 5)
-    Row(Modifier.fillMaxWidth().padding(vertical = 16.dp).semantics(mergeDescendants = true) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(vertical = 12.dp).semantics(mergeDescendants = true) {
         contentDescription = step; progressBarRangeInfo = ProgressBarRangeInfo((page + 1).toFloat(), 1f..5f, 3)
     }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         repeat(5) { index ->
-            val color by animateColorAsState(if (index <= page) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, label = "segment")
-            Box(Modifier.weight(1f).height(6.dp).clip(CircleShape).background(color))
+            val color by animateColorAsState(if (index <= page) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh, label = "segment")
+            Box(Modifier.weight(1f).height(4.dp).clip(CircleShape).background(color))
         }
     }
 }

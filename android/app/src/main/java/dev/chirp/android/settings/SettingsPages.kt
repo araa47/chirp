@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import dev.chirp.android.*
 import dev.chirp.android.R
@@ -24,6 +27,7 @@ internal fun SettingsDetail(page: SettingsPage, state: SetupState, actions: Sett
         SettingsPage.Notes -> NotesSettings()
         SettingsPage.History -> HistoryPage(history)
         SettingsPage.About -> AboutPage(updates, actions.showSetup)
+        SettingsPage.Pair -> PairSettingsPage(state, actions)
     }
 }
 
@@ -42,6 +46,13 @@ private fun ConnectionPage(state: SetupState, actions: SettingsActions) {
             summary = stringResource(R.string.settings_allow_wifi_summary))
         NavRow(stringResource(if (state.paired) R.string.settings_change_pairing else R.string.settings_pair_computer), actions.changePairing)
     }
+    // The name this phone was paired under, or the shared token, as on iOS.
+    if (state.paired) SettingsGroup {
+        val device = state.health?.device
+        InfoRow(stringResource(R.string.settings_this_device), device ?: stringResource(R.string.settings_this_device_shared), stringResource(R.string.settings_this_device),
+            if (device != null) stringResource(R.string.settings_this_device_named_info, device)
+            else stringResource(R.string.settings_this_device_shared_info, "$PAIRING_COMMAND --name \"${android.os.Build.MODEL}\""))
+    }
     if (state.paired) SettingsGroup { ActionRow(stringResource(R.string.settings_forget_pairing), { confirmForget = true }, destructive = true) }
     PhoneFallbackSettings()
     if (confirmForget) AlertDialog(onDismissRequest = { confirmForget = false },
@@ -50,6 +61,22 @@ private fun ConnectionPage(state: SetupState, actions: SettingsActions) {
         confirmButton = { TextButton({ confirmForget = false; actions.forgetPairing() },
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.settings_forget)) } },
         dismissButton = { TextButton({ confirmForget = false }) { Text(stringResource(R.string.settings_cancel)) } })
+}
+
+/**
+ * Connection → Change pairing, as on iOS: the pairing steps, Scan code and the paste field on a Settings page. When the
+ * computer answers and the pairing is saved, it returns to Connection.
+ */
+@Composable
+private fun PairSettingsPage(state: SetupState, actions: SettingsActions) {
+    LaunchedEffect(state.connected) { if (state.connected) actions.paired() }
+    Text(pairingStepsAnnotated(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val busy = state.scanning || state.checking
+    Button(actions.pairing.scan, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = !busy && !state.connected) {
+        Icon(painterResource(R.drawable.ic_qr_scan), null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
+        Text(stringResource(when { state.scanning -> R.string.onboarding_scanning; state.checking -> R.string.onboarding_connecting; else -> R.string.onboarding_scan }))
+    }
+    PairingForm(state, actions.pairing)
 }
 
 /** Clean-up and styles, stop behaviour, spoken commands, auto-enter, and the other ways to dictate. */

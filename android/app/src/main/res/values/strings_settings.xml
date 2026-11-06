@@ -322,6 +322,23 @@
     <string name="onboarding_bubble_title">Turn on the floating mic</string>
     <string name="onboarding_continue_without">Continue without it</string>
     <string name="onboarding_skip">Skip for now</string>
+    <string name="onboarding_skip_setup">Skip setup</string>
+    <string name="onboarding_back">Back</string>
+    <!-- Welcome's three lines, as on iOS. -->
+    <string name="onboarding_welcome_dictate">Dictate into any app</string>
+    <string name="onboarding_welcome_notes">Keep conversations in Notes</string>
+    <string name="onboarding_welcome_private">Audio goes only to your own computer.</string>
+    <!-- The pair form's outcomes, as on iOS; %1$s is the computer's name. -->
+    <string name="onboarding_pair_connected">Connected to %1$s</string>
+    <string name="onboarding_pair_failed">Couldn’t pair with your computer</string>
+    <string name="onboarding_pair_failed_body">Check the code, Tailscale on both devices, and that Chirp is running on your computer.</string>
+    <!-- Settings → Connection: the name this phone was paired under. -->
+    <string name="settings_this_device">This device</string>
+    <string name="settings_this_device_shared">Paired with your computer’s shared token</string>
+    <!-- %1$s is the pairing name. -->
+    <string name="settings_this_device_named_info">Paired as “%1$s”. The computer lists this pairing under that name, and it can be revoked on its own.</string>
+    <!-- %1$s is the pairing command, shown in full. -->
+    <string name="settings_this_device_shared_info">Paired with your computer’s shared token. For a pairing you can revoke on its own, run %1$s on your computer and pair again.</string>
     <string name="onboarding_select_keyboard">Select Chirp Keyboard</string>
     <string name="onboarding_keyboard_body">A full keyboard with Chirp’s microphone built in. Type normally, or tap the mic above the keys to dictate.</string>
     <string name="onboarding_selected_default">Selected as default</string>

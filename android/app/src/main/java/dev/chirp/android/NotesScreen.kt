@@ -245,7 +245,8 @@ private fun NotesTopBar(model: NotesModel, editing: Boolean, gutter: androidx.co
             }
             // One meta line, as on iOS and the Mac (#271 2.8): the state while it isn't idle, then date · duration · open to-dos · audio.
             val status = model.status
-            val quiet = !model.state.active && (status == NotesStatus.IDLE || status.text == UiText.Res(R.string.notes_status_stopped))
+            // As on iOS: "Stopped" after a recording ends; an idle note ("Tap Record to take notes") shows only its facts.
+            val quiet = status == NotesStatus.IDLE
             FlowRow(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp),
                 itemVerticalAlignment = Alignment.CenterVertically) {
                 if (model.state.active) LiveDot(model.recording)
