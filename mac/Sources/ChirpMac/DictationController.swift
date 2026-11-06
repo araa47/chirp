@@ -75,6 +75,14 @@ final class DictationController {
     private var polishingRaw: String?
     /// "Insert raw immediately": the raw insertion started when `correcting` arrived (nil outcome: cancelled first).
     private var rawInsertTask: Task<InsertionOutcome?, Never>?
+    /// The one-time Keep clean-up ready hint (`KeepLoadedHint`): when polishing began, how long the user waited for the
+    /// final, and the server's answer, asked as polishing began, to whether its model still had to load. Only tracked
+    /// until the hint has been shown once.
+    private var polishStartedAt: ContinuousClock.Instant?
+    private var polishWaited: TimeInterval?
+    private var coldCheck: Task<Bool, Never>?
+    /// How long the last outcome keeps the HUD up, so the hint waits for it.
+    private var lastLinger: TimeInterval = 0
     private var startOptions = StartOptions()
     /// The hotkey's presses for the current mode and shortcut; rebuilt whenever the hotkey is registered.
     private var gesture = HotkeyGesture()
@@ -304,6 +312,7 @@ final class DictationController {
         pendingFinal = nil
         polishingRaw = nil
         rawInsertTask = nil
+        resetPolishWait()
         autoEnterSkipped = false
         inserter.forgetUndo()
         rawOffer.close()
@@ -427,6 +436,7 @@ final class DictationController {
             beginPolishing(raw: raw, profile: profile, words: words)
         case .message(.final(let f)):
             if machine.state == .listening || machine.state == .connecting { send(.toggle) }
+            if machine.state == .correcting { endPolishWait() }
             pendingFinal = f
             send(.finalReceived)
         case .message(.error(let code, let message)):
@@ -447,6 +457,7 @@ final class DictationController {
         hud.model.beginPolishing(raw: raw, style: profile.isEmpty ? hud.model.styleName ?? "" : CorrectionProfile.name(for: profile, in: health), words: words)
         send(.correctingReceived)
         hud.announce(HUDStatus.polishing)
+        startPolishWait()
         let myEpoch = epoch
         // "Insert raw immediately": only where the AX write can be replaced in place later; elsewhere the cleaned
         // text is inserted once, as usual.
@@ -461,6 +472,7 @@ final class DictationController {
     /// Clean-up timed out, errored or lost its socket: keep the raw transcript.
     private func failCorrection() {
         guard machine.state == .correcting else { return }
+        endPolishWait()
         pendingFinal = FinalResult(text: polishingRaw ?? "", corrected: false, correctionError: "timeout")
         send(.correctionFailed)
     }
@@ -517,6 +529,7 @@ final class DictationController {
         pendingFinal = nil
         polishingRaw = nil
         rawInsertTask = nil
+        resetPolishWait()
         stopCapture()
         eventTask?.cancel()
         eventTask = nil
@@ -535,6 +548,8 @@ final class DictationController {
         polishingRaw = nil
         let rawFirst = rawInsertTask
         rawInsertTask = nil
+        let (cold, waited) = (coldCheck, polishWaited)
+        resetPolishWait()
         // What was learned applies to the text itself too, so it works with clean-up off or an older server.
         let text = startOptions.learned?.apply(to: final.text) ?? final.text
         let s = session
@@ -574,6 +589,7 @@ final class DictationController {
                 await pressReturn(after: outcome, hudLingers: lingers)
             }
             send(.insertionFinished)
+            offerKeepReady(cold: cold, waited: waited)
         }
     }
 
@@ -634,6 +650,7 @@ final class DictationController {
         hud.model.showUseRaw = p.showUseRaw
         hud.model.onUseRaw = p.showUseRaw ? { [weak self] in self?.useRaw() } : nil
         // A successful insertion fades the HUD at once (and never brings one up just to fade it, as Insert Again would).
+        lastLinger = p.linger
         if p.linger > 0 { hud.show(); hud.hide(after: p.linger) } else { hud.hide() }
         hud.announce(p.status)
         if p.offersRawOutsideHUD || (p.showUseRaw && !hud.acceptsClicks), inserter.canUseRaw, !isPaused { rawOffer.open(avoiding: settings.hotkey) }
@@ -724,6 +741,56 @@ extension DictationController {
         hud.show()
         hud.announce(hud.model.status)
         hud.hide(after: 2)
+    }
+
+    /// Polishing began: start the clock and, until the hint has been shown once, ask the server whether its clean-up
+    /// model is still loading (a cheap `GET` beside the clean-up itself).
+    fileprivate func startPolishWait() {
+        polishStartedAt = .now
+        polishWaited = nil
+        coldCheck?.cancel()
+        coldCheck = nil
+        guard !settings.keepReadyHintShown else { return }
+        let config = settings.serverConfig()
+        coldCheck = Task { (try? await config.fetchCleanupSettings()).map(KeepLoadedHint.coldLoad) ?? false }
+    }
+
+    /// The final (or the clean-up's failure) arrived: how long the user watched "Polishing…".
+    fileprivate func endPolishWait() {
+        guard let start = polishStartedAt, polishWaited == nil else { return }
+        let d = (ContinuousClock.now - start).components
+        polishWaited = Double(d.seconds) + Double(d.attoseconds) / 1e18
+    }
+
+    fileprivate func resetPolishWait() {
+        polishStartedAt = nil
+        polishWaited = nil
+        coldCheck = nil
+    }
+
+    /// After an insertion that waited on a cold clean-up model: once ever, a short HUD note that Settings → Clean-up can
+    /// keep it ready. It waits for the outcome's HUD to finish, and is dropped (to try another time) when a new
+    /// dictation starts meanwhile. Never during a dictation.
+    fileprivate func offerKeepReady(cold: Task<Bool, Never>?, waited: TimeInterval?) {
+        guard let cold, let waited, !settings.keepReadyHintShown else { return }
+        let myEpoch = epoch
+        let delay = lastLinger + 0.4
+        Task { [weak self] in
+            let wasCold = await cold.value
+            chirpLog.info("cleanup polish_wait_ms=\(Int(waited * 1000), privacy: .public) cold=\(wasCold, privacy: .public)")
+            guard KeepLoadedHint.shouldShow(alreadyShown: settings.keepReadyHintShown, cold: wasCold, waited: waited) else { return }
+            try? await Task.sleep(for: .seconds(delay))
+            guard let self, self.epoch == myEpoch, !self.machine.state.isActive, !settings.keepReadyHintShown else { return }
+            settings.keepReadyHintShown = true
+            self.hud.cancelHide()
+            self.hud.model.reset()
+            self.hud.model.status = KeepLoadedHint.message
+            self.hud.model.indicator = .sparkle
+            self.hud.model.silence()
+            self.hud.show()
+            self.hud.announce(KeepLoadedHint.message)
+            self.hud.hide(after: KeepLoadedHint.duration)
+        }
     }
 
     /// History's Insert Again: `text` into the focused field of the frontmost app the way a dictation is inserted (AX,

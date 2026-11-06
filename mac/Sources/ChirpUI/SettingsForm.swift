@@ -61,7 +61,7 @@ public struct SettingsState: Sendable {
     /// The styles the server offers (the built-ins until it says otherwise) and whether it offers any at all.
     public var profiles = CorrectionProfile.builtIn
     public var serverOffersStyles = true
-    /// "Keep clean-up model loaded": what the server last said, and where its memory is used ("this Mac" or the host).
+    /// "Keep clean-up ready": what the server last said, and where its memory is used ("this Mac" or the host).
     public var keepLoaded = KeepLoadedState()
     public var serverHost = "this Mac"
     /// Some of Live Notes' speaker-label model is on this Mac, complete or not (Remove deletes it).
@@ -117,8 +117,8 @@ public struct SettingsState: Sendable {
 }
 
 /// The preferences window's pages, in the sidebar's order: start Chirp and fix permissions; dictation (every shortcut,
-/// how a dictation stops, sounds and where it listens); history and privacy; clean-up; the Notes library; phones; and
-/// Advanced (the server, its token, models and the Doctor). About is the sidebar's footer row.
+/// how a dictation stops, sounds and where it listens); history and privacy; clean-up (and keeping its model ready); the
+/// Notes library; phones; and Advanced (the server, its token, models and the Doctor). About is the sidebar's footer row.
 public enum SettingsTab: String, CaseIterable, Sendable {
     case general, dictation, privacy, cleanup, notes, devices, advanced, about
 
@@ -324,7 +324,7 @@ public final class SettingsForm {
     public let showChanges = NSButton(checkboxWithTitle: "Show changes after clean-up", target: nil, action: nil)
     public let offerRaw = NSButton(checkboxWithTitle: "Offer “Use raw” for 5 seconds after clean-up", target: nil, action: nil)
     public let appStyles = AppStylesTable()
-    /// Server: keeps the server's clean-up model in memory. Its state, memory cost and any error sit under it.
+    /// Clean-up: keeps the server's clean-up model in memory. Its state, memory cost and any error sit under it.
     public let keepLoaded = NSButton(checkboxWithTitle: KeepLoaded.title, target: nil, action: nil)
     private let keepLoadedStatus = StatusLine()
     private let keepLoadedHelp = SettingsForm.help("")
@@ -489,8 +489,13 @@ public final class SettingsForm {
             ]),
         ])
 
+        let keepLoadedStack = stack([keepLoaded, keepLoadedStatus, keepLoadedHelp, keepLoadedError])
+        keepLoadedError.textColor = .systemRed
+        keepLoadedError.isHidden = true
+        keepLoadedStatus.setAccessibilityLabel("Clean-up model status")
         build(.cleanup, [
             SettingsSection(nil, [row(nil, cleanupEnabled, help: cleanupHelp), row("Style", style, help: styleHelp)]),
+            SettingsSection("Speed", [row(nil, keepLoadedStack)]),
             SettingsSection("Style prompts", [row(nil, prompts.view, stacked: true)]),
             SettingsSection("Per-app styles", [row(nil, appStyles.view,
                 help: Self.help("The frontmost app when you start dictating picks the style. Other apps use the default style."), stacked: true)]),
@@ -531,10 +536,6 @@ public final class SettingsForm {
             ]),
         ])
 
-        let keepLoadedStack = stack([keepLoaded, keepLoadedStatus, keepLoadedHelp, keepLoadedError])
-        keepLoadedError.textColor = .systemRed
-        keepLoadedError.isHidden = true
-        keepLoadedStatus.setAccessibilityLabel("Clean-up model status")
         build(.devices, [
             SettingsSection("Phones", [
                 row("Pair a phone", pairButton, help: Self.help("Shows a code for Chirp on Android or iPhone to connect over your tailnet. Each phone gets its own pairing.")),
@@ -549,7 +550,6 @@ public final class SettingsForm {
                 row("Pairing code", tokenStatus, help: tokenHelp),
                 row("Status", serverStatus, help: serverDetail),
             ]),
-            SettingsSection("Clean-up model", [row(nil, keepLoadedStack)]),
             SettingsSection("Tools", [
                 row("Local models", modelsButton, help: modelsHelp),
                 row("Doctor", doctorButton, help: Self.help("Copies the command that checks the server, to run in Terminal.")),
@@ -845,7 +845,7 @@ public final class SettingsForm {
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
-    /// The "Keep clean-up model loaded" switch, its status and help, or why it is unavailable; the periodic refresh
+    /// The "Keep clean-up ready" switch, its status and help, or why it is unavailable; the periodic refresh
     /// calls this too, so it only sets what changed.
     public func showKeepLoaded(_ state: KeepLoadedState, host: String) {
         let p = KeepLoadedPresentation(state, host: host)

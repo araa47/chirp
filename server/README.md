@@ -510,6 +510,8 @@ How the helper behaves:
 
 `keep_loaded = true` keeps the helper resident: no idle unload, and the server prewarms the helper at startup.
 
+On the Mac this is **Keep clean-up ready** in Settings → Clean-up (see [the Mac README](../mac/README.md#keep-clean-up-ready)); the phone apps do not offer it, because it spends the server machine's RAM.
+
 The effective value is a client-persisted runtime override in `~/Library/Application Support/Chirp/server-state.json` (mode 0600, atomic write, containing only `{"correction_keep_loaded": bool}`), which wins over the TOML value; `server.toml` is never rewritten.
 
 The authenticated `GET /v1/correction/settings` endpoint (same bearer auth as the profiles endpoint) reports `{"keep_loaded", "loaded", "loading", "model", "memory_mb", "memory_estimated", "mode"}`. `PUT` with `{"keep_loaded": bool}` persists the override and applies it immediately: `true` loads in the background and never idle-unloads; `false` re-arms the idle timer. Invalid bodies return 400 `bad_request`; outside managed mode PUT returns 409 `unsupported`.
