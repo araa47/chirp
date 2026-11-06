@@ -93,6 +93,35 @@ class NotesDocumentTest {
         assertNull("unchanged since the last one", d.reorganizeRequest(final = false, manual = false))
     }
 
+    @Test fun `stop keeps the words where the passes found nothing substantive`() {
+        val d = NotesDocument(startedAt = 0)
+        d.append(segment(0, "Hello, one, two, three."))
+        d.apply(ok(NotesMarkdown.PLACEHOLDER), requireNotNull(d.nextStructureRequest()))
+        assertEquals("while recording the placeholder stays", NotesMarkdown.PLACEHOLDER, d.text)
+        d.append(segment(1, "Testing."))
+        d.freezeAll()
+        assertEquals("Hello, one, two, three.\n\n" + NotesDocument.FALLBACK_HEADER + "\n\nTesting.", d.text)
+        assertEquals("Hello, one, two, three.", d.libraryTitle())
+
+        val off = NotesDocument(startedAt = 0)
+        off.append(segment(0, "Hello."))
+        off.apply(ok(NotesMarkdown.PLACEHOLDER), requireNotNull(off.nextStructureRequest()))
+        off.freezeAll(structuring = false)
+        assertEquals("structuring off leaves the text alone", NotesMarkdown.PLACEHOLDER, off.text)
+
+        val real = NotesDocument(startedAt = 0)
+        real.append(segment(0, "We ship Friday."))
+        real.apply(ok("- Ship **Friday**"), requireNotNull(real.nextStructureRequest()))
+        real.freezeAll()
+        assertEquals("- Ship **Friday**", real.text)
+
+        val two = NotesDocument(startedAt = 0)
+        two.append(NotesSegment(0, 0.0, "Hello. Hi.", turns = listOf(SpeakerTurn(1, 0.0, "Hello."), SpeakerTurn(2, 1.0, "Hi."))))
+        two.apply(ok(NotesMarkdown.PLACEHOLDER), requireNotNull(two.nextStructureRequest()))
+        two.freezeAll()
+        assertEquals("Person 1: Hello.\n\nPerson 2: Hi.", two.text)
+    }
+
     @Test fun `split, diff and export`() {
         val text = "One sentence here. ".repeat(50).trim()
         val (a, b) = requireNotNull(NotesDocument.split(text))
