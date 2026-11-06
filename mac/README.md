@@ -175,9 +175,9 @@ Then, from any app:
 
 The first time a dictation is left on the clipboard the HUD shows a one-time tip naming ⌃⌥V and ⌃⌥H (the keys you chose).
 
-| Paste Chirp can't read back | Paste that most likely failed | The newest dictation in the menu |
-| :---: | :---: | :---: |
-| <a href="../docs/screenshots/mac/hud-paste-unconfirmed-light.png"><img src="../docs/screenshots/mac/hud-paste-unconfirmed-light.png" width="260" alt="HUD: Pasted · also on the clipboard"></a> | <a href="../docs/screenshots/mac/hud-paste-failed-dark.png"><img src="../docs/screenshots/mac/hud-paste-failed-dark.png" width="260" alt="HUD in dark appearance: Couldn't confirm it went in — press ⌘V"></a> | <a href="../docs/screenshots/mac/menu-last-dictation-light.png"><img src="../docs/screenshots/mac/menu-last-dictation-light.png" width="260" alt="Chirp menu starting with the newest dictation's preview and age, then Paste Again ⌃⌥V and Copy"></a> |
+| The newest dictation in the menu |
+| :---: |
+| <a href="../docs/screenshots/mac/menu-last-dictation-light.png"><img src="../docs/screenshots/mac/menu-last-dictation-light.png" width="260" alt="Chirp menu starting with the newest dictation's preview and age, then Paste Again ⌃⌥V and Copy"></a> |
 
 ### Styles
 

@@ -603,7 +603,7 @@ public enum Snapshots {
         "hud-flow-2-polishing", "hud-flow-3-diff", "hud-correction-use-raw",
         "hud-wordwave-listening", "hud-wordwave-long", "hud-wordwave-polishing",
         "menu-ready", "menu-notes-recording", "menu-recent-notes-submenu", "menu-cleanup-submenu",
-        "settings-general-ready", "settings-general-missing", "settings-dictation-ready", "settings-dictation-shortcuts-custom",
+        "settings-general-ready", "settings-general-missing", "settings-dictation-shortcuts-custom",
         "settings-dictation-sounds", "settings-cleanup-custom", "settings-notes-library", "settings-notes-downloaded",
         "settings-devices-ready", "settings-advanced-ready", "settings-about-ready", "onboarding-welcome",
         "notes-empty", "notes-library", "notes-recording", "notes-search", "notes-no-results", "notes-deleted",
@@ -611,8 +611,7 @@ public enum Snapshots {
         "notes-transcript-speakers", "notes-transcript-speakers-renamed", "notes-recording-call", "notes-sources-call",
         "notes-speaker-model-downloading", "notes-speaker-model-failed",
         "notes-name-speakers-line", "notes-name-speakers-sheet", "notes-name-speakers-suggest", "notes-name-speakers-remember",
-        "history-cleaned", "history-empty", "menu-recent-dictations-submenu",
-        "hud-paste-unconfirmed", "hud-paste-failed", "menu-last-dictation",
+        "history-cleaned", "history-empty", "menu-recent-dictations-submenu", "menu-last-dictation",
         "settings-saved-voices-ready", "settings-saved-voices-empty", "notes-voice-recognised",
     ]
 
