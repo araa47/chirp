@@ -442,9 +442,10 @@ struct LiveNotesControllerTests {
 
     @Test func notesShortcutTableMatchesCurrentBindings() {
         #expect(ShortcutsPage.notesShortcuts.map(\.title) == [
-            "New note", "Record / Stop note", "Pause / Resume note", "Edit by voice", "Search notes", "Show or hide transcript",
+            "New note", "New note and record", "Record / Stop note", "Pause / Resume note", "Edit by voice", "Search notes",
+            "Show or hide transcript",
         ])
-        #expect(ShortcutsPage.notesShortcuts.map(\.keys) == ["⌘N", "⇧⌘R", "⇧⌘P", "⇧⌘E", "⌘F", "⌥⌘T"])
+        #expect(ShortcutsPage.notesShortcuts.map(\.keys) == ["⌘N", "⌃⌥N", "⇧⌘R", "⇧⌘P", "⇧⌘E", "⌘F", "⌥⌘T"])
     }
 
     @Test func notesIntentActionsActOnlyOnALiveSession() async throws {
