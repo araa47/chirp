@@ -54,7 +54,11 @@ def check(probe, work, output):
             return found and found.group(1)
         clock = next((t for n in hierarchy if n.get('package') == package for t in [elapsed(n)] if t), '0:0')
         seconds = sum(int(part) * 60 ** i for i, part in enumerate(reversed(clock.split(':'))))
-        return {'status': status, 'note': note, 'clock': seconds, 'notes_chars': notes, 'gaps': [t for t in texts if 'audio not transcribed' in t],
+        # A listening spoken edit, read on its own: the note's header shows the recording status ("Listening…") first.
+        command = any(t == 'Say the edit…' or t.startswith('“') for t in texts) \
+            or any(n.get('content-desc', '').startswith('Send the spoken edit') for n in hierarchy)
+        return {'status': status, 'note': note, 'clock': seconds, 'notes_chars': notes, 'command': command,
+                'gaps': [t for t in texts if 'audio not transcribed' in t],
                 'hearing': any(n.get('resource-id') == 'notes-hearing' for n in hierarchy)}
 
     def wait(predicate, message, seconds=DEADLINE):
@@ -112,9 +116,11 @@ def check(probe, work, output):
     # Edit by voice while recording: capture goes to the command's socket and back to a fresh notes socket.
     before = finals()
     tap(wait_node('Edit notes by voice'))
-    wait(lambda s: s['status'] in ('Say the edit…', '“…”'), 'The voice command did not start listening', 20)
-    time.sleep(8)
-    tap(wait_node('Send the spoken edit'))
+    # A command listens for at most 20 s and then sends itself; on a busy host one hierarchy read can take most of that.
+    wait(lambda s: s['command'] or calls('edit') >= 1, 'The voice command did not start listening', 20)
+    time.sleep(5)
+    send = next((n for n in nodes() if n.get('content-desc', '').startswith('Send the spoken edit')), None)
+    if send is not None: tap(send)
     wait(lambda s: calls('edit') >= 1, 'The spoken edit never reached /v1/notes/edit', 60)
     assert all(code == 200 for code in server()['edit']), 'The edit call failed: ' + json.dumps(server())
     wait(lambda s: recording(s) and finals() >= before + 3, 'Notes did not go on recording after the spoken edit')
