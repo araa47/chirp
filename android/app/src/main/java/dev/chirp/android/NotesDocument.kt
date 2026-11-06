@@ -371,9 +371,24 @@ internal class NotesDocument(var startedAt: Long = System.currentTimeMillis(), t
 
     /** At Stop, after the final pass: the tail settles and, with structuring on, whatever it did not cover falls back. */
     fun freezeAll(structuring: Boolean = true) = recording(NotesChange.Kind.APPEND) {
+        if (structuring) keepWordsOverPlaceholder()
         settleTail()
         if (structuring) appendFallback()
         consecutiveFailures = 0
+    }
+
+    /**
+     * A finished note never reads "(nothing yet)" when words were heard: when the passes judged the whole open window
+     * not substantive (a few words, a test phrase), its tail is only the placeholder, and Stop puts the window's own
+     * words there instead (labelled when more than one person spoke), as on the Mac. Nothing changes while recording,
+     * or when the window had no words.
+     */
+    private fun keepWordsOverPlaceholder() {
+        if (tail.trim() != NotesMarkdown.PLACEHOLDER) return
+        val people = committed.flatMap { it.turns.orEmpty() }.map { roster.resolve(it.effectivePerson) }.distinct().size
+        val words = windowSegments.filter { it.id <= structuredEnd }
+            .map { (if (people > 1) spoken(it).replace("\n", "\n\n") else it.text).trim() }.filter { it.isNotEmpty() }
+        if (words.isNotEmpty()) replaceTail(words.joinToString("\n\n"))
     }
 
     private fun appendFallback() {
