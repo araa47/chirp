@@ -67,6 +67,7 @@ import Testing
         let sys = FakeSystem(), board = FakePasteboard()
         sys.bundle = Self.ego
         sys.pasteLands = false
+        board.tracksReads = true
         var copied = false
         let inserter = TextInserter(env: InsertionEnvironment(
             secureInputEnabled: { false }, axTrusted: { true }, frontmostBundleID: { Self.ego },
@@ -76,7 +77,7 @@ import Testing
                 // The user copies something while Chirp waits for the paste.
                 if !copied { copied = true; _ = board.write(text: "user copied this", transient: false) }
             }), pasteboard: board)
-        #expect(await inserter.insert("ship it tonight") == .pasteUnconfirmed(.unreadable))
+        #expect(await inserter.insert("ship it tonight") == .pasteUnconfirmed(.notRead))
         await inserter.settle()
         #expect(board.text == "user copied this")
     }

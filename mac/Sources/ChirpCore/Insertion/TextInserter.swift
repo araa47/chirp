@@ -25,7 +25,11 @@ public struct InsertionEnvironment {
     /// A fingerprint of the focused field (its length and selection, or its text), or nil when it cannot be read (no
     /// Accessibility, a secure field, Chromium and Electron web fields). A paste is confirmed when it changes.
     public var focusedFieldState: () -> String?
+    /// Timers: the clipboard restore and the Use raw window.
     public var sleep: (Duration) async -> Void
+    /// The short polls of the check after ⌘V (`sleep` unless given), kept apart so a fake clock for the timers does
+    /// not have to step through them.
+    public var checkSleep: (Duration) async -> Void
 
     public init(secureInputEnabled: @escaping () -> Bool, axTrusted: @escaping () -> Bool,
                 frontmostBundleID: @escaping () -> String?,
@@ -33,7 +37,8 @@ public struct InsertionEnvironment {
                 axReplace: @escaping (NSRange, String, String) async -> Bool,
                 postPaste: @escaping () -> Bool,
                 focusedFieldState: @escaping () -> String? = { nil },
-                sleep: @escaping (Duration) async -> Void = { try? await Task.sleep(for: $0) }) {
+                sleep: @escaping (Duration) async -> Void = { try? await Task.sleep(for: $0) },
+                checkSleep: ((Duration) async -> Void)? = nil) {
         self.secureInputEnabled = secureInputEnabled
         self.axTrusted = axTrusted
         self.frontmostBundleID = frontmostBundleID
@@ -42,6 +47,7 @@ public struct InsertionEnvironment {
         self.postPaste = postPaste
         self.focusedFieldState = focusedFieldState
         self.sleep = sleep
+        self.checkSleep = checkSleep ?? sleep
     }
 }
 
@@ -224,8 +230,10 @@ public final class TextInserter {
         }
         let generation = restoreGeneration
         var changed = false
-        for _ in 0..<Self.pasteChecks {
-            await env.sleep(Self.pasteCheckInterval)
+        // Nothing to observe (an unreadable field and a pasteboard that can't tell reads): no point waiting.
+        let checks = before != nil || pasteboard.tracksReads ? Self.pasteChecks : 0
+        for _ in 0..<checks {
+            await env.checkSleep(Self.pasteCheckInterval)
             if let before, let now = env.focusedFieldState(), now != before { changed = true; break }
             // An unreadable field: the read is all there is to wait for.
             if before == nil, pasteboard.trackedReadUptime != nil { break }
