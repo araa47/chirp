@@ -582,6 +582,54 @@ final class LiveNotesController: ObservableObject {
         publish()
     }
 
+    // MARK: hardware keyboard
+
+    /// The Notes tab is on screen in the key window (the dictation key drives Notes there, as in the Mac's Notes window).
+    var notesTabShown = false
+    /// The note the Notes tab shows in its detail, nil on the bare library: ⌘⇧R records into it, as the Mac's does.
+    var shownNote: UUID?
+
+    /// The note that records or is paused, wherever the library is: what ⌘⇧R stops and ⌘⇧P pauses.
+    var captureState: NotesRecorderState { captureRecorder?.state ?? .idle }
+
+    /// ⌘N from any tab: a blank typed note, shown and ready to type.
+    func keyNewNote() async {
+        await newNote()
+        requestedSelection = document.id
+    }
+
+    /// ⌃⌥N (the Mac's New note): always a new note that records; a paused one resumes, a recording one is shown.
+    func keyNewRecording() async {
+        if captureState == .paused { await resume() }
+        else if !isActive { await newRecording() }
+        requestedSelection = recordingID ?? document.id
+    }
+
+    /// ⌘⇧R from any tab: stops the note that records, else records into the note on screen, else a new note.
+    func keyRecordOrStop() async {
+        if captureState.isLive { await stop(); return }
+        guard !isActive else { return }
+        if notesTabShown, let shown = shownNote, shown == document.id { await record() } else { await newRecording() }
+        requestedSelection = recordingID ?? document.id
+    }
+
+    /// The dictation key on the Notes tab: a press records (the note on screen, else a new one), the next pauses and
+    /// the next resumes; Stop is ⌘⇧R or the button. While a field has focus and nothing records, the key dictates into
+    /// the field as everywhere else. Returns false when the key is not Notes' here.
+    func hotkeyPress(fieldFocused: Bool) -> Bool {
+        guard notesTabShown else { return false }
+        switch captureState {
+        case .recording: Task { await pause() }
+        case .paused: Task { await resume() }
+        case .starting, .stopping: break   // a press while Notes connects or finishes does nothing
+        case .idle, .stopped, .error:
+            guard !fieldFocused else { return false }
+            guard !isActive else { return true }
+            Task { await keyRecordOrStop() }
+        }
+        return true
+    }
+
     func stopAndContinue() async {
         await stop()
         await record()

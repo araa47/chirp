@@ -55,30 +55,30 @@ final class ChirpHardwareKeyboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Microphone off"].waitForExistence(timeout: 5))
     }
 
-    /// ⌘Return starts and stops, ⌘⇧Z uses raw, ⌘⇧C copies, ⌘. cancels, ⌘⇧E ends, ⌘⇧K arms and ⌘1–⌘4 switch tabs.
-    /// Needs a hardware keyboard connected to the simulator (Simulator → I/O → Keyboard); headless
-    /// simulators drop synthesized key events, which the Esc probe detects.
+    /// ⌘. cancels, ⌃⌥Z uses raw, ⌘⇧C copies, ⌘⇧E ends, ⌘⇧K arms, ⌘1–⌘4 switch tabs, then ⌘Return starts and stops.
+    /// Needs the simulator's hardware keyboard, which attaches on the first synthesized key (that key is lost).
+    /// XCUITest's synthesized Return and Esc never reach the app on the iPad simulator (⌘ and letter keys do, logged at
+    /// `UIApplication.sendEvent`), so ⌘Return is checked last and skips with that reason; check it on a device.
     @MainActor func testDictationMenuShortcuts() throws {
         let app = pairedApp()
+        app.typeKey(".", modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 1.5)
         let status = app.staticTexts["sessionStatus"], transcript = app.staticTexts["transcript"]
-        app.buttons["chirp.dictation.start"].tap()
+        let start = app.buttons["chirp.dictation.start"], stop = app.buttons["chirp.dictation.stop"]
+        start.tap()
         XCTAssertTrue(waitFor(status, "label == 'Listening…'"))
-        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey(".", modifierFlags: .command)
         guard waitFor(status, "label == 'Ready'", timeout: 3) else {
             throw XCTSkip("Synthesized hardware key events do not reach the app: no hardware keyboard is connected to this simulator.")
         }
-        app.typeKey(.return, modifierFlags: .command)
-        XCTAssertTrue(waitFor(transcript, "label == 'synthetic words'"), "⌘Return did not start dictation")
-        app.typeKey(.return, modifierFlags: .command)
-        XCTAssertTrue(waitFor(transcript, "label == 'Synthetic words.'"), "⌘Return did not stop dictation")
-        app.typeKey("z", modifierFlags: [.command, .shift])
-        XCTAssertTrue(waitFor(transcript, "label == 'synthetic words'"), "⌘⇧Z did not use raw")
+        start.tap()
+        XCTAssertTrue(waitFor(transcript, "label == 'synthetic words'"))
+        stop.tap()
+        XCTAssertTrue(waitFor(transcript, "label == 'Synthetic words.'"))
+        app.typeKey("z", modifierFlags: [.control, .option])
+        XCTAssertTrue(waitFor(transcript, "label == 'synthetic words'"), "⌃⌥Z did not use raw")
         app.typeKey("c", modifierFlags: [.command, .shift])
         XCTAssertTrue(waitFor(app.staticTexts["sessionNotice"], "label == 'Copied.'"), "⌘⇧C did not copy")
-        app.typeKey(.return, modifierFlags: .command)
-        XCTAssertTrue(waitFor(status, "label == 'Listening…'"))
-        app.typeKey(".", modifierFlags: .command)
-        XCTAssertTrue(waitFor(status, "label == 'Ready'"), "⌘. did not cancel")
         app.typeKey("e", modifierFlags: [.command, .shift])
         XCTAssertTrue(waitFor(status, "label == 'Microphone off'"), "⌘⇧E did not end the session")
         app.typeKey("k", modifierFlags: [.command, .shift])
@@ -89,6 +89,14 @@ final class ChirpHardwareKeyboardUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Dictation history"].waitForExistence(timeout: 3), "⌘3 did not open History")
         app.typeKey("2", modifierFlags: .command)
         XCTAssertTrue(waitFor(status, "label == 'Ready'"), "⌘2 did not open Dictate")
+        app.typeKey(.return, modifierFlags: .command)
+        guard waitFor(status, "label == 'Listening…'") else {
+            app.endChirpSession()
+            throw XCTSkip("⌘Return: XCUITest's synthesized Return does not reach the app on this simulator; check it with a real keyboard.")
+        }
+        app.typeKey(.return, modifierFlags: .command)
+        XCTAssertTrue(waitFor(transcript, "label == 'Synthetic words.'"), "⌘Return did not stop dictation")
+        app.endChirpSession()
     }
 
     /// The README and in-app help send iPad users to Full Keyboard Access → Commands to give their Toggle

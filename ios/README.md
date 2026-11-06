@@ -308,17 +308,25 @@ from every tab and show in the iPad's hold-⌘ overlay and menu bar:
 | Shortcut | Action |
 |---|---|
 | ⌘Return | Start or stop dictation (⌘Space is Spotlight on iPadOS) |
-| ⌘. (or Esc while dictating) | Cancel dictation |
+| ⌘. | Cancel dictation (on the iPad simulator Esc never reached the app, so use ⌘.) |
 | ⌘⇧C | Copy result |
-| ⌘⇧Z | Use raw transcript |
+| ⌃⌥Z | Use raw transcript (as on the Mac; ⌘⇧Z is Redo) |
 | ⌘⇧K | Start keyboard session |
 | ⌘⇧E | End session |
 | ⌘1 – ⌘4 | Notes, Dictate, History, Settings (the **Go** menu) |
+| ⌘N | New note, ready to type (the **Notes** menu, from any tab) |
+| ⌃⌥N | New note that records, as on the Mac (resumes a paused one) |
+| ⌘⇧R | Record into the note on screen, else a new note; Stop from anywhere |
+| ⌘⇧P | Pause / Resume recording |
+
+On the **Notes** tab the hold-to-talk key below drives Notes, as in the Mac's
+Notes window: a press records, the next pauses, the next resumes. With a text
+field focused and nothing recording it dictates into the field.
 
 **Hold-to-talk key.** In Chirp, hold **Right ⌥ Option** to dictate and let go to
 insert. The text lands at the caret of the Chirp field you were typing in (a
 listening bar shows the live words), or on Dictate when no field has focus.
-**Esc** cancels. Settings → Dictation → **Keyboard shortcut** records another key (a
+**⌘.** cancels. Settings → Dictation → **Keyboard shortcut** records another key (a
 modifier on its own, such as Right ⌘, or a key with ⌃, ⌥ or ⌘), switches to
 **Press to start and stop**, or turns it off. The rules are the Mac's: a
 modifier on its own only counts when no other key is pressed with it (⌥← and

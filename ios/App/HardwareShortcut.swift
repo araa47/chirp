@@ -52,6 +52,8 @@ final class HardwareShortcutController: ObservableObject {
 
     /// Opens Dictate for a dictation with no field to land in.
     var showDictate: (() -> Void)?
+    /// Offers a press to Notes first (with whether a text field has focus); true when Notes took it.
+    var notesKey: ((Bool) -> Bool)?
 
     private weak var model: SessionCoordinator?
     private weak var field: UIResponder?
@@ -198,12 +200,18 @@ final class HardwareShortcutController: ObservableObject {
     func run(_ commands: [HardwareShortcutCommand]) {
         for command in commands {
             switch command {
-            case .start: start()
+            case .start: if !notesTook() { start() }
             case .stop: if active { model?.stopDictation() }
             case .cancel: if active { cancelDictation() }
-            case .toggle: if active { model?.stopDictation() } else { start() }
+            case .toggle: if active { model?.stopDictation() } else if !notesTook() { start() }
             }
         }
+    }
+
+    /// A press with no dictation under way goes to Notes when the Notes tab is on screen (record, pause, resume).
+    private func notesTook() -> Bool {
+        guard !active, !busy, let notesKey else { return false }
+        return notesKey(Self.focusedField() != nil)
     }
 
     private func start() {
@@ -309,8 +317,8 @@ struct ShortcutListeningBar: ViewModifier {
     }
 
     private var hint: String {
-        shortcuts.shortcut.mode == .hold ? "Let go of \(shortcuts.shortcut.title) to insert · Esc cancels"
-            : "Press \(shortcuts.shortcut.title) again to insert · Esc cancels"
+        shortcuts.shortcut.mode == .hold ? "Let go of \(shortcuts.shortcut.title) to insert · ⌘. cancels"
+            : "Press \(shortcuts.shortcut.title) again to insert · ⌘. cancels"
     }
 
     private var bar: some View {
@@ -346,7 +354,7 @@ struct HardwareShortcutSettings: View {
                           summary: shortcut.enabled ? shortcut.instruction : "Off",
                           symbol: "keyboard",
                           infoTitle: "Keyboard shortcut",
-                          infoBody: "Works with a hardware keyboard while Chirp is open. The text goes into the Chirp field you are typing in, or onto Dictate when no field has focus. Esc cancels. A modifier key on its own only counts when you press no other key with it, so ⌥ shortcuts and special characters keep working.",
+                          infoBody: "Works with a hardware keyboard while Chirp is open. The text goes into the Chirp field you are typing in, or onto Dictate when no field has focus. ⌘. cancels. A modifier key on its own only counts when you press no other key with it, so ⌥ shortcuts and special characters keep working.",
                           identifier: "chirp.hwkey.enabled",
                           set: { shortcuts.update(shortcut.with(enabled: $0)) })
             }
