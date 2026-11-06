@@ -53,7 +53,12 @@ final class ChirpHardwareShortcutUITests: XCTestCase {
         let status = app.staticTexts["sessionStatus"], transcript = app.staticTexts["transcript"]
         XCTAssertTrue(waitFor(status, "label == 'Listening…'"), "Holding Right ⌥ did not start dictation on Dictate")
         XCTAssertTrue(waitFor(transcript, "label == 'synthetic words'"))
-        XCTAssertTrue(app.staticTexts["chirp.dictation.shortcutsHint"].label.hasPrefix("Hold Right ⌥ Option"))
+        // The keys hint is under the mic at regular width (iPad) only; a phone has no room for it.
+        if app.windows.firstMatch.horizontalSizeClass == .regular {
+            XCTAssertTrue(app.staticTexts["chirp.dictation.shortcutsHint"].label.hasPrefix("Hold Right ⌥ Option"))
+        } else {
+            XCTAssertFalse(app.staticTexts["chirp.dictation.shortcutsHint"].exists)
+        }
         screenshot("Shortcut listening on Dictate")
         seam("up", app)
         XCTAssertTrue(waitFor(transcript, "label == 'Synthetic words.'"), "Letting go did not finish")

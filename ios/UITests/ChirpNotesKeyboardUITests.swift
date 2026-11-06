@@ -113,6 +113,7 @@ final class ChirpNotesKeyboardUITests: XCTestCase {
         XCTAssertTrue(waitFor(status, "label == 'Stopped'"))
 
         // The editor focused: the key still records the note instead of dictating into the editor.
+        app.buttons["chirp.notes.edit"].tap()
         let editor = app.textViews["chirp.notes.editor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
