@@ -336,7 +336,9 @@ final class NotesEditorCoordinator: NSObject, NSTextViewDelegate {
         scrollView = NSScrollView()
         let textView = NotesTextView(usingTextLayoutManager: true)
         self.textView = textView
-        lastFocusRequest = model.focusRequest
+        // A New Note asked for focus while no editor was on screen: this one carries it out.
+        lastFocusRequest = model.focusOnAppear ? model.focusRequest - 1 : model.focusRequest
+        model.focusOnAppear = false
         isFocused = { [weak textView] in textView?.window?.firstResponder === textView }
         super.init()
         Self.configure(textView)
@@ -471,7 +473,16 @@ final class NotesEditorCoordinator: NSObject, NSTextViewDelegate {
         textView.placeholder = NotesStatus.placeholder(key: model.notesKey)
         if model.focusRequest != lastFocusRequest {
             lastFocusRequest = model.focusRequest
-            textView.window?.makeFirstResponder(textView)
+            model.focusOnAppear = false   // carried out here: a later editor must not take focus for it again
+            if let window = textView.window {
+                window.makeFirstResponder(textView)
+            } else {
+                // A new editor is not in its window yet during its first update.
+                DispatchQueue.main.async { [weak textView] in
+                    guard let textView else { return }
+                    textView.window?.makeFirstResponder(textView)
+                }
+            }
         }
     }
 

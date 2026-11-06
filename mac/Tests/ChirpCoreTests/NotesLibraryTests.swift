@@ -505,6 +505,16 @@ private func libraryDirectory() -> URL {
         #expect(title("").hasPrefix("Note, "))
     }
 
+    /// A short recording the passes found nothing in kept "_(nothing yet)_" as its title (and the window's).
+    @Test func thePlaceholderAndTheNotStructuredNoticeAreNeverTheTitle() {
+        #expect(title("_(nothing yet)_", segment: "Hello, one, two, three.") == "Hello, one, two, three")
+        #expect(title("\(NotesDocument.fallbackHeader)\n\nwe ship friday") == "we ship friday")
+        #expect(title("_(nothing yet)_").hasPrefix("Note, "))
+        var d = NotesDocument(startedAt: Date(timeIntervalSince1970: 0), text: "_(nothing yet)_\n\n- Ship Friday")
+        d.append(NotesSegment(id: 0, offset: 0, raw: "x", text: "x"))
+        #expect(d.title == "Ship Friday" && !d.snippet().contains("nothing yet"))
+    }
+
     @Test func aHeadingAndAChosenTitleAreUnchanged() {
         #expect(title("intro\n## The Heading\nbody") == "The Heading")
         var d = NotesDocument(text: "- Person 1: long text here")

@@ -462,10 +462,25 @@ public struct NotesDocument: Equatable, Sendable, Codable {
     @discardableResult
     public mutating func freezeAll(structuring: Bool = true) -> NotesTextChange? {
         recordingChange(.append) { d in
+            if structuring { d.keepWordsOverPlaceholder() }
             d.settleTail()
             if structuring { d.appendFallback() }
             d.consecutiveFailures = 0
         }
+    }
+
+    /// A finished note never reads "(nothing yet)" when words were heard: when the passes judged the whole open window
+    /// not substantive (a few words, a test phrase), its tail is only the placeholder, and Stop puts the window's own
+    /// words there instead (labelled when more than one person spoke). Nothing changes while recording, or when the
+    /// window had no words.
+    private mutating func keepWordsOverPlaceholder() {
+        guard tail.trimmingCharacters(in: .whitespacesAndNewlines) == NotesMarkdown.placeholder else { return }
+        let covered = windowSegments.filter { $0.id <= structuredEnd }
+        let labelled = speakerCount > 1
+        let words = covered.map { labelled ? labelledText($0, separator: "\n\n") : $0.text }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard !words.isEmpty else { return }
+        replaceTail(with: words.joined(separator: "\n\n"))
     }
 
     /// The window's corrected text under "Not structured — see transcript", as ordinary (user-editable) text.

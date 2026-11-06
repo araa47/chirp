@@ -541,7 +541,6 @@ struct NotesEmptyState: View {
             HStack(spacing: 10) {
                 Button {
                     library.onNew()
-                    model.focusRequest += 1
                 } label: {
                     Label("New Note", systemImage: "square.and.pencil").padding(.horizontal, 4)
                 }

@@ -66,6 +66,30 @@ func unwrap<T>(_ value: T?, sourceLocation: SourceLocation = #_sourceLocation) t
         #expect(change.range.location >= typed.utf16.count && change.replacement == "\n- b")
     }
 
+    /// "Hello, one, two, three" is not substantive: the pass answers the placeholder. A finished note keeps the words
+    /// instead of reading "(nothing yet)"; while recording the placeholder stays.
+    @Test func stopKeepsTheWordsWhereThePassFoundNothingSubstantive() throws {
+        var d = doc(["Hello, one, two, three."], typed: "")
+        d.apply(ok(NotesMarkdown.placeholder), for: try #require(d.nextStructureRequest(final: true)))
+        #expect(d.tail == NotesMarkdown.placeholder)
+        d.freezeAll()
+        #expect(d.text == "Hello, one, two, three." && d.notesBody == "Hello, one, two, three." && d.tail.isEmpty)
+        // Typed text above it stays; with structuring off nothing is rewritten.
+        var typed = doc(["testing"], typed: "mine")
+        typed.apply(ok(NotesMarkdown.placeholder), for: try #require(typed.nextStructureRequest(final: true)))
+        typed.freezeAll()
+        #expect(typed.text == "mine\n\ntesting")
+        var off = doc(["testing"])
+        off.apply(ok(NotesMarkdown.placeholder), for: try #require(off.nextStructureRequest(final: true)))
+        off.freezeAll(structuring: false)
+        #expect(off.text == NotesMarkdown.placeholder)
+        // Real notes are never touched.
+        var real = doc(["we ship friday"])
+        real.apply(ok("- Ship Friday"), for: try #require(real.nextStructureRequest(final: true)))
+        real.freezeAll()
+        #expect(real.text == "- Ship Friday")
+    }
+
     @Test func settlesAtFreezeChars() throws {
         var d = doc([String(repeating: "a", count: 1000)])
         var r = try #require(d.nextStructureRequest())

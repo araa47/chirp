@@ -231,6 +231,11 @@ public final class NotesModel {
     public var editorFocused = false
     /// Bumped to ask the editor to take keyboard focus (the empty state was clicked, the window opened with focus).
     public var focusRequest = 0
+    /// New Note asked for a blank note: the editor shows in place of the empty-state art, focused or not.
+    public var composing = false
+    /// The editor that appears next takes the keyboard for the pending `focusRequest` (New Note asked while the
+    /// empty-state art, not an editor, was on screen). Read and cleared once by the editor.
+    @ObservationIgnored public var focusOnAppear = false
     /// The dictation hotkey's keys ("⌥ Option"), empty until the window is shown.
     public var dictationKey = ""
     /// The Start/Stop Notes shortcut's keys, for the empty state and the editor's placeholder.
@@ -424,7 +429,7 @@ public final class NotesModel {
 
     /// The empty-state art: no notes, nothing recorded yet, and the editor not focused (a click focuses it).
     public var showsEmptyState: Bool {
-        document.text.isEmpty && document.segments.isEmpty && state == .idle && !editorFocused
+        document.text.isEmpty && document.segments.isEmpty && state == .idle && !editorFocused && !composing
     }
 
     /// The Reorganize button can be pressed: structuring and the endpoint are available, there are notes, and no

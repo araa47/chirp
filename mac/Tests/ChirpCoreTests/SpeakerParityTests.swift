@@ -161,6 +161,27 @@ private func libraryDirectory() -> URL {
         await h.stop()
     }
 
+    /// A cold offline load (the first Record after an install compiles the model) took ~7 s on a real Mac, with
+    /// Record looking dead and the first words lost. Record starts at once; labels join when the model is loaded.
+    @Test func recordingWithTheModelOnDiskStartsAtOnceAndJoinsLabelsWhenLoaded() async throws {
+        let store = FakeModelStore(downloaded: true)
+        store.hold = true
+        let h = NotesHarness(speakers: store)
+        await h.record()
+        #expect(h.recorder.state == .recording && h.recorder.speakers == nil)   // not held up by the load
+        await h.until("speaker model loading") { store.loads == [false] && h.session.speakers.isLoading }
+        #expect(h.model.speakerStatus == "Loading speaker model…")
+        h.model.onRecordToggle()                      // a second press stops, as usual: nothing is swallowed
+        await h.until("stopped") { h.recorder.state == .stopped || h.recorder.state == .idle }
+        await h.record()
+        #expect(h.recorder.state == .recording && store.loads == [false])   // one load, still running
+        store.release()
+        await h.until("speaker model ready") { h.session.speakers.model == .ready }
+        await h.settle()
+        #expect(h.recorder.speakers != nil)          // joined mid-recording
+        await h.stop()
+    }
+
     @Test func aFailedDownloadShowsRetryAndKeepsLabelsOn() async throws {
         let store = FakeModelStore(downloaded: false)
         store.fail = true

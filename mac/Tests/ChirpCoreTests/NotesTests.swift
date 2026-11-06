@@ -443,6 +443,10 @@ final class NotesURLStub: URLProtocol, @unchecked Sendable {
         let typed = NotesModel()
         typed.document.userEdit(NSRange(location: 0, length: 0), "x")
         #expect(!typed.showsEmptyState && typed.hasContent)
+        // New Note on the empty state shows the blank note's editor before it has focus.
+        let composing = NotesModel()
+        composing.composing = true
+        #expect(!composing.showsEmptyState)
     }
 }
 
