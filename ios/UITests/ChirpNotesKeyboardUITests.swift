@@ -124,6 +124,9 @@ final class ChirpNotesKeyboardUITests: XCTestCase {
         screenshot("Dictation key: recording with the editor focused")
         app.buttons["chirp.notes.stop"].tap()
         XCTAssertTrue(waitFor(status, "label == 'Stopped'"))
+        // Done closes the editor and its on-screen keyboard, which covers the tab bar on iPhone.
+        app.buttons["chirp.notes.edit"].tap()
+        XCTAssertTrue(waitFor(editor, "exists == false", timeout: 5))
 
         // Away from Notes the key dictates as before.
         app.selectChirpTab("History")
