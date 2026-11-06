@@ -31,6 +31,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.alpha
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
@@ -153,44 +158,103 @@ internal fun ScratchpadScreen(model: ScratchpadModel, mic: () -> Unit, copy: () 
         }
     }
     val action = model.status.action
-    Surface(Modifier.fillMaxSize()) {
+    val scheme = MaterialTheme.colorScheme
+    // The page is the pond background with the text on a white card, as iOS's Dictate tab.
+    Surface(Modifier.fillMaxSize(), color = scheme.background) {
         Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
                 Column(Modifier.widthIn(max = 600.dp).fillMaxSize().padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // Copy/Share in the top bar (spec §D); Save as note and Clear sit in the overflow.
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Clear in the overflow; Copy, Share and Save as note sit under the text once there is some (iOS Dictate).
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Spacer(Modifier.weight(1f))
-                        IconButton(copy, enabled = model.hasText) { Icon(painterResource(R.drawable.ic_copy), stringResource(R.string.scratchpad_copy)) }
-                        IconButton(share, enabled = model.hasText) { Icon(painterResource(R.drawable.ic_share), stringResource(R.string.scratchpad_share)) }
                         OverflowMenu(model)
                     }
                     if (model.retained) StatusBanner(StatusKind.Error, stringResource(R.string.debug_retention))
-                    // The borderless blank page: no label, no outline, just text.
-                    TextField(model.field, { if (!model.active) model.field = it }, Modifier.fillMaxWidth().weight(1f).heightIn(min = 120.dp),
-                        placeholder = { Text(stringResource(R.string.scratchpad_placeholder)) }, readOnly = model.active,
-                        textStyle = MaterialTheme.typography.bodyLarge,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
-                    if (model.active && model.partial.isNotEmpty()) Text(model.partial, Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium, maxLines = 3)
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(model.status.shown(LocalResources.current), Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
-                        if (model.rawAvailable && rawSeconds > 0) TextButton(model::useRaw, Modifier.semantics {
-                            contentDescription = rawAvailable
-                        }) { Text(stringResource(R.string.quick_dictate_use_raw_seconds, rawSeconds), Modifier.clearAndSetSemantics { },
-                            style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum")) }
-                        if (action != null) TextButton({ act(action) }) { Text(stringResource(action.label)) }
+                    // One banner with one fix for connection and permission problems, as iOS's PondBanner.
+                    if (action != null) StatusBanner(StatusKind.Warning, model.status.shown(LocalResources.current), action = stringResource(action.label), onAction = { act(action) })
+                    Surface(Modifier.fillMaxWidth().weight(1f), shape = MaterialTheme.shapes.large, color = scheme.surface) {
+                        Column {
+                            // The text itself: no label, no outline.
+                            TextField(model.field, { if (!model.active) model.field = it }, Modifier.fillMaxWidth().weight(1f).heightIn(min = 120.dp),
+                                placeholder = { Text(stringResource(R.string.scratchpad_placeholder)) }, readOnly = model.active,
+                                textStyle = MaterialTheme.typography.bodyLarge,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent),
+                                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+                            if (model.active && model.partial.isNotEmpty()) Text(model.partial, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, maxLines = 3)
+                        }
                     }
+                    if (!model.active && model.hasText) FinishedActions(model, copy, share, rawSeconds, rawAvailable)
+                    if (!model.active) model.beforeCleanup?.let { BeforeCleanup(it) }
+                    if (action == null) StatusTitle(model)
                     if (model.cleanupAvailable) StyleGroup(model)
                     MicButton(model, mic)
+                    // Cancel discards the utterance, as on iOS; Stop keeps it.
+                    if (model.active && !model.stopping) TextButton({ model.cancel() }, Modifier.align(Alignment.CenterHorizontally)) { Text(stringResource(R.string.panel_cancel)) }
                     // The one privacy line (spec §D: a blank page): said while the page is blank, gone once there is text.
                     if (!model.hasText && !model.active) Text(
                         stringResource(if (model.historyOn) R.string.scratchpad_privacy_history else R.string.scratchpad_privacy_none),
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                        color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
+        }
+    }
+}
+
+/** "Listening… 0:02" in `record`, "Polishing…" in `moon`, otherwise the outcome: iOS Dictate's title3 status line. */
+@Composable
+private fun StatusTitle(model: ScratchpadModel) {
+    val roles = LocalChirpRoles.current
+    val listening = model.listeningSince
+    val elapsed by androidx.compose.runtime.produceState(0L, listening) {
+        while (listening != null) { value = (android.os.SystemClock.elapsedRealtime() - listening) / 1000; kotlinx.coroutines.delay(500) }
+    }
+    val color = when {
+        model.polishing -> roles.moon
+        listening != null -> roles.record
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    // Only the status is a live region; the clock is readable but never re-announced each second.
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        Text(model.status.shown(LocalResources.current), Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold, color = color, textAlign = TextAlign.Center)
+        if (listening != null && !model.polishing) Text("%d:%02d".format(java.util.Locale.US, elapsed / 60, elapsed % 60), Modifier.padding(start = 8.dp),
+            style = dev.chirp.android.ui.ChirpTokens.timer, color = color)
+    }
+}
+
+/** Copy · Share · Save as note, then Use raw while it is offered: iOS Dictate's chips under the text. */
+@Composable
+private fun FinishedActions(model: ScratchpadModel, copy: () -> Unit, share: () -> Unit, rawSeconds: Int, rawDescription: String) {
+    @Composable fun chip(label: String, icon: Int, onClick: () -> Unit, modifier: Modifier = Modifier) =
+        AssistChip(onClick, { Text(label, maxLines = 1) }, modifier, leadingIcon = { Icon(painterResource(icon), null, Modifier.size(18.dp)) }, shape = CircleShape, border = null,
+            colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.surface, labelColor = MaterialTheme.colorScheme.onSurface,
+                leadingIconContentColor = MaterialTheme.colorScheme.primary))
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        chip(stringResource(R.string.scratchpad_copy), R.drawable.ic_copy, copy)
+        chip(stringResource(R.string.scratchpad_share), R.drawable.ic_share, share)
+        chip(stringResource(R.string.scratchpad_save_as_note), R.drawable.ic_notes_tab, model::saveAsNote)
+        if (model.rawAvailable && rawSeconds > 0) chip(stringResource(R.string.quick_dictate_use_raw_seconds, rawSeconds), R.drawable.ic_undo, model::useRaw,
+            Modifier.semantics { contentDescription = rawDescription })
+    }
+}
+
+/** The words before clean-up changed them: a `moon` label over a gold bar, behind a disclosure (iOS Dictate). */
+@Composable
+private fun BeforeCleanup(raw: String) {
+    val roles = LocalChirpRoles.current
+    var open by rememberSaveable(raw) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth()) {
+        TextButton({ open = !open }, colors = ButtonDefaults.textButtonColors(contentColor = roles.moon)) {
+            Icon(painterResource(R.drawable.ic_sparkle), null, Modifier.size(16.dp))
+            Text(stringResource(R.string.history_before_cleanup), Modifier.padding(start = 6.dp))
+            Icon(painterResource(R.drawable.ic_chevron_right), null, Modifier.padding(start = 2.dp).size(18.dp).rotate(if (open) 90f else 0f))
+        }
+        if (open) Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 12.dp, end = 8.dp, bottom = 4.dp)) {
+            Box(Modifier.width(3.dp).fillMaxHeight().background(roles.moonFill))
+            Text(raw, Modifier.padding(start = 10.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -202,8 +266,6 @@ private fun OverflowMenu(model: ScratchpadModel) {
     Box {
         IconButton({ menu = true }) { Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.history_more_options)) }
         DropdownMenu(menu, { menu = false }) {
-            DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_notes), null) }, text = { Text(stringResource(R.string.scratchpad_save_as_note)) },
-                onClick = { menu = false; model.saveAsNote() }, enabled = model.hasText && !model.active)
             DropdownMenuItem(leadingIcon = { Icon(painterResource(R.drawable.ic_delete), null) }, text = { Text(stringResource(R.string.scratchpad_clear)) },
                 onClick = { menu = false; model.clear() }, enabled = model.hasText && !model.active)
         }
@@ -247,15 +309,19 @@ private fun MicButton(model: ScratchpadModel, onClick: () -> Unit) {
     val micLabel = stringResource(if (model.active) R.string.scratchpad_mic_stop else R.string.scratchpad_mic_start)
     Box(Modifier.fillMaxWidth().height(168.dp), contentAlignment = Alignment.Center) {
         if (listening) Ripple(model.level.coerceIn(0.0, 1.0).toFloat(), Modifier.size(160.dp), color = roles.koiDecor)
+        // Polishing: the gold moon disc with pulsing sparkles, as iOS Dictate.
+        val polishing = model.polishing
+        val pulse = if (polishing) androidx.compose.animation.core.rememberInfiniteTransition(label = "polish").animateFloat(1f, .45f,
+            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(900), androidx.compose.animation.core.RepeatMode.Reverse), label = "sparkle").value else 1f
         Surface(onClick, Modifier.size(96.dp).semantics {
             role = Role.Button
             contentDescription = micLabel
         }, enabled = !model.stopping, shape = CircleShape,
-            color = if (model.active) roles.record else MaterialTheme.colorScheme.primary,
-            contentColor = if (model.active) onRecord else MaterialTheme.colorScheme.onPrimary) {
+            color = if (polishing) roles.moonFill else if (model.active) roles.record else MaterialTheme.colorScheme.primary,
+            contentColor = if (polishing) Color(0xFF402D00) else if (model.active) onRecord else MaterialTheme.colorScheme.onPrimary) {
             Box(contentAlignment = Alignment.Center) {
-                androidx.compose.material3.Icon(painterResource(if (model.active) R.drawable.ic_stop else R.drawable.ic_mic), null,
-                    Modifier.size(40.dp))
+                androidx.compose.material3.Icon(painterResource(if (polishing) R.drawable.ic_sparkle else if (model.active) R.drawable.ic_stop else R.drawable.ic_mic), null,
+                    Modifier.size(40.dp).alpha(pulse))
             }
         }
     }

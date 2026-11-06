@@ -85,6 +85,8 @@
     <string name="status_copied_paste">Copied — paste anywhere</string>
     <string name="status_copied">Copied</string>
     <string name="status_pad_idle">Tap the mic to dictate</string>
+    <!-- After a final that clean-up changed (iOS Dictate: "Polished. Copy or share when ready."). -->
+    <string name="status_pad_polished">Polished</string>
     <string name="status_stop_first">Stop dictating first</string>
     <string name="status_note_saved">Saved as note</string>
     <string name="status_notes_off">Notes are off — turn on Keep notes on this phone in Settings → Notes</string>
