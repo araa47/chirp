@@ -11,21 +11,21 @@
     <string name="notes_retranscribe_title">Re-transcribe “%1$s”?</string>
     <!-- %1$d:%2$s is the clip length as minutes:seconds; %3$s is the server’s address. -->
     <string name="notes_retranscribe_send_clip">Send this %1$d:%2$s clip to your Chirp server on %3$s to transcribe it again?</string>
-    <!-- %1$d min %2$d s is the kept audio’s length; %3$d is the clip count; %4$s is the server’s address. -->
+    <!-- %1$s is the kept audio’s length ("32 s", "3 min 5 s"); %2$d is the clip count; %3$s is the server’s address. -->
     <plurals name="notes_retranscribe_send_note">
-        <item quantity="one">Chirp sends this note’s kept audio (%1$d min %2$d s, %3$d clip) to your Chirp server on %4$s.</item>
-        <item quantity="other">Chirp sends this note’s kept audio (%1$d min %2$d s, %3$d clips) to your Chirp server on %4$s.</item>
+        <item quantity="one">Chirp sends this note’s kept audio (%1$s, %2$d clip) to your Chirp server on %3$s.</item>
+        <item quantity="other">Chirp sends this note’s kept audio (%1$s, %2$d clips) to your Chirp server on %3$s.</item>
     </plurals>
     <string name="notes_retranscribe_not_kept">It is transcribed in memory there and not kept. Nothing else receives the audio.</string>
     <!-- %1$s is the server’s speech model; %2$s is the engine this note was transcribed with. -->
     <string name="notes_retranscribe_models">Speech model: %1$s. This note was transcribed with: %2$s.</string>
     <string name="notes_retranscribe_model_unknown">unknown</string>
     <string name="notes_retranscribe_same_model">Same model as before. Results change only if clean-up or context changed.</string>
-    <string name="notes_retranscribe_cleanup_on">Clean-up: On. Change the model in Chirp on your computer.</string>
-    <string name="notes_retranscribe_cleanup_off">Clean-up: Off. Change the model in Chirp on your computer.</string>
+    <string name="notes_retranscribe_cleanup_on">Clean-up: on. Change the model in Chirp on your computer.</string>
+    <string name="notes_retranscribe_cleanup_off">Clean-up: off. Change the model in Chirp on your computer.</string>
     <!-- %1$s is the host that clean-up sends text to. -->
     <string name="notes_retranscribe_cleanup_host">Clean-up sends text to %1$s. Audio stays on your computer.</string>
-    <string name="notes_retranscribe_debug_retention">Your server is keeping debug recordings. This audio will be saved there for up to 3 days.</string>
+    <string name="notes_retranscribe_debug_retention">Your computer is keeping debug recordings. This audio will be saved there for up to 3 days.</string>
     <!-- %1$d segments of %2$d have no kept audio. -->
     <plurals name="notes_retranscribe_missing_audio">
         <item quantity="one">%1$d of %2$d segments has no kept audio and keeps its current text.</item>
@@ -33,7 +33,7 @@
     </plurals>
     <string name="notes_retranscribe_rebuild">Also rebuild the notes from the new transcript.</string>
     <string name="notes_retranscribe_rebuild_detail">This replaces the notes text, including your edits. You can undo it.</string>
-    <string name="notes_retranscribe_rebuild_needs_cleanup">Needs clean-up on your server</string>
+    <string name="notes_retranscribe_rebuild_needs_cleanup">Needs clean-up on your computer</string>
     <string name="notes_retranscribe_update_chirp">Update Chirp on your computer to re-transcribe</string>
     <string name="notes_retranscribe_action">Re-transcribe</string>
     <string name="notes_retranscribe_action_anyway">Re-transcribe anyway</string>
@@ -50,10 +50,10 @@
     <!-- %1$s is the words heard but not yet in the notes. -->
     <string name="notes_hearing_description">Hearing: %1$s</string>
     <string name="notes_empty_type">Type notes</string>
-    <string name="notes_empty_recording_title">Notes appear as you talk</string>
-    <string name="notes_empty_title">Your notes appear here</string>
-    <string name="notes_empty_recording_detail">Headings, lists and to-dos land here a moment after each pause.</string>
-    <string name="notes_empty_detail">Tap Record and talk. Chirp turns it into headings, lists and to-dos. Or tap here to type.</string>
+    <string name="notes_empty_recording_title">A little room for your thoughts</string>
+    <string name="notes_empty_title">Make this note your own</string>
+    <string name="notes_empty_recording_detail">Chirp turns what you say into notes. You can edit them at any time.</string>
+    <string name="notes_empty_detail">Chirp turns what you say into notes. Tap Record and talk, or tap here to type.</string>
 
     <!-- Share to Notes -->
     <string name="share_notes_only_text">Only text can be shared to Notes.</string>
@@ -157,7 +157,7 @@
     <string name="notes_speakers_play_sample">Play a sample of Person %1$d</string>
     <!-- %1$s is the first thing the person said, quoted. -->
     <string name="notes_speakers_sample">“%1$s”</string>
-    <string name="notes_speakers_same_as">Same as ▸</string>
+    <string name="notes_speakers_same_as">Same person as…</string>
 
     <!-- Notes settings -->
     <string name="notes_settings_on">On</string>
@@ -393,7 +393,7 @@
     <!-- %1$d is the segment number. -->
     <string name="notes_transcript_play_segment">Play segment %1$d</string>
     <!-- %1$s is why the audio wasn’t transcribed. -->
-    <string name="notes_transcript_failed">⚠︎ audio not transcribed (%1$s)</string>
+    <string name="notes_transcript_failed">Not transcribed (%1$s)</string>
     <!-- %1$s is the transcript text; re-transcription kept the original. -->
     <string name="notes_transcript_kept_original">%1$s (kept original)</string>
     <string name="notes_transcript_empty">What is said appears here, a line per segment.</string>

@@ -227,6 +227,14 @@ class NotesPageTest {
         compose.runOnIdle { rig.record().final("synthetic words"); rig.idle() }
         compose.onNodeWithText("Transcript").performClick()
         compose.onAllNodesWithText("synthetic words").onLast().assertIsDisplayed()
-        compose.onNodeWithText("00:00:00", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("0:00", substring = true).assertIsDisplayed()
+        // Older notes never saved their model; the engine line waits until one is known, as on iOS.
+        compose.onNodeWithText("Transcribed with unknown").assertDoesNotExist()
+    }
+
+    @Test fun `the meta line under the title gives the date and open to-dos, as on iOS`() {
+        screen("- [ ] Draft the invitation\n- [ ] Check pricing")
+        compose.onNodeWithTag("notes-meta").assertTextContains("☐ 2 open", substring = true)
+        compose.onNodeWithText("Tap Record to take notes").assertDoesNotExist()
     }
 }

@@ -112,7 +112,7 @@ private fun voiceDetail(voice: SavedVoice): String {
     val earlier = stringResource(R.string.saved_voices_date_earlier)
     fun date(value: String): String = try {
         java.time.Instant.parse(value).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-            .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+            .format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)) // "9 Oct 2025", as on iOS
     } catch (_: Exception) { earlier }
     return if (voice.updated != voice.created) stringResource(R.string.saved_voices_detail_updated, date(voice.created), date(voice.updated), voice.seconds.toInt())
     else stringResource(R.string.saved_voices_detail, date(voice.created), voice.seconds.toInt())

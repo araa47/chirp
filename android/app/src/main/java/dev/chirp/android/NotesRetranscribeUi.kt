@@ -5,11 +5,23 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import dev.chirp.android.ui.LocalChirpRoles
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
+
+/** "32 s", "3 min", "3 min 5 s", "1 h 02 min": the sheet's length, as on iOS. */
+internal fun retranscribeLength(seconds: Int): String = when {
+    seconds < 60 -> "$seconds s"
+    seconds < 3600 -> if (seconds % 60 == 0) "${seconds / 60} min" else "${seconds / 60} min ${seconds % 60} s"
+    else -> "${seconds / 3600} h ${"%02d".format(java.util.Locale.US, seconds / 60 % 60)} min"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,7 +35,7 @@ internal fun RetranscribeSheet(model: NotesModel) {
             Text(stringResource(R.string.notes_retranscribe_title, model.displayTitle), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
             Text(if (model.retranscribeSegment != null)
                 stringResource(R.string.notes_retranscribe_send_clip, seconds / 60, (seconds % 60).toString().padStart(2, '0'), model.retranscribeDestination.text())
-                else pluralStringResource(R.plurals.notes_retranscribe_send_note, clips.size, seconds / 60, seconds % 60, clips.size, model.retranscribeDestination.text()))
+                else pluralStringResource(R.plurals.notes_retranscribe_send_note, clips.size, retranscribeLength(seconds), clips.size, model.retranscribeDestination.text()))
             Text(stringResource(R.string.notes_retranscribe_not_kept))
             Text(stringResource(R.string.notes_retranscribe_models, health?.speechModel ?: health?.engine ?: stringResource(R.string.notes_retranscribe_model_unknown), model.document.transcriptEngine.ui.text()))
             if (model.document.segments.isNotEmpty() && model.document.segments.all { it.engine != null && it.engine == health?.engine })
@@ -31,21 +43,29 @@ internal fun RetranscribeSheet(model: NotesModel) {
             Text(stringResource(if (model.retranscribeCleanup) R.string.notes_retranscribe_cleanup_on else R.string.notes_retranscribe_cleanup_off))
             if (model.retranscribeCleanup && health?.correctionLeavesMachine == true && health.correctionHost != null)
                 Text(stringResource(R.string.notes_retranscribe_cleanup_host, health.correctionHost))
-            if (health?.debugRetention == true)
-                Text(stringResource(R.string.notes_retranscribe_debug_retention), color = MaterialTheme.colorScheme.error)
+            // A red-tinted card, as on iOS; the button below turns red too.
+            if (health?.debugRetention == true) Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.errorContainer) {
+                Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(painterResource(R.drawable.ic_warning), null, Modifier.size(20.dp), tint = LocalChirpRoles.current.record)
+                    Text(stringResource(R.string.notes_retranscribe_debug_retention), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
             val missing = model.document.segments.count { segment -> model.document.audio.none { it.segment == segment.id } }
             if (missing > 0 && model.retranscribeSegment == null) Text(pluralStringResource(R.plurals.notes_retranscribe_missing_audio, missing, missing, model.document.segments.size))
             val rebuild = health?.correctionAvailable == true && health.notesStructure
-            Row {
-                Checkbox(model.rebuildChoice, { model.rebuildChoice = it }, enabled = rebuild)
+            // A switch, as on iOS; the whole row toggles it.
+            Row(Modifier.fillMaxWidth().toggleable(model.rebuildChoice, enabled = rebuild, role = Role.Switch) { model.rebuildChoice = it },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.notes_retranscribe_rebuild))
-                    Text(stringResource(R.string.notes_retranscribe_rebuild_detail), style = MaterialTheme.typography.bodySmall)
-                    if (!rebuild) Text(stringResource(R.string.notes_retranscribe_rebuild_needs_cleanup), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.notes_retranscribe_rebuild_detail), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!rebuild) Text(stringResource(R.string.notes_retranscribe_rebuild_needs_cleanup), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                Switch(model.rebuildChoice, null, enabled = rebuild)
             }
             if (health?.notesRetranscribe != true) Text(stringResource(R.string.notes_retranscribe_update_chirp))
-            else Button(model::startRetranscribe, Modifier.fillMaxWidth()) { Text(stringResource(if (health.debugRetention) R.string.notes_retranscribe_action_anyway else R.string.notes_retranscribe_action)) }
+            else Button(model::startRetranscribe, Modifier.fillMaxWidth(), colors = if (health.debugRetention)
+                ButtonDefaults.buttonColors(containerColor = LocalChirpRoles.current.record, contentColor = MaterialTheme.colorScheme.onError) else ButtonDefaults.buttonColors()) { Text(stringResource(if (health.debugRetention) R.string.notes_retranscribe_action_anyway else R.string.notes_retranscribe_action)) }
             TextButton({ model.retranscribeSheet = false }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.notes_action_cancel)) }
         }
     }
@@ -60,10 +80,16 @@ internal fun RetranscribeSheet(model: NotesModel) {
 @Composable
 internal fun RetranscribeBanner(model: NotesModel) {
     model.retranscribeProgress?.let { progress ->
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
-            Text(progress.label.text())
-            LinearProgressIndicator(progress = { if (progress.total == 0) 0f else progress.done.toFloat() / progress.total }, modifier = Modifier.fillMaxWidth())
-            TextButton({ RetranscribeGate.owner?.cancelRetranscribe() }) { Text(stringResource(R.string.notes_action_cancel)) }
+        // A tinted card with the waveform, the label, a bar and a tonal Cancel, as on iOS.
+        Surface(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .5f)) {
+            Row(Modifier.padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(painterResource(R.drawable.ic_waveform), null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(progress.label.text(), style = MaterialTheme.typography.bodyMedium)
+                    LinearProgressIndicator(progress = { if (progress.total == 0) 0f else progress.done.toFloat() / progress.total }, modifier = Modifier.fillMaxWidth())
+                }
+                FilledTonalButton({ RetranscribeGate.owner?.cancelRetranscribe() }) { Text(stringResource(R.string.notes_action_cancel)) }
+            }
         }
     }
     model.retranscribeFailure?.let { failure ->

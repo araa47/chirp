@@ -50,6 +50,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -161,7 +162,10 @@ internal fun NotesScreen(model: NotesModel, record: () -> Unit, copy: () -> Unit
                 // Independent recovery, connection and speaker notices coexist; cap the stack so notes stay usable.
                 NotesStatusStack(model, act, Modifier.padding(horizontal = gutter).heightIn(max = statusMaxHeight))
                 if (!editing && !wide && !externalTranscript) Row(Modifier.padding(horizontal = gutter)) {
-                    AssistChip({ transcript = true }, label = { Text(stringResource(R.string.notes_editor_transcript)) }, leadingIcon = { Icon(painterResource(R.drawable.ic_transcript), null, Modifier.size(18.dp)) })
+                    // Koi-tinted, as iOS's bordered Transcript capsule.
+                    AssistChip({ transcript = true }, label = { Text(stringResource(R.string.notes_editor_transcript)) }, leadingIcon = { Icon(painterResource(R.drawable.ic_transcript), null, Modifier.size(18.dp)) },
+                        shape = CircleShape, border = null, colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer, leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer))
                 }
                 Row(Modifier.fillMaxWidth().weight(1f)) {
                     Box(Modifier.weight(1.5f).fillMaxHeight()) {
@@ -239,12 +243,17 @@ private fun NotesTopBar(model: NotesModel, editing: Boolean, gutter: androidx.co
                 .semantics { contentDescription = renameDescription; heading() },
                 style = ChirpTokens.noteTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // One meta line, as on iOS and the Mac (#271 2.8): the state while it isn't idle, then date · duration · open to-dos · audio.
+            val status = model.status
+            val quiet = !model.state.active && (status == NotesStatus.IDLE || status.text == UiText.Res(R.string.notes_status_stopped))
+            FlowRow(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp),
+                itemVerticalAlignment = Alignment.CenterVertically) {
                 if (model.state.active) LiveDot(model.recording)
-                Text(model.status.text.text(), Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.labelLarge,
+                if (!quiet) Text(status.text.text(), Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.labelLarge,
                     color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (editing && (model.state.active || model.elapsed > 0)) Text(stringResource(R.string.notes_editor_elapsed, model.elapsedText.text()), style = dev.chirp.android.ui.ChirpTokens.timerSmall,
+                if (editing && model.state.active) Text(stringResource(R.string.notes_editor_elapsed, model.elapsedText.text()), style = dev.chirp.android.ui.ChirpTokens.timerSmall,
                     color = scheme.onSurfaceVariant)
+                Text(noteFacts(model), Modifier.testTag("notes-meta"), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
             }
         }
         if (model.reorganizing !is Reorganizing.Unavailable) IconButton(model::organize, enabled = model.canOrganize,
@@ -254,6 +263,22 @@ private fun NotesTopBar(model: NotesModel, editing: Boolean, gutter: androidx.co
         IconButton(edit) { Icon(painterResource(if (editing) R.drawable.ic_check else R.drawable.ic_edit), stringResource(if (editing) R.string.notes_editor_done_editing else R.string.notes_editor_edit)) }
         NotesMenu(model, menu)
     }
+}
+
+/** "6 Nov 2026, 14:28 · 12 min · ☐ 2 open · 25 kB": a fact with nothing to say is left out (iOS `NoteMeta.facts`). */
+@Composable
+internal fun noteFacts(model: NotesModel): String {
+    val context = LocalContext.current
+    val started = model.document.startedAt
+    val date = remember(started) { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(started)) }
+    val open = model.document.openTodos
+    val bytes = model.document.audio.sumOf { it.bytes }
+    return buildList {
+        add(date)
+        if (!model.state.active && model.elapsed >= 1) add(notesDuration(model.elapsed))
+        if (open > 0) add(pluralStringResource(R.plurals.notes_library_open_tasks, open, open))
+        if (bytes > 0) add(android.text.format.Formatter.formatShortFileSize(context, bytes))
+    }.joinToString(" · ")
 }
 
 @Composable
@@ -559,7 +584,9 @@ internal fun TranscriptPane(model: NotesModel, modifier: Modifier, titled: Boole
             FilterChip(model.raw, { model.raw = !model.raw }, label = { Text(stringResource(R.string.notes_transcript_show_raw)) })
             if (close != null) IconButton(close) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.notes_transcript_close)) }
         }
-        Text(stringResource(R.string.notes_transcript_engine, model.document.transcriptEngine.ui.text()), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        // Older notes never recorded their model: the line shows once one is known (a live recording or a re-transcribe), as on iOS.
+        if (model.document.transcriptEngine != TranscriptEngine.Unknown)
+            Text(stringResource(R.string.notes_transcript_engine, model.document.transcriptEngine.ui.text()), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
         if (playbackFailed) Text(stringResource(R.string.notes_transcript_playback_failed), Modifier.padding(vertical = 8.dp), color = scheme.error, style = MaterialTheme.typography.bodyMedium)
         val document = model.document
         val roster = document.roster
@@ -593,11 +620,15 @@ internal fun TranscriptPane(model: NotesModel, modifier: Modifier, titled: Boole
                     if (clip != null) IconButton({ if (active) player?.stop() else player?.play(document.uid, segment.id) }, Modifier.size(48.dp)) {
                         Icon(painterResource(if (active) R.drawable.ic_stop else R.drawable.ic_play), if (active) stringResource(R.string.notes_transcript_stop_playback) else stringResource(R.string.notes_transcript_play_segment, segment.id + 1), tint = scheme.primary)
                     }
-                    Text(NotesDocument.timestamp(segment.offset), Modifier.padding(top = 2.dp), style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace,
-                        color = scheme.outline)
+                    // "0:12", as on iOS; the export keeps hh:mm:ss.
+                    Text(NotesDocument.clock(segment.offset), Modifier.padding(top = 2.dp), style = dev.chirp.android.ui.ChirpTokens.timerSmall,
+                        color = scheme.onSurfaceVariant)
                     val failure = segment.failure
                     val turns = segment.turns
-                    if (failure != null) Text(stringResource(R.string.notes_transcript_failed, failure), color = scheme.error, style = MaterialTheme.typography.bodyMedium)
+                    if (failure != null) Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(painterResource(R.drawable.ic_warning), null, Modifier.size(16.dp), tint = LocalChirpRoles.current.record)
+                        Text(stringResource(R.string.notes_transcript_failed, failure), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    }
                     else if (!turns.isNullOrEmpty()) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         turns.forEachIndexed { i, turn ->
                             if ((if (model.raw) turn.raw else turn.text).isBlank()) return@forEachIndexed
