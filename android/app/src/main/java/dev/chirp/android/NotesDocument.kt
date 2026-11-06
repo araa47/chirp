@@ -648,6 +648,12 @@ internal class NotesDocument(var startedAt: Long = System.currentTimeMillis(), t
             return NotesChange(prefix, old.length - suffix, new.substring(prefix, new.length - suffix), kind)
         }
 
+        /** "0:12", "12:05", "1:02:05" from the session start: the transcript rows' clock. */
+        fun clock(offset: Double): String {
+            val s = maxOf(0, offset.toInt())
+            return if (s >= 3600) "%d:%02d:%02d".format(Locale.US, s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(Locale.US, s / 60, s % 60)
+        }
+
         /** `hh:mm:ss` from the session start. */
         fun timestamp(offset: Double): String {
             val s = maxOf(0, offset.toInt())

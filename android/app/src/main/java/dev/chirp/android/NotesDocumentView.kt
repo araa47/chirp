@@ -147,8 +147,9 @@ private fun TaskBox(checked: Boolean) {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(6.dp)
     Box(Modifier.padding(start = 2.dp).size(20.dp).clip(shape)
-        .then(if (checked) Modifier.background(scheme.primary) else Modifier.border(2.dp, scheme.outline, shape)), contentAlignment = Alignment.Center) {
-        if (checked) Icon(painterResource(R.drawable.ic_check), null, Modifier.size(16.dp), tint = scheme.onPrimary)
+        // A done to-do is lily (success), as on iOS; an open one is a muted outline.
+        .then(if (checked) Modifier.background(dev.chirp.android.ui.LocalChirpRoles.current.lily) else Modifier.border(2.dp, scheme.outline, shape)), contentAlignment = Alignment.Center) {
+        if (checked) Icon(painterResource(R.drawable.ic_check), null, Modifier.size(16.dp), tint = scheme.surface)
     }
 }
 

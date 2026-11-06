@@ -116,7 +116,7 @@ class NotesRetranscribeRenderTest {
         for (night in listOf(false, true)) {
             compose.runOnIdle { dark.value = night }; compose.mainClock.advanceTimeBy(2000); compose.waitForIdle()
             compose.onNodeWithText("Re-transcribe anyway").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText("Your server is keeping debug recordings. This audio will be saved there for up to 3 days.").assertExists()
+            compose.onNodeWithText("Your computer is keeping debug recordings. This audio will be saved there for up to 3 days.").assertExists()
             compose.onNodeWithText("Clean-up sends text to cleanup.example.test. Audio stays on your computer.").assertExists()
             val bitmap = notesScreenshot(compose.onNode(isRoot() and hasAnyDescendant(hasText("Re-transcribe anyway"))))
             File(File(System.getProperty("chirp.screenshots")).apply { mkdirs() }, "notes-retranscribe-warning-${if (night) "dark" else "light"}.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
