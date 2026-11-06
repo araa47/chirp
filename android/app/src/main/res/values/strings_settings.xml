@@ -112,18 +112,22 @@
     <string name="history_notes_off">Notes are off — turn on Keep notes on this phone in Settings → Notes</string>
     <string name="history_note_failed">Couldn\'t add the note</string>
     <string name="history_subtitle">What you dictated, encrypted on this phone only</string>
+    <!-- The History caption while history is off but older dictations remain (iOS). -->
+    <string name="history_subtitle_off">History is off. Existing dictations stay until they expire or you delete them.</string>
+    <!-- History detail: append to the latest note, or save as a new note when there is none. -->
+    <string name="history_add_to_note">Add to note</string>
     <string name="history_more_options">More options</string>
     <string name="history_settings">History settings</string>
     <string name="history_search">Search history</string>
     <string name="history_clear_search">Clear search</string>
-    <string name="history_off">Dictation history is off</string>
+    <string name="history_off">History is off</string>
     <string name="history_off_body">Turn it on to keep recent dictations here, encrypted on this phone only.</string>
     <string name="history_turn_on">Turn on</string>
     <string name="history_no_matches">No matches</string>
     <string name="history_no_matches_body">Nothing in your history matches. Try other words.</string>
-    <string name="history_empty">No dictations yet</string>
+    <string name="history_empty">Nothing yet</string>
     <!-- %1$s: how long history keeps dictations, such as "7 days". -->
-    <string name="history_empty_body">New dictations stay here for %1$s.</string>
+    <string name="history_empty_body">Dictations you finish appear here and stay for %1$s.</string>
     <string name="history_select_prompt">Select a dictation to see it in full.</string>
     <!-- %1$s: the latest note's title. -->
     <string name="history_add_to_latest">Add to latest note (“%1$s”)</string>
@@ -134,7 +138,7 @@
     <string name="history_partial">partial</string>
     <string name="history_before_cleanup">Before clean-up</string>
     <string name="history_copy">Copy</string>
-    <string name="history_copy_raw">Copy raw</string>
+    <string name="history_copy_raw">Copy original</string>
     <string name="history_share">Share</string>
     <!-- App updates from the paired computer (UpdateSettings.kt) -->
     <string name="update_needs_tailscale">Updates need a computer paired over Tailscale</string>

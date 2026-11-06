@@ -7,9 +7,8 @@ import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
-import dev.chirp.android.shell.HistoryDay
 import dev.chirp.android.shell.HistoryScreen
-import dev.chirp.android.shell.historyDay
+import dev.chirp.android.shell.historyGroupLabel
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -48,12 +47,16 @@ class HistoryScreenTest {
         secrets.forEach { secret -> assertFalse("in prefs", prefs.contains(secret)); assertFalse("in the log", log.contains(secret)) }
     }
 
-    @Test fun `days are calendar days in the zone`() {
+    @Test fun `days are calendar days in the zone, then weekdays, then dates as on iOS`() {
         val zone = ZoneOffset.UTC
-        assertEquals(HistoryDay.Today, historyDay(now, now - 8 * hour + 60_000, zone))
-        assertEquals(HistoryDay.Yesterday, historyDay(now, now - 8 * hour - 60_000, zone))
-        assertEquals(HistoryDay.Yesterday, historyDay(now, now - 32 * hour + 60_000, zone))
-        assertEquals(HistoryDay.Earlier, historyDay(now, now - 32 * hour - 60_000, zone))
+        val res = context.resources
+        assertEquals("Today", historyGroupLabel(res, now, now - 8 * hour + 60_000, zone))
+        assertEquals("Yesterday", historyGroupLabel(res, now, now - 8 * hour - 60_000, zone))
+        assertEquals("Yesterday", historyGroupLabel(res, now, now - 32 * hour + 60_000, zone))
+        val weekday = java.time.Instant.ofEpochMilli(now - 56 * hour).atZone(zone).dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
+        assertEquals(weekday, historyGroupLabel(res, now, now - 56 * hour, zone))
+        val older = java.time.Instant.ofEpochMilli(now - 20 * 24 * hour).atZone(zone).toLocalDate()
+        assertTrue(historyGroupLabel(res, now, now - 20 * 24 * hour, zone).startsWith("${older.dayOfMonth} "))
     }
 
     @Test fun `entries are grouped by day and search filters them`() {
@@ -63,7 +66,8 @@ class HistoryScreenTest {
         record("Running ten minutes late", at = now - 72 * hour)
         show()
         reveal("Running ten minutes late")
-        val tops = listOf("Today", "Meet at the pier at noon", "Yesterday", "Draft the quarterly summary", "Earlier", "Running ten minutes late").map {
+        val earlier = historyGroupLabel(context.resources, now, now - 72 * hour)
+        val tops = listOf("Today", "Meet at the pier at noon", "Yesterday", "Draft the quarterly summary", earlier, "Running ten minutes late").map {
             compose.onNodeWithText(it).fetchSemanticsNode().boundsInRoot.top
         }
         assertEquals("headers in order, each above its entries", tops.sorted(), tops)
@@ -90,7 +94,7 @@ class HistoryScreenTest {
         compose.onNodeWithText("Copy").performClick()
         assertEquals("Draft the quarterly summary", clip().getItemAt(0).text.toString())
         assertTrue(clip().description.extras!!.getBoolean("android.content.extra.IS_SENSITIVE"))
-        compose.onNodeWithText("Copy raw").performClick()
+        compose.onNodeWithText("Copy original").performClick()
         assertEquals("draft the uh quarterly summary", clip().getItemAt(0).text.toString())
         assertPrivate("quarterly summary", "draft the uh")
     }
@@ -126,13 +130,13 @@ class HistoryScreenTest {
         val row = compose.onNode(hasText("Meet at the pier at noon") and hasClickAction()).fetchSemanticsNode()
         compose.runOnIdle { row.config[androidx.compose.ui.semantics.SemanticsActions.CustomActions].first { it.label == "Delete" }.action() }
         compose.waitUntil(5000) { store.entries().isEmpty() }
-        compose.onNodeWithText("No dictations yet").assertExists()
+        compose.onNodeWithText("Nothing yet").assertExists()
     }
 
     @Test fun `history off shows the opt-in, and settings sit behind the menu where turning off confirms then deletes`() {
         store.disable()
         show()
-        compose.onNodeWithText("Dictation history is off").assertExists()
+        compose.onNodeWithText("History is off").assertExists()
         compose.onNodeWithText("Search history").assertDoesNotExist()
         compose.onNodeWithText("Turn on").performClick()
         compose.onNodeWithText("Keep dictation history on this phone").assertIsOff().performClick()
@@ -219,7 +223,7 @@ class HistoryScreenTest {
     @Test fun `the menu opens history settings with retention`() {
         store.enable()
         show()
-        compose.onNodeWithText("No dictations yet").assertExists()
+        compose.onNodeWithText("Nothing yet").assertExists()
         compose.onNodeWithContentDescription("More options").performClick()
         compose.onNodeWithText("History settings").performClick()
         compose.onNodeWithText("1 day").performScrollTo().performClick()
