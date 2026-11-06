@@ -23,7 +23,7 @@ internal fun SettingsDetail(page: SettingsPage, state: SetupState, actions: Sett
         SettingsPage.Feedback -> FeedbackPage()
         SettingsPage.Notes -> NotesSettings()
         SettingsPage.History -> HistoryPage(history)
-        SettingsPage.About -> AboutPage(updates)
+        SettingsPage.About -> AboutPage(updates, actions.showSetup)
     }
 }
 
@@ -128,11 +128,21 @@ private fun HistoryPage(history: DictationHistory?) {
 }
 
 @Composable
-private fun AboutPage(updates: UpdateController?) {
+private fun AboutPage(updates: UpdateController?, showSetup: () -> Unit) {
     val context = LocalContext.current
     val store = remember { SettingsStore(context) }
     var report by remember { mutableStateOf(DiagnosticsReport.text(context)) }
     var debug by remember { mutableStateOf(store.debugOverlay) }
+    var privacy by remember { mutableStateOf(false) }
+    // Version and Privacy lead, as on iOS; Show setup again closes the page.
+    SettingsGroup {
+        SettingsItem {
+            Text(stringResource(R.string.settings_about_version), style = MaterialTheme.typography.bodyLarge)
+            Text(dev.chirp.android.BuildConfig.VERSION_NAME, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        NavRow(stringResource(R.string.settings_about_privacy), { privacy = true }, summary = stringResource(R.string.settings_about_privacy_summary), icon = R.drawable.ic_shield)
+    }
+    if (privacy) InfoSheet(stringResource(R.string.settings_about_privacy), stringResource(R.string.settings_about_privacy_body)) { privacy = false }
     UpdateSettings(updates)
     SettingsGroup(stringResource(R.string.settings_diagnostics)) {
         SettingsItem { DiagnosticsBody(report) }
@@ -141,6 +151,7 @@ private fun AboutPage(updates: UpdateController?) {
         ActionRow(stringResource(R.string.settings_copy_diagnostics), { copyDiagnostics(context, report) })
         ActionRow(stringResource(R.string.settings_clear_timings), { DiagnosticsReport.clearTimings(context); report = DiagnosticsReport.text(context) })
     }
+    SettingsGroup { ActionRow(stringResource(R.string.settings_about_show_setup), showSetup) }
 }
 
 /** Shared by this page and setup's Diagnostics dialog. */

@@ -35,7 +35,8 @@ internal fun SettingsList(state: SetupState, actions: SettingsActions, history: 
         // The list stays composed beside its detail page on a Fold: preference changes must refresh its summaries.
         key(revision) { SettingsGroup {
             NavRow(stringResource(SettingsPage.Connection.title), { open(SettingsPage.Connection) },
-                summary = if (state.paired) connection.title.text() else stringResource(R.string.settings_summary_pair), icon = R.drawable.ic_devices)
+                // "Connected · host · engine · clean-up on your computer", or "Not paired · Pair your computer to dictate", as on iOS.
+                summary = listOfNotNull(connection.title.text(), connection.summary?.text()).joinToString(" · "), icon = R.drawable.ic_devices)
             NavRow(stringResource(SettingsPage.HowYouDictate.title), { open(SettingsPage.HowYouDictate) }, summary = inputModeSummary(state), icon = R.drawable.ic_mic)
             NavRow(stringResource(SettingsPage.Dictation.title), { open(SettingsPage.Dictation) }, summary = dictationSummary(context, state), icon = R.drawable.ic_tune)
             NavRow(stringResource(SettingsPage.Keyboard.title), { open(SettingsPage.Keyboard) }, summary = if (state.inputMode == InputMode.OWN_KEYBOARD)

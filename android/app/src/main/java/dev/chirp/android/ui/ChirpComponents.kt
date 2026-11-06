@@ -119,7 +119,10 @@ internal fun ActionRow(title: String, onClick: () -> Unit, modifier: Modifier = 
 @Composable
 internal fun <T> ChoiceChips(options: List<T>, selected: T, label: (T) -> String, modifier: Modifier = Modifier, onSelect: (T) -> Unit) {
     FlowRow(modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { option -> FilterChip(option == selected, { onSelect(option) }, label = { Text(label(option)) }) }
+        // The chosen chip is koi-filled (koiContainer), as on iOS; the card behind is secondaryContainer, so the default fill vanished.
+        options.forEach { option -> FilterChip(option == selected, { onSelect(option) }, label = { Text(label(option)) },
+            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer)) }
     }
 }
 

@@ -57,7 +57,7 @@ class SettingsScreenTest {
         SettingsPage.Feedback to listOf("App colours", "Haptic cues", "Sound cues"),
         SettingsPage.Notes to listOf("Save battery while the screen is off", "Keep a recovery copy until notes are saved", "Keep notes on this phone"),
         SettingsPage.History to listOf("Keep dictation history on this phone", "What Chirp keeps"),
-        SettingsPage.About to listOf("Check for updates", "Debug overlay (timings only)", "Copy diagnostics", "Clear timings"),
+        SettingsPage.About to listOf("Version", "Privacy", "Check for updates", "Debug overlay (timings only)", "Copy diagnostics", "Clear timings", "Show setup again"),
     )
 
     @Test fun `every setting is reachable from its category page exactly once, and back returns to the list`() {
@@ -80,10 +80,10 @@ class SettingsScreenTest {
     @Test fun `each category row carries a live one-line summary`() {
         val (state, history, updates) = settingsFixture()
         show(state, history, updates)
-        compose.onNodeWithText("Connected · mac.example.test").assertExists()                       // Connection
+        compose.onNodeWithText("Connected · mac.example.test · ", substring = true).assertExists()  // Connection, with engine and clean-up as on iOS
         compose.onNodeWithText("Clean-up on · stops on tap").assertExists()  // Dictation
         compose.onNodeWithText("Battery saver · recovery copy · keeps notes").assertExists()      // Notes (defaults)
-        compose.onNodeWithText("Dictation history off").assertExists()                            // Privacy & history
+        compose.onNodeWithText("History off").assertExists()                            // Privacy & history
         compose.onNodeWithText("Chirp ${BuildConfig.VERSION_NAME}").assertExists()                // About
     }
 
@@ -236,7 +236,7 @@ class SettingsScreenTest {
         show(state, history, updates)
         open(SettingsPage.Dictation)
         compose.onNode(hasText("Clean-up") and isToggleable()).assertIsDisplayed().assertIsOn()
-        compose.onNodeWithText("Polishes punctuation and filler words on your computer").assertIsDisplayed()
+        compose.onNodeWithText("Clean-up runs on your computer.").assertIsDisplayed()
         compose.runOnIdle { assertFalse(context.getSharedPreferences("chirp", 0).contains("correction_explicit")) }
         compose.onNode(hasText("Clean-up") and isToggleable()).performClick()
         compose.runOnIdle { assertFalse(SettingsStore(context).correction); assertTrue(context.getSharedPreferences("chirp", 0).getBoolean("correction_explicit", false)) }
@@ -256,7 +256,7 @@ class SettingsScreenTest {
         show(state, history, updates)
         open(SettingsPage.Dictation)
         compose.onNodeWithText("Stop dictation").performScrollTo()
-        compose.onNodeWithText("Learn more").performScrollTo().performClick()
+        compose.onNodeWithText("About Stop dictation").performScrollTo().performClick()
         compose.onNodeWithText("Tap the stop button to finish. Either way, a countdown starts 15 seconds before the limit and dictation ends at 10 minutes.").assertExists()
     }
 

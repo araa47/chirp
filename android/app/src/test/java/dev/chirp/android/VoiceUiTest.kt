@@ -80,9 +80,9 @@ class VoiceUiTest {
     @Test fun `denied microphone offers app permissions and the pair page shows its issue with one action`() {
         val state = SetupState().apply { step = PAGE_MIC }; val calls = Calls()
         compose.setContent { ChirpTheme { Onboarding(state, calls.actions(state)) } }
-        compose.onNodeWithText("Open app permissions").assertDoesNotExist()
+        compose.onNodeWithText("Open Settings").assertDoesNotExist()
         compose.runOnIdle { state.micDenied = true }
-        compose.onNodeWithText("Open app permissions").performClick()
+        compose.onNodeWithText("Open Settings").performClick()
         compose.runOnIdle { state.step = PAGE_PAIR; state.pairIssue = PairIssue.Unreachable }
         compose.onNodeWithText("Couldn’t reach your computer").assertIsDisplayed()
         compose.onNodeWithText("Try again").performClick()
