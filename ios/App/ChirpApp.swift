@@ -21,6 +21,7 @@ struct ChirpApp: App {
         WindowGroup { ChirpScene(coordinator: coordinator) }
             .commands {
                 DictationCommands(model: coordinator)
+                NotesCommands(notes: .current(for: coordinator))
                 NavigationCommands()
             }
     }
@@ -47,7 +48,14 @@ struct ChirpScene: View {
     }
     private var root: some View {
         ChirpRootView(model: coordinator, notes: .current(for: coordinator), tab: $tab)
-            .onAppear { HardwareShortcutController.shared.showDictate = { tab = .dictate } }
+            .onAppear {
+                let notes = LiveNotesController.current(for: coordinator)
+                HardwareShortcutController.shared.showDictate = { tab = .dictate }
+                // On the Notes tab the dictation key records, pauses and resumes Notes, as in the Mac's Notes window.
+                HardwareShortcutController.shared.notesKey = { [weak notes] fieldFocused in notes?.hotkeyPress(fieldFocused: fieldFocused) ?? false }
+                notes.notesTabShown = tab == .notes
+            }
+            .onChange(of: tab) { _, tab in LiveNotesController.current(for: coordinator).notesTabShown = tab == .notes }
             .onChange(of: scenePhase) { _, phase in if phase == .active { coordinator.refreshSetup(); coordinator.reconcile() } }
             .onOpenURL { url in
                 let c = URLComponents(url: url, resolvingAgainstBaseURL: false)

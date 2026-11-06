@@ -231,11 +231,11 @@ struct NoteDetailView: View {
                 Text(clock(notes.elapsed)).font(ChirpType.timer(.headline))
             }.accessibilityHidden(true)
             Button(notes.isPaused ? "Resume" : "Pause", systemImage: notes.isPaused ? "mic.fill" : "pause.fill") { Task { await notes.togglePause() } }
-                .buttonStyle(.bordered).buttonBorderShape(.capsule).keyboardShortcut("p", modifiers: [.command, .shift])
+                .buttonStyle(.bordered).buttonBorderShape(.capsule)
                 .accessibilityIdentifier("chirp.notes.pause")
             Button("Stop", systemImage: "stop.fill") { Task { await notes.stop() } }
                 .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Color.chirp.record).foregroundStyle(Color.chirp.onKoi)
-                .keyboardShortcut("r", modifiers: [.command, .shift]).accessibilityIdentifier("chirp.notes.stop")
+                .accessibilityIdentifier("chirp.notes.stop")
         } else if notes.state == .stopping {
             ProgressView("Finishing…").accessibilityIdentifier("chirp.notes.finishing")
         } else {
@@ -247,7 +247,7 @@ struct NoteDetailView: View {
                 if notes.isActive { confirmSwitch = true } else { Task { await notes.record() } }
             }.buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Color.chirp.koi).foregroundStyle(Color.chirp.onKoi)
                 .disabled(!notes.paired || notes.starting || session.armed || notes.isRetranscribing)
-                .keyboardShortcut("r", modifiers: [.command, .shift]).accessibilityIdentifier("chirp.notes.record")
+                .accessibilityIdentifier("chirp.notes.record")
         }
     }
 

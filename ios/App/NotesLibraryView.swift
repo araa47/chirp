@@ -63,6 +63,7 @@ struct NotesLibraryView: View {
             if let id { Task { await open(id); notes.didNavigateToNote() } }
         }
         .onChange(of: notes.entries) { _, _ in revision += 1 }
+        .onChange(of: selectedID, initial: true) { _, id in notes.shownNote = UUID(uuidString: id) }
         .task(id: query + String(revision)) {
             guard let library = notes.library else { return }
             do {
@@ -268,7 +269,6 @@ struct NotesLibraryView: View {
                 // New note types a note here, with no computer or microphone, and never stops a recording (A2-7).
                 Button { Task { await newNote() } } label: { Image(systemName: "square.and.pencil").frame(minWidth: 44, minHeight: 44) }
                     .buttonStyle(.bordered).buttonBorderShape(.circle).accessibilityLabel("New note")
-                    .keyboardShortcut("n", modifiers: .command)
                     .accessibilityShowsLargeContentViewer().accessibilityIdentifier("chirp.notes.new")
                 Button(action: dictate) { Image(systemName: "mic").frame(minWidth: 44, minHeight: 44) }
                     .buttonStyle(.bordered).buttonBorderShape(.circle).accessibilityLabel("Dictate")
@@ -276,8 +276,8 @@ struct NotesLibraryView: View {
                 Button { if notes.isActive { confirmRecording = true } else { Task { await startRecording() } } } label: {
                     Label("Record", systemImage: "record.circle").font(.headline).padding(.vertical, 8).lineLimit(1)
                 }.buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Color.chirp.koi)
-                    // ⇧⌘R records from the library; with a note open, its own Record / Stop owns the shortcut.
-                    .foregroundStyle(Color.chirp.onKoi).keyboardShortcut(selectedID.isEmpty ? KeyboardShortcut("r", modifiers: [.command, .shift]) : nil)
+                    // ⌘N and ⇧⌘R are the Notes menu's (NotesCommands), so they work from every tab.
+                    .foregroundStyle(Color.chirp.onKoi)
                     .accessibilityShowsLargeContentViewer()
                     .accessibilityIdentifier("chirp.notes.record")
             }
