@@ -59,6 +59,9 @@ def check(p, work, output):
             return [n for n in p['nodes']() if n.get('package') == package and n.get('text') and w * .15 < p['center'](n)[0] < w * .45
                     and p['bounds'](n)[3] > p['bounds'](n)[1]]
         first = column()
+        if not first:  # Say what is on screen instead of failing inside min().
+            seen = [(n.get('text'), p['center'](n)[0]) for n in p['nodes']() if n.get('package') == package and n.get('text')]
+            raise AssertionError(f'No Settings column text between 15% and 45% of {w}px; text centres: {seen[:20]}')
         assert min(p['bounds'](n)[1] for n in first) >= status_bottom, 'Settings column starts under the status bar'
         shot('settings-column-top')
         for _ in range(8):
