@@ -52,7 +52,7 @@ struct ChirpScene: View {
                 let notes = LiveNotesController.current(for: coordinator)
                 HardwareShortcutController.shared.showDictate = { tab = .dictate }
                 // On the Notes tab the dictation key records, pauses and resumes Notes, as in the Mac's Notes window.
-                HardwareShortcutController.shared.notesKey = { [weak notes] fieldFocused in notes?.hotkeyPress(fieldFocused: fieldFocused) ?? false }
+                HardwareShortcutController.shared.notesKey = { [weak notes] dictating in notes?.hotkeyPress(dictationActive: dictating) ?? false }
                 notes.notesTabShown = tab == .notes
             }
             .onChange(of: tab) { _, tab in LiveNotesController.current(for: coordinator).notesTabShown = tab == .notes }
@@ -92,10 +92,14 @@ struct DictationCommands: Commands {
             Button("Use Raw Transcript") { model.useRaw() }
                 .keyboardShortcut("z", modifiers: [.control, .option]).disabled(!model.canUseRaw)   // ⌘⇧Z is the system's Redo: it never reached this item
             Divider()
-            Button("Start Keyboard Session") { Task { do { try await model.armSession() } catch { model.show(error) } } }
-                .keyboardShortcut("k", modifiers: [.command, .shift]).disabled(model.armed || !model.paired || model.working)
-            Button("End Session") { model.endSession() }
-                .keyboardShortcut("e", modifiers: [.command, .shift]).disabled(!model.armed)
+            // ⌘⇧K starts the session and ends it, like ⌘Return for dictation: ⇧⌘E is Edit by voice in Notes, as on the Mac.
+            if model.armed {
+                Button("End Session") { model.endSession() }
+                    .keyboardShortcut("k", modifiers: [.command, .shift])
+            } else {
+                Button("Start Keyboard Session") { Task { do { try await model.armSession() } catch { model.show(error) } } }
+                    .keyboardShortcut("k", modifiers: [.command, .shift]).disabled(!model.paired || model.working)
+            }
             HardwareShortcutCommand(model: model, shortcuts: .shared)
         }
     }

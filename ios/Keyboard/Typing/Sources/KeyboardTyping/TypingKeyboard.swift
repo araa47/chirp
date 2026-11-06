@@ -24,6 +24,7 @@ public enum TypingKeyboard {
         let autocomplete = ChirpAutocompleteService()
         services.autocompleteService = autocomplete
         services.feedbackService = ChirpFeedbackService(hasFullAccess: hasFullAccess)
+        if !(services.layoutService is ChirpLayoutService) { services.layoutService = ChirpLayoutService(base: services.layoutService) }
         let actions = ChirpActionHandler(controller: controller)
         services.actionHandler = actions
         return (autocomplete, actions)

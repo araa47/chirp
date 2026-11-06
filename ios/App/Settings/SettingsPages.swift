@@ -294,6 +294,15 @@ struct ShortcutsPage: View {
         ("Show or hide transcript", "⌥⌘T"),
     ]
 
+    // The Dictation menu (DictationCommands, every tab). ⇧⌘K starts and ends the session; ⇧⌘E is Edit by voice.
+    static let dictationShortcuts: [(title: String, keys: String)] = [
+        ("Start or stop dictation", "⌘↩"),
+        ("Cancel dictation", "⌘."),
+        ("Copy result", "⇧⌘C"),
+        ("Use raw transcript", "⌃⌥Z"),
+        ("Start or end keyboard session", "⇧⌘K"),
+    ]
+
     var body: some View {
         SettingsPageScroll {
             SettingsGroup(title: "Notes") {
@@ -306,12 +315,9 @@ struct ShortcutsPage: View {
                     let hw = hardware.shortcut
                     shortcut(hw.mode == .hold ? "Hold to dictate" : "Press to start or stop", hw.title)
                 }
-                shortcut("Start or stop dictation", "⌘↩")
-                shortcut("Cancel dictation", "⌘.")
-                shortcut("Copy result", "⇧⌘C")
-                shortcut("Use raw transcript", "⌃⌥Z")
-                shortcut("Start keyboard session", "⇧⌘K")
-                shortcut("End session", "⇧⌘E")
+                ForEach(Self.dictationShortcuts, id: \.keys) { row in
+                    shortcut(row.title, row.keys)
+                }
             }
             SettingsGroup(title: "Go") {
                 shortcut("Notes, Dictate, History, Settings", "⌘1–4")

@@ -432,6 +432,26 @@ struct LiveNotesControllerTests {
         #expect(f.notes.structuring == .idle)
     }
 
+    /// The dictation key on the Notes tab follows the Mac's Notes window (`NotesHotkeyRouter`): record, pause, resume,
+    /// whatever field has focus; away from Notes, or with a dictation under way, it stays the dictation key.
+    @Test func dictationKeyDrivesNotesOnTheNotesTabLikeTheMac() async throws {
+        let f = try fixture(); defer { f.clean() }
+        f.notes.notesTabShown = false
+        #expect(!f.notes.hotkeyPress(dictationActive: false), "Away from Notes the key dictates")
+        f.notes.notesTabShown = true
+        #expect(!f.notes.hotkeyPress(dictationActive: true), "A dictation under way keeps its key")
+        #expect(f.notes.state == .idle && !f.audio.isRunning)
+
+        #expect(f.notes.hotkeyPress(dictationActive: false))
+        try await eventually("recording") { f.notes.captureState == .recording }
+        #expect(f.notes.hotkeyPress(dictationActive: false))
+        try await eventually("paused") { f.notes.captureState == .paused }
+        #expect(f.notes.hotkeyPress(dictationActive: false))
+        try await eventually("resumed") { f.notes.captureState == .recording }
+        await f.notes.stop()
+        try await eventually("stopped") { f.notes.state == .stopped }
+    }
+
     @Test func notesShortcutsArePublishedAlongsideDictation() {
         #expect(ChirpShortcuts.appShortcuts.count == 8)
         #expect(String(localized: StartChirpNotesIntent.title) == "Record note with Chirp")
@@ -446,6 +466,13 @@ struct LiveNotesControllerTests {
             "Show or hide transcript",
         ])
         #expect(ShortcutsPage.notesShortcuts.map(\.keys) == ["⌘N", "⌃⌥N", "⇧⌘R", "⇧⌘P", "⇧⌘E", "⌘F", "⌥⌘T"])
+        // ⇧⌘E is Edit by voice, as in the Mac's Notes window; the keyboard session starts and ends on ⇧⌘K.
+        #expect(ShortcutsPage.dictationShortcuts.map(\.title) == [
+            "Start or stop dictation", "Cancel dictation", "Copy result", "Use raw transcript", "Start or end keyboard session",
+        ])
+        #expect(ShortcutsPage.dictationShortcuts.map(\.keys) == ["⌘↩", "⌘.", "⇧⌘C", "⌃⌥Z", "⇧⌘K"])
+        let keys = (ShortcutsPage.notesShortcuts + ShortcutsPage.dictationShortcuts).map(\.keys)
+        #expect(Set(keys).count == keys.count, "two app shortcuts share keys: \(keys)")
     }
 
     @Test func notesIntentActionsActOnlyOnALiveSession() async throws {

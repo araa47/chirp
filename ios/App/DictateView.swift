@@ -46,7 +46,8 @@ struct DictateView: View {
                 }
             } else {
                 pageScroll.safeAreaInset(edge: .bottom, spacing: 0) {
-                    if !typeSize.isAccessibilitySize {
+                    // Not while the result is edited: the panel rides up with the keyboard and would cover Done.
+                    if !typeSize.isAccessibilitySize, !editing {
                         controls.padding(.horizontal, ChirpSpacing.gutter(sizeClass)).padding(.top, ChirpSpacing.s12).padding(.bottom, ChirpSpacing.s16)
                             .frame(maxWidth: .infinity).background(Color.chirp.background)
                     }

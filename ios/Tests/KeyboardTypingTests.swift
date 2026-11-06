@@ -111,7 +111,12 @@ import UIKit
         }
         TypingKeyboard.apply(.email, to: r.controller)
         let bottom = r.controller.services.layoutService.keyboardLayout(for: r.context).itemRows.last?.map(\.action) ?? []
-        #expect(bottom.contains(.character("@")), "the e-mail layout has @ beside the space bar")
+        #expect(bottom.filter { $0 == .character("@") }.count == 1, "the e-mail layout has one @ beside the space bar: \(bottom)")
+        if r.context.deviceTypeForKeyboard == .pad {
+            // KeyboardKit's iPad row ignores the field type; Chirp adds Apple's @ and . around the space bar.
+            let space = bottom.firstIndex(of: .space)
+            #expect(space.map { bottom[$0 - 1] == .character("@") && bottom[$0 + 1] == .character(".") } == true, "\(bottom)")
+        }
     }
 
     @Test func numbersPageReturnsToLettersAfterSpace() {

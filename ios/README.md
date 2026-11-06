@@ -311,8 +311,7 @@ from every tab and show in the iPad's hold-⌘ overlay and menu bar:
 | ⌘. | Cancel dictation (on the iPad simulator Esc never reached the app, so use ⌘.) |
 | ⌘⇧C | Copy result |
 | ⌃⌥Z | Use raw transcript (as on the Mac; ⌘⇧Z is Redo) |
-| ⌘⇧K | Start keyboard session |
-| ⌘⇧E | End session |
+| ⌘⇧K | Start or end the keyboard session (⌘⇧E is Edit by voice in Notes, as on the Mac) |
 | ⌘1 – ⌘4 | Notes, Dictate, History, Settings (the **Go** menu) |
 | ⌘N | New note, ready to type (the **Notes** menu, from any tab) |
 | ⌃⌥N | New note that records, as on the Mac (resumes a paused one) |
@@ -320,8 +319,10 @@ from every tab and show in the iPad's hold-⌘ overlay and menu bar:
 | ⌘⇧P | Pause / Resume recording |
 
 On the **Notes** tab the hold-to-talk key below drives Notes, as in the Mac's
-Notes window: a press records, the next pauses, the next resumes. With a text
-field focused and nothing recording it dictates into the field.
+Notes window: a press records, the next pauses, the next resumes (Stop is ⌘⇧R or
+the button). That holds whatever field has focus, the note's editor included,
+the same rule (`NotesHotkeyRouter`) the Mac follows; a dictation already under
+way keeps the key. On the other tabs it dictates.
 
 **Hold-to-talk key.** In Chirp, hold **Right ⌥ Option** to dictate and let go to
 insert. The text lands at the caret of the Chirp field you were typing in (a
