@@ -38,9 +38,11 @@ credential or personal text is included.
   and Android font scale 200% (`large`). Rendered by `HistoryActionsRenderTest`; regenerate with
   `./gradlew :app:testDebugUnitTest --tests '*HistoryActionsRenderTest' -Pchirp.updateScreenshots`.
 - `onboarding-{welcome,keyboard,microphone,pair}-{light,dark}.png` plus `-font-200-*`, `keyboard-done-*`,
-  `pair-{failed,checking,connected}-*`: the four-page wizard. The welcome page carries the approved full-bleed
-  pond art edge to edge and introduces Notes as well as dictation; every page keeps one koi primary button and
-  the segmented progress. Rendered by `VoiceUiTest`.
+  `pair-{failed,checking,connected}-*`: the wizard laid out like iOS's: the welcome page carries the approved
+  full-bleed pond art edge to edge, then a bold title and three feature lines; the other pages have Back under the
+  segmented progress, a left-aligned bold title and a 72 dp badge that turns lily when done; every page pins one koi
+  primary button with Skip for now (Skip setup on Welcome) below it. The pair page stays *Pair your computer* when
+  it connects or fails. Rendered by `VoiceUiTest`. `settings-pair-*` is Settings → Connection → Change pairing.
 - `scratchpad-{idle,listening,use-raw,text}-{light,dark}.png`: the Scratchpad laid out like iOS's Dictate tab — the
   text on a white card over the pond background, Copy · Share · Save as note (and Use raw while offered) under it,
   the status line in `record` with its clock while listening and "Polished" with a **Before clean-up** disclosure

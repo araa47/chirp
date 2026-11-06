@@ -27,10 +27,22 @@ internal enum class SettingsPage(@StringRes val title: Int) {
     Connection(R.string.settings_page_connection), HowYouDictate(R.string.settings_page_how_you_dictate), Dictation(R.string.settings_page_dictation),
     Keyboard(R.string.settings_page_keyboard), Feedback(R.string.settings_page_feedback), Notes(R.string.notes_short),
     History(R.string.settings_page_history), About(R.string.settings_page_about),
+    /** Connection → Change pairing / Pair computer: a sub-page whose Back returns to Connection, as on iOS. Not a home row. */
+    Pair(R.string.settings_change_pairing),
 }
+
+/** The page's title: Pair says "Pair computer" until there is a pairing to change. */
+@Composable
+internal fun SettingsPage.label(state: SetupState): String =
+    stringResource(if (this == SettingsPage.Pair && !state.paired) R.string.settings_pair_computer else title)
+
+/** Where Back goes from [page]: Pair returns to Connection; every other page to the list. */
+internal fun settingsParent(page: SettingsPage?): SettingsPage? = if (page == SettingsPage.Pair) SettingsPage.Connection else null
 
 internal class SettingsActions(
     val checkConnection: () -> Unit = {}, val changePairing: () -> Unit = {}, val forgetPairing: () -> Unit = {},
+    /** The Pair sub-page's scanner, paste field and retry; [paired] runs once the computer answered and the pairing saved. */
+    val pairing: dev.chirp.android.PairingActions = dev.chirp.android.PairingActions(), val paired: () -> Unit = {},
     /** About → Show setup again: the onboarding from Welcome; Back returns to Settings. */
     val showSetup: () -> Unit = {},
     val allowWifi: () -> Unit = {}, val floatingMicSettings: () -> Unit = {}, val keyboardPreferences: () -> Unit = {},
@@ -55,7 +67,9 @@ internal fun SettingsScreen(state: SetupState, actions: SettingsActions = Settin
     Surface(Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             val twoPane = maxWidth >= TWO_PANE
-            BackHandler(enabled = onExit != null || (page != null && !twoPane)) { if (page != null && !twoPane) page = null else onExit?.invoke() }
+            BackHandler(enabled = onExit != null || (page != null && (!twoPane || settingsParent(page) != null))) {
+                if (page != null && (!twoPane || settingsParent(page) != null)) page = settingsParent(page) else onExit?.invoke()
+            }
             // One scroll position per page: a long page (Notes) must not keep the list's offset, nor leave it behind on Back.
             val shown = if (twoPane) (page ?: SettingsPage.Connection) else page
             val scroll = rememberSaveable(twoPane, shown, saver = ScrollState.Saver) { ScrollState(0) }
@@ -71,12 +85,12 @@ internal fun SettingsScreen(state: SetupState, actions: SettingsActions = Settin
                         key(page) { SettingsList(state, actions, history) { page = it } }
                     }
                 }
-                PageScaffold(stringResource(shown!!.title), back = null, scroll, Modifier.weight(1f).fillMaxHeight()) {
+                PageScaffold(shown!!.label(state), back = settingsParent(shown)?.let { parent -> { page = parent } }, scroll, Modifier.weight(1f).fillMaxHeight()) {
                     SettingsDetail(shown, state, actions, history, updates)
                 }
             } else if (shown == null) PageScaffold(stringResource(R.string.settings_title), back = null, scroll, Modifier.widthIn(max = 600.dp).fillMaxSize()) {
                 SettingsList(state, actions, history) { page = it }
-            } else PageScaffold(stringResource(shown.title), back = { page = null }, scroll, Modifier.widthIn(max = 600.dp).fillMaxSize()) {
+            } else PageScaffold(shown.label(state), back = { page = settingsParent(shown) }, scroll, Modifier.widthIn(max = 600.dp).fillMaxSize()) {
                 SettingsDetail(shown, state, actions, history, updates)
             }
         }

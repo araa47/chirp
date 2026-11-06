@@ -174,7 +174,7 @@ class SettingsStore(context: Context) {
             if (value == null) prefs.edit { remove("health") }
             else prefs.edit { putString("health", JSONObject().put("ok", true).put("ready", value.ready)
                 .put("debug_retention", value.debugRetention).put("engine", value.engine.orEmpty())
-                .put("notes_retranscribe", value.notesRetranscribe).put("notes_context", value.notesContext).put("speech_model", value.speechModel)
+                .put("notes_retranscribe", value.notesRetranscribe).put("notes_context", value.notesContext).put("speech_model", value.speechModel).put("device", value.device.orEmpty())
                 .put("operation_deadlines", value.operationDeadlines.json())
                 .put("correction", if (value.correctionAvailable) "available" else "off")
                 .put("correction_leaves_machine", value.correctionLeavesMachine)

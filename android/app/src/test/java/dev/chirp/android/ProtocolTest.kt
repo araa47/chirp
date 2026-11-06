@@ -22,6 +22,14 @@ class ProtocolTest {
         assertEquals(ServerEvent.Failure("auth"), Protocol.decode("""{"type":"error","code":"auth","message":"never shown"}"""))
         assertEquals(ServerEvent.Unknown, Protocol.decode("""{"type":"future"}"""))
     }
+    @Test fun `health keeps the pairing name for This device, bounded and without control characters`() {
+        fun device(value: String) = Protocol.health("""{"ok":true,"ready":true,"debug_retention":false,"device":$value}""").device
+        assertEquals("Pixel Fold", device("\"Pixel Fold\""))
+        assertNull(device("null")); assertNull(device("\"\""))
+        assertNull(device("\"bad\\u0007name\""))
+        assertEquals(64, device("\"${"x".repeat(100)}\"")!!.length)
+        assertNull(Protocol.health("""{"ok":true,"ready":true,"debug_retention":false}""").device)
+    }
     @Test fun `authenticated health is required and privacy metadata preserved`() {
         val health = Protocol.health("""{"ok":true,"ready":true,"debug_retention":true,"correction":"available","correction_leaves_machine":true,"correction_host":"example.test"}""")
         assertTrue(health.ready); assertTrue(health.debugRetention); assertTrue(health.correctionLeavesMachine)

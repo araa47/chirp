@@ -116,9 +116,9 @@ class SetupActivityTest {
         controller.newIntent(Intent().putExtra("section", "settings"))
         assertTrue(activity.state.shellOpen); assertEquals(ShellTab.Settings, activity.state.tab); assertNull(activity.state.settingsPage)
         assertTrue("opened from outside: back returns there", activity.state.exitOnBack)
+        // From the app, pairing is Settings → Connection → Pair, as on iOS.
         controller.newIntent(Intent().putExtra("section", "pair"))
-        assertFalse(activity.state.shellOpen); assertEquals(PAGE_PAIR, activity.state.step)
-        assertEquals("back from a pair-only page leaves it", PAGE_PAIR, activity.state.entryStep); assertTrue(activity.state.pairFromShell)
+        assertTrue(activity.state.shellOpen); assertEquals(SettingsPage.Pair, activity.state.settingsPage)
         controller.newIntent(Intent().putExtra("section", "connection"))
         assertTrue(activity.state.shellOpen); assertEquals(SettingsPage.Connection, activity.state.settingsPage)
         controller.newIntent(Intent().putExtra("section", "try"))
@@ -128,10 +128,11 @@ class SetupActivityTest {
         controller.newIntent(Intent().putExtra("section", "history"))
         assertEquals(ShellTab.History, activity.state.tab); assertTrue(activity.state.exitOnBack)
     }
-    @Test fun `a pairing link closes the shell and goes to the pair page`() {
+    @Test fun `a pairing link in the app opens Settings' pair page and tests the link there`() {
         controller.newIntent(Intent().putExtra("section", "settings"))
         controller.newIntent(Intent(Intent.ACTION_VIEW, Uri.parse(syntheticLink)))
-        assertFalse(activity.state.shellOpen); assertEquals(PAGE_PAIR, activity.state.step)
+        assertTrue(activity.state.shellOpen); assertEquals(SettingsPage.Pair, activity.state.settingsPage)
+        assertTrue(activity.state.checking)
     }
     @Test fun `new try entry is consumed and opening Settings survives recreation`() {
         val entry = Intent().putExtra("section", "try")

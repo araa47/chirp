@@ -71,13 +71,13 @@ On the phone, Chirp settings → **About → Updates** checks `https://<paired h
 
 ### First launch
 
-Onboarding has five steps: **Welcome · How you’ll dictate · Keyboard or Floating mic · Microphone · Pair**. A segmented bar shows progress and one primary button stays at the bottom, including at 200% font. Back returns to the previous step. Returning from system settings refreshes the checklist and advances when the requirement is met. Existing users who finished onboarding go straight to Notes after an upgrade.
+Onboarding has five steps: **Welcome · How you’ll dictate · Keyboard or Floating mic · Microphone · Pair**. The pages follow iOS: a segmented bar with **Back** under it, a left-aligned title with a round badge that turns green with a check when the step is done, and one primary button with **Skip for now** under it, pinned at the bottom (including at 200% font). Returning from system settings refreshes the checklist and advances when the requirement is met. Existing users who finished onboarding go straight to Notes after an upgrade.
 
-1. **Welcome:** dictation and Notes, then **Get started**.
+1. **Welcome:** three lines (dictate into any app, keep conversations in Notes, audio goes only to your own computer), then **Get started**, or **Skip setup**.
 2. **How you’ll dictate:** choose **Use Chirp Keyboard** or **Keep Gboard** (or your selected keyboard’s name). Neither is preselected; Continue requires a choice. Notes, Scratchpad, History and tiles work either way.
 3. **Keyboard:** enable and select Chirp Keyboard. **Floating mic:** read the disclosure, open the service’s Accessibility details, then allow it. Returning with it still off offers restricted-settings help. **Skip for now** leaves a dismissible reminder in Notes. Advanced Protection replaces the setup action with **Use Chirp Keyboard instead** and **Continue without it**.
 4. **Microphone:** allow it while using the app. It opens only during dictation or a recording note.
-5. **Pair:** scan your computer's QR code or paste its pairing link. Chirp tests the link before saving it. **Finish** opens Notes.
+5. **Pair:** scan your computer's QR code or paste its pairing link. Chirp tests the link before saving it. The page stays *Pair your computer*: **Connected to <computer>** with the engine, then **Continue** opens Notes; or **Couldn’t pair with your computer** with the reason (asleep, not on the tailnet, no secure connection) and one fix.
 
 Switch later in **Settings → How you dictate**, directly below Connection. The selected mode has a live checklist and keyboard picker or the same floating-mic guide. Choosing a mode never disables an IME or service. Keyboard preferences remain available; the hardware shortcut requires Chirp Keyboard. The floating mic hides while Chirp Keyboard is selected in either mode. Renders: `docs/screenshots/android/keepkb-*.png` and `onboarding-*.png`.
 
@@ -98,7 +98,7 @@ One destination, **Chirp settings** (the Settings tab), holds every setting. Ope
 
 | Row | Its page |
 |---|---|
-| Connection | A status row (*Connected · host*, *Computer unreachable · host*, *Not paired*), **Check connection**, **Change pairing** (or **Pair computer**), **Allow Wi-Fi server access** (only when needed), **Forget pairing** (asks first: *You'll need the QR code to pair again*), and **When your computer is unavailable** (the phone-local recogniser) |
+| Connection | A status row (*Connected · host*, *Computer unreachable · host*, *Not paired*), **Check connection**, **Change pairing** (or **Pair computer**; a page of its own, as on iOS, that returns here once paired), **This device** (the name this phone was paired under, or the shared token), **Allow Wi-Fi server access** (only when needed), **Forget pairing** (asks first: *You'll need the QR code to pair again*), and **When your computer is unavailable** (the phone-local recogniser) |
 | How you dictate | **Chirp Keyboard** or **Keep my keyboard**, with a live checklist and the keyboard picker or the floating-mic guide (see [First launch](#first-launch)) |
 | Dictation | **Clean-up** (only when the computer offers it) and **Styles** (default and per-app styles, prompt editing), **Stop dictation** (when I tap / when I pause), **Spoken commands**, **Press Send** after dictating |
 | Keyboard | **Keyboard look**, **Swipe typing**, **Hardware keyboard shortcut** (Ctrl+Alt+Space, works with Chirp Keyboard), **Larger mic on the inner screen**, **Layouts, languages & typing** (HeliBoard's own settings). Its summary says when it isn't in use because you keep your own keyboard |
@@ -117,7 +117,7 @@ On the computer, open Chirp → Settings → Devices → **Pair a Phone…**, wh
 uv run chirp-server pair --url https://<your-computer>.<tailnet>.ts.net/chirp
 ```
 
-On the phone, onboarding's last page (*Pair your computer*, or Chirp settings → Connection → Change pairing) — with Tailscale on, on both devices:
+On the phone, onboarding's last page (*Pair your computer*), or Chirp settings → Connection → Change pairing — with Tailscale on, on both devices:
 
 - **Scan code** is primary (the scanner uses Google Play services). **Paste link instead** works without it.
 - A scanned code or pasted link is tested and saved straight away; nothing is stored until the computer answers.
