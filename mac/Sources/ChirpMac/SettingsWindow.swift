@@ -72,7 +72,7 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
     private var tabs: SettingsShellController?
     private var form: SettingsForm?
     private var refreshTimer: Timer?
-    /// What the server last said about keeping the clean-up model loaded, and the request that is updating it.
+    /// What the server last said about keeping the clean-up model ready (Settings → Clean-up), and the request that is updating it.
     private var keepLoaded = KeepLoadedState()
     private var keepLoadedTask: Task<Void, Never>?
 
@@ -177,7 +177,7 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
 
     /// A page came on screen: the ones that ask the server or the library refresh what they show.
     private func pageShown(_ tab: SettingsTab) {
-        if tab == .advanced { refreshKeepLoaded() }
+        if tab == .cleanup { refreshKeepLoaded() }
         if tab == .devices { refreshDevices() }
         activityPoller.tabVisible = tab == .devices && window?.isVisible == true
     }
@@ -276,7 +276,7 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
         }
     }
 
-    // MARK: keep clean-up model loaded
+    // MARK: keep clean-up ready
 
     private var serverConfig: ServerConfig { ServerConfig.load(urlString: settings.serverURL) }
 

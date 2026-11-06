@@ -220,8 +220,8 @@ import Testing
         #expect(has(form.privateSession, .privacy) && has(form.historyEnabled, .privacy) && has(form.historyRetention, .privacy))
         #expect(has(form.historyApps.view, .privacy) && has(form.learnFromEdits, .privacy) && has(form.showLearned, .privacy))
         #expect(!has(form.historyEnabled, .dictation) && !has(form.privateSession, .dictation) && !has(form.learnFromEdits, .dictation))
-        // Advanced: the server URL, token, models and Doctor.
-        #expect(has(form.serverURL, .advanced) && has(form.doctorButton, .advanced) && has(form.modelsButton, .advanced) && has(form.keepLoaded, .advanced))
+        // Advanced: the server URL, token, models and Doctor. Keep clean-up ready sits with the other clean-up options.
+        #expect(has(form.serverURL, .advanced) && has(form.doctorButton, .advanced) && has(form.modelsButton, .advanced) && has(form.keepLoaded, .cleanup))
         #expect(has(form.pairButton, .devices) && has(form.devicesView, .devices) && has(form.rotateButton, .devices) && has(form.about, .about))
         // and on no other
         for control in [form.launch, form.hotkey, form.sounds, form.cleanupEnabled, form.removeSpeakerModel, form.serverURL, form.keepLoaded,

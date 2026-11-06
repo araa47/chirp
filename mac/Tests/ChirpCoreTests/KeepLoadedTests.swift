@@ -199,11 +199,11 @@ private let home = ServerConfig(baseURL: URL(string: "http://127.0.0.1:7821/chir
         #expect(s.availability == .available)
         var p = KeepLoadedPresentation(s, host: "this Mac")
         #expect(p.isEnabled && !p.isOn && p.status == "Not loaded")
-        #expect(p.help == "Clean-up starts instantly instead of loading after a pause. Uses about 2.6 GB of memory on this Mac.")
+        #expect(p.help == "Keeps the clean-up model in memory, so clean-up starts instantly instead of loading the model after a pause. Uses about 2.6 GB of RAM on this Mac.")
         s = try available(loadedJSON)
         p = KeepLoadedPresentation(s, host: "mainframe")
         #expect(p.isOn && p.status == "Loaded · 2.6 GB" && p.statusTone == .ok)
-        #expect(p.help.hasSuffix("Uses 2.6 GB of memory on mainframe."))
+        #expect(p.help.hasSuffix("Uses 2.6 GB of RAM on mainframe."))
         s = try available(loadingJSON)
         p = KeepLoadedPresentation(s)
         #expect(p.isOn && p.status == "Loading…" && p.statusTone == .busy && s.isLoading)
@@ -212,7 +212,7 @@ private let home = ServerConfig(baseURL: URL(string: "http://127.0.0.1:7821/chir
     @Test func withoutAMemoryFigureTheHelpOmitsTheCost() throws {
         let s = try available(#"{"keep_loaded":false,"mode":"managed"}"#)
         let p = KeepLoadedPresentation(s)
-        #expect(p.help == "Clean-up starts instantly instead of loading after a pause.")
+        #expect(p.help == "Keeps the clean-up model in memory, so clean-up starts instantly instead of loading the model after a pause.")
         let loaded = try available(#"{"keep_loaded":true,"loaded":true,"mode":"managed"}"#)
         #expect(KeepLoadedPresentation(loaded).status == "Loaded")
     }
@@ -340,44 +340,44 @@ private let home = ServerConfig(baseURL: URL(string: "http://127.0.0.1:7821/chir
         return out
     }
 
-    @Test func theSwitchIsOnTheAdvancedPageWithItsVoiceOverLabel() throws {
+    @Test func theSwitchIsOnTheCleanupPageWithItsVoiceOverLabel() throws {
         let f = form(KeepLoadedState(settings: try decode(loadedJSON), availability: .available))
-        #expect(f.keepLoaded.title == "Keep clean-up model loaded")
+        #expect(f.keepLoaded.title == "Keep clean-up ready")
         #expect(f.keepLoaded.state == .on && f.keepLoaded.isEnabled)
-        #expect(f.keepLoaded.isDescendant(of: f.view(for: .advanced)))
+        #expect(f.keepLoaded.isDescendant(of: f.view(for: .cleanup)))
         #expect(f.keepLoaded.accessibilityHelp()?.contains("2.6 GB") == true)
-        let shown = texts(in: f.view(for: .advanced))
+        let shown = texts(in: f.view(for: .cleanup))
         #expect(shown.contains("Loaded · 2.6 GB"))
-        #expect(shown.contains("Clean-up starts instantly instead of loading after a pause. Uses 2.6 GB of memory on this Mac."))
+        #expect(shown.contains("Keeps the clean-up model in memory, so clean-up starts instantly instead of loading the model after a pause. Uses 2.6 GB of RAM on this Mac."))
     }
 
     @Test func followsTheStateThroughTransitions() throws {
         let f = form(KeepLoadedState())
         #expect(!f.keepLoaded.isEnabled && f.keepLoaded.state == .off)
-        #expect(texts(in: f.view(for: .advanced)).contains("Checking the server…"))
+        #expect(texts(in: f.view(for: .cleanup)).contains("Checking the server…"))
 
         var s = KeepLoadedState(settings: try decode(estimateJSON), availability: .available)
         f.showKeepLoaded(s, host: "mainframe.example.ts.net")
         #expect(f.keepLoaded.isEnabled && f.keepLoaded.state == .off)
-        var shown = texts(in: f.view(for: .advanced))
+        var shown = texts(in: f.view(for: .cleanup))
         #expect(shown.contains("Not loaded"))
-        #expect(shown.contains { $0.hasSuffix("Uses about 2.6 GB of memory on mainframe.example.ts.net.") })
+        #expect(shown.contains { $0.hasSuffix("Uses about 2.6 GB of RAM on mainframe.example.ts.net.") })
 
         _ = s.toggle(to: true)
         f.showKeepLoaded(s, host: "this Mac")
         #expect(f.keepLoaded.state == .on && !f.keepLoaded.isEnabled)
-        #expect(texts(in: f.view(for: .advanced)).contains("Loading…"))
+        #expect(texts(in: f.view(for: .cleanup)).contains("Loading…"))
 
         s.toggleFailed(.unreachable)
         f.showKeepLoaded(s, host: "this Mac")
         #expect(f.keepLoaded.state == .off && f.keepLoaded.isEnabled)
-        shown = texts(in: f.view(for: .advanced))
+        shown = texts(in: f.view(for: .cleanup))
         #expect(shown.contains(CleanupSettingsError.unreachable.changeFailure))
 
         _ = s.toggle(to: true)
         s.toggleSucceeded(try decode(loadedJSON))
         f.showKeepLoaded(s, host: "this Mac")
-        shown = texts(in: f.view(for: .advanced))
+        shown = texts(in: f.view(for: .cleanup))
         #expect(f.keepLoaded.state == .on && shown.contains("Loaded · 2.6 GB") && !shown.contains(CleanupSettingsError.unreachable.changeFailure))
     }
 
@@ -388,16 +388,58 @@ private let home = ServerConfig(baseURL: URL(string: "http://127.0.0.1:7821/chir
                             (.unreachable, "Can’t reach the server.")] {
             let f = form(KeepLoadedState(availability: .unavailable(why)))
             #expect(!f.keepLoaded.isEnabled && f.keepLoaded.state == .off)
-            let shown = texts(in: f.view(for: .advanced))
+            let shown = texts(in: f.view(for: .cleanup))
             #expect(shown.contains(line))
             #expect(!shown.contains("Loading…") && !shown.contains("Not loaded"))
         }
     }
 
-    @Test func theAdvancedPageStillHasAMeasuredSize() {
+    @Test func theCleanupPageStillHasAMeasuredSize() {
         // the row must not break the page's measured size
         let f = form(KeepLoadedState())
-        let size = f.fittingSize(for: .advanced)
+        let size = f.fittingSize(for: .cleanup)
         #expect(size.width == SettingsForm.pageWidth && size.height > 300)
+    }
+
+    @Test func itSitsNearTheTopOfCleanupAndIsGoneFromAdvanced() {
+        let f = form(KeepLoadedState())
+        #expect(!f.keepLoaded.isDescendant(of: f.view(for: .advanced)))
+        let page = f.view(for: .cleanup)
+        page.layoutSubtreeIfNeeded()
+        // Right under the on/off switch and the style, above the long style-prompt editor.
+        let keep = f.keepLoaded.convert(f.keepLoaded.bounds, to: page)
+        let prompts = f.prompts.view.convert(f.prompts.view.bounds, to: page)
+        let enabled = f.cleanupEnabled.convert(f.cleanupEnabled.bounds, to: page)
+        #expect(page.isFlipped ? (keep.minY > enabled.minY && keep.minY < prompts.minY) : (keep.minY < enabled.minY && keep.minY > prompts.minY))
+    }
+}
+
+@Suite struct KeepLoadedHintTests {
+    private let cold = CleanupModelSettings(keepLoaded: false, loaded: false, model: "qwen3-4b", memoryMB: 2662)
+
+    @Test func coldOnlyForAManagedModelThatIsNotKeptReady() {
+        #expect(KeepLoadedHint.coldLoad(cold))
+        #expect(KeepLoadedHint.coldLoad(CleanupModelSettings(keepLoaded: false, loaded: false, loading: true)))
+        // Already in memory: the wait was the generation itself, which this switch would not shorten.
+        #expect(!KeepLoadedHint.coldLoad(CleanupModelSettings(keepLoaded: false, loaded: true)))
+        // Already kept ready, or no local model to keep.
+        #expect(!KeepLoadedHint.coldLoad(CleanupModelSettings(keepLoaded: true, loaded: false, loading: true)))
+        #expect(!KeepLoadedHint.coldLoad(CleanupModelSettings(keepLoaded: false, mode: .endpoint)))
+        #expect(!KeepLoadedHint.coldLoad(CleanupModelSettings(keepLoaded: false, mode: .off)))
+    }
+
+    @Test func showsOnceAfterANoticeableColdWait() {
+        #expect(KeepLoadedHint.shouldShow(alreadyShown: false, cold: true, waited: 2.0))
+        #expect(KeepLoadedHint.shouldShow(alreadyShown: false, cold: true, waited: 5.4))
+        #expect(!KeepLoadedHint.shouldShow(alreadyShown: false, cold: true, waited: 1.2))
+        #expect(!KeepLoadedHint.shouldShow(alreadyShown: false, cold: false, waited: 5.4))
+        #expect(!KeepLoadedHint.shouldShow(alreadyShown: true, cold: true, waited: 5.4))
+    }
+
+    @Test func theWordingNamesWhereToFixIt() {
+        #expect(KeepLoadedHint.message == "Clean-up was loading its model. Keep it ready in Settings → Clean-up.")
+        // Two lines of the island's message body at most.
+        #expect(KeepLoadedHint.message.count <= 80)
+        #expect(LocalModelsView.keepReadyNote.contains("Keep clean-up ready in Settings → Clean-up"))
     }
 }

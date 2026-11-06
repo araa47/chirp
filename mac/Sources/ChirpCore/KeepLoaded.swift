@@ -1,6 +1,6 @@
 import Foundation
 
-/// "Keep clean-up model loaded": the client side of `GET`/`PUT /v1/correction/settings`. The server loads its managed
+/// "Keep clean-up ready" (once "Keep clean-up model loaded"): the client side of `GET`/`PUT /v1/correction/settings`. The server loads its managed
 /// MLX clean-up model on first use and unloads it after a pause; this setting keeps it in memory instead. Everything
 /// here is pure (decoding, error mapping, wording, the state transitions), so it is unit-tested without a server.
 
@@ -141,7 +141,9 @@ extension ServerConfig {
 }
 
 public enum KeepLoaded {
-    public static let title = "Keep clean-up model loaded"
+    public static let title = "Keep clean-up ready"
+    /// What it does, in front of the memory cost.
+    public static let benefit = "Keeps the clean-up model in memory, so clean-up starts instantly instead of loading the model after a pause."
     public static let updateServer = "Update the Chirp server to use this."
 
     /// MB as GB with one decimal ("2.6 GB"; 1 GB = 1024 MB, as the helper counts), prefixed "about" for an estimate.
@@ -170,7 +172,7 @@ public enum KeepLoaded {
     }
 }
 
-/// What the Server tab's Keep clean-up model loaded switch shows, as the server's answers come in. The switch changes at once and goes back with
+/// What Settings → Clean-up's Keep clean-up ready switch shows, as the server's answers come in. The switch changes at once and goes back with
 /// an inline error when the server refuses.
 public struct KeepLoadedState: Sendable, Equatable {
     public enum Availability: Sendable, Equatable {
@@ -293,8 +295,8 @@ public struct KeepLoadedPresentation: Sendable, Equatable {
             let s = state.settings
             isOn = state.pending ?? s?.keepLoaded ?? false
             isEnabled = state.pending == nil
-            var text = "Clean-up starts instantly instead of loading after a pause."
-            if let memory = s?.memoryText { text += " Uses \(memory) of memory on \(host)." }
+            var text = KeepLoaded.benefit
+            if let memory = s?.memoryText { text += " Uses \(memory) of RAM on \(host)." }
             help = text
             // Turning it on starts the load, so say so before the server's next answer.
             let loading = s?.loading == true || (state.pending == true && s?.loaded != true)
@@ -314,5 +316,26 @@ public struct KeepLoadedPresentation: Sendable, Equatable {
     /// With the server's host spelled out ("this Mac" for loopback).
     public init(_ state: KeepLoadedState, config: ServerConfig) {
         self.init(state, host: KeepLoaded.hostPhrase(config))
+    }
+}
+
+/// The one-time hint after a dictation waited on a cold clean-up model: the moment the cost of leaving it unloaded is
+/// felt. It is shown once ever, never during a dictation, and only when the server said its model was not ready as
+/// clean-up began and the wait was long enough to notice.
+public enum KeepLoadedHint {
+    /// Polishing shorter than this goes unnoticed, so no hint.
+    public static let minimumWait: TimeInterval = 2
+    public static let message = "Clean-up was loading its model. Keep it ready in Settings → Clean-up."
+    /// How long the toast stays up.
+    public static let duration: TimeInterval = 4
+
+    /// The server's answer as clean-up began says it had to load the model, and this switch would have avoided that.
+    public static func coldLoad(_ s: CleanupModelSettings) -> Bool {
+        s.mode == .managed && !s.keepLoaded && (s.loading || !s.loaded)
+    }
+
+    /// Whether the hint is due after a dictation: not shown before, the model was cold, and the user waited for it.
+    public static func shouldShow(alreadyShown: Bool, cold: Bool, waited: TimeInterval) -> Bool {
+        !alreadyShown && cold && waited >= minimumWait
     }
 }

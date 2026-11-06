@@ -40,7 +40,7 @@ cd chirp</code></pre></li>
     <li><strong>Optionally, a clean-up model</strong><p>A small local language model can tidy your text afterwards. <strong>Qwen3 4B</strong> on MLX scored best in Chirp's tests; smaller ones are faster but miss more. On Intel Macs, built-in clean-up and Notes structuring use llama.cpp on CPU and can be slow. Dictation works without them. Turn clean-up off, or use an OpenAI-compatible local endpoint such as Ollama or LM Studio. Click <strong>Use Model</strong> to check it loads. You can skip this and add it later.</p></li>
     <li><strong>Start the server</strong><p>Click <strong>Start Local Server</strong>. (After changing a model later, use <strong>Apply &amp; Restart Server</strong> — downloading alone never swaps the running model.)</p></li>
   </ol>
-  <figure class="shot"><div class="frame"><!--shot:mac/settings-advanced-ready|Settings, Advanced: the server URL on 127.0.0.1, the token, the server status, the clean-up model and the Local models and Doctor tools--></div><figcaption>Settings → Advanced once everything is running. The server only listens on this Mac.</figcaption></figure>
+  <figure class="shot"><div class="frame"><!--shot:mac/settings-advanced-ready|Settings, Advanced: the server URL on 127.0.0.1, the token, the server status and the Local models and Doctor tools--></div><figcaption>Settings → Advanced once everything is running. The server only listens on this Mac.</figcaption></figure>
 
   <h2 id="permissions">Grant two permissions</h2>
   <p>The <strong>Set Up Chirp</strong> window walks you through it, with its steps listed on the left: Welcome, Microphone, Accessibility, Chirp server and Try it. Each step turns green the moment you grant access in System Settings → Privacy &amp; Security. The last step tries a dictation, and <strong>Open Notes</strong> takes you to the notes library.</p>
@@ -63,6 +63,7 @@ cd chirp</code></pre></li>
 
   <h2 id="cleanup">Turn on clean-up (optional)</h2>
   <p>If you downloaded a clean-up model, open <strong>Clean-up</strong> in the menu-bar menu and tick <strong>Clean up Text</strong>. Chirp then removes fillers and stutters and fixes punctuation before inserting, using the model on your Mac.</p>
+  <p>The model unloads after a few idle minutes, so the first clean-up after a pause waits while it loads again. To skip that wait, turn on <strong>Keep clean-up ready</strong> in Settings → Clean-up: the model stays in memory (about 2.6 GB of RAM for Qwen3 4B) and clean-up starts instantly. Chirp suggests this once, the first time a dictation waits for the model.</p>
   <p><strong>Intel Mac?</strong> Built-in clean-up and Notes structuring run on CPU and can be slow. You can leave clean-up off and dictate normally, or use an OpenAI-compatible local endpoint such as Ollama or LM Studio. Turn <strong>Structure notes</strong> off to use Notes as a plain transcript.</p>
   <figure class="shot"><div class="frame"><!--shot:mac/hud-flow-3-diff|The HUD after clean-up with “three thirty” replaced by “3:30” and “uh” removed--></div></figure>
   <ul>

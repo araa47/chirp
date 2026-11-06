@@ -125,6 +125,11 @@ public final class Preferences: @unchecked Sendable {
         get { defaults.bool(forKey: "showChangesAfterCleanup") }
         set { defaults.set(newValue, forKey: "showChangesAfterCleanup") }
     }
+    /// The one-time "Clean-up was loading its model" hint (`KeepLoadedHint`) has been shown; it never shows again.
+    public var keepReadyHintShown: Bool {
+        get { defaults.bool(forKey: "keepReadyHintShown") }
+        set { defaults.set(newValue, forKey: "keepReadyHintShown") }
+    }
     /// The HUD's word waveform: each word's audio drawn above it while dictating. Off by default; on asks the server
     /// for word timings.
     public var wordWaveform: Bool {

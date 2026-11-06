@@ -215,6 +215,7 @@ public enum Snapshots {
             hud("copied") { applyOutcome(.copied, final: final(), to: $0) },
             hud("unverified-ax") { applyOutcome(.insertedUnverified, final: final(), to: $0) },
             hud("secure-field") { applyOutcome(.refusedSecure, final: final(), to: $0) },
+            hud("keep-ready-hint") { $0.status = KeepLoadedHint.message; $0.indicator = .sparkle; $0.duration = nil },
             hud("no-mic-signal") { $0.status = "No microphone signal"; $0.isError = true; $0.indicator = .warning },
             hud("error-long") {
                 $0.status = "Server rejected the token (check ~/.config/chirp/token) — then restart dictation"
@@ -370,23 +371,23 @@ public enum Snapshots {
                 $0.tokenPresent = false; $0.serverURL = "https://mainframe.example.ts.net/chirp"
                 $0.serverStatus = "Unreachable"; $0.serverStatusTone = .error
             },
-            form("warm-off", .advanced) { styled(&$0); $0.keepLoaded = KeepLoadedState(settings: warmOff, availability: .available) },
-            form("warm-loading", .advanced) {
+            form("warm-off", .cleanup) { styled(&$0); $0.keepLoaded = KeepLoadedState(settings: warmOff, availability: .available) },
+            form("warm-loading", .cleanup) {
                 styled(&$0)
                 $0.keepLoaded = KeepLoadedState(settings: CleanupModelSettings(keepLoaded: true, loading: true, model: "qwen3-4b", memoryMB: 2662, memoryEstimated: true),
                                                 availability: .available)
             },
-            form("warm-remote-host", .advanced) {
+            form("warm-remote-host", .cleanup) {
                 styled(&$0); $0.serverHost = "mainframe.example.ts.net"; $0.serverURL = "https://mainframe.example.ts.net/chirp"
                 $0.keepLoaded = KeepLoadedState(settings: CleanupModelSettings(keepLoaded: true, loaded: true, model: "qwen3-4b", memoryMB: 2662),
                                                 availability: .available)
             },
-            form("warm-error", .advanced) {
+            form("warm-error", .cleanup) {
                 styled(&$0)
                 $0.keepLoaded = KeepLoadedState(settings: warmOff, availability: .available, error: CleanupSettingsError.unreachable.changeFailure)
             },
-            form("warm-old-server", .advanced) { styled(&$0); $0.keepLoaded = KeepLoadedState(availability: .unavailable(.serverTooOld)) },
-            form("warm-remote-model", .advanced) { styled(&$0); $0.keepLoaded = KeepLoadedState(availability: .unavailable(.remoteModel)) },
+            form("warm-old-server", .cleanup) { styled(&$0); $0.keepLoaded = KeepLoadedState(availability: .unavailable(.serverTooOld)) },
+            form("warm-remote-model", .cleanup) { styled(&$0); $0.keepLoaded = KeepLoadedState(availability: .unavailable(.remoteModel)) },
             form("ready", .about) { _ in },
         ]
     }

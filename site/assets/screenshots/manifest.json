@@ -1138,56 +1138,56 @@
     ]
   },
   "mac/settings-advanced-ready-dark.png": {
-    "sha256": "78469e81c4b2e0f7dfd649c56648f7d7cefcaf0f6505410c9ee4d56855e1a823",
+    "sha256": "2ccef6c78c065dd71498ae60a65231f35157a3700a6861f477d0b3e24aebb101",
     "width": 1440,
-    "height": 1124,
+    "height": 1040,
     "variants": [
       {
         "file": "mac/settings-advanced-ready-dark-320.webp",
         "width": 320,
-        "height": 250
+        "height": 231
       },
       {
         "file": "mac/settings-advanced-ready-dark-640.webp",
         "width": 640,
-        "height": 500
+        "height": 462
       },
       {
         "file": "mac/settings-advanced-ready-dark-960.webp",
         "width": 960,
-        "height": 749
+        "height": 693
       },
       {
         "file": "mac/settings-advanced-ready-dark-1440.webp",
         "width": 1440,
-        "height": 1124
+        "height": 1040
       }
     ]
   },
   "mac/settings-advanced-ready-light.png": {
-    "sha256": "7c0ba8bbd79c4bbc5ee457c0302b7aa69f528239085beabf8943007a5dc95e1e",
+    "sha256": "66eb9238495c5a12a3f75aca7271d48fb367483df670cade3c21239df0e84b10",
     "width": 1440,
-    "height": 1124,
+    "height": 1040,
     "variants": [
       {
         "file": "mac/settings-advanced-ready-light-320.webp",
         "width": 320,
-        "height": 250
+        "height": 231
       },
       {
         "file": "mac/settings-advanced-ready-light-640.webp",
         "width": 640,
-        "height": 500
+        "height": 462
       },
       {
         "file": "mac/settings-advanced-ready-light-960.webp",
         "width": 960,
-        "height": 749
+        "height": 693
       },
       {
         "file": "mac/settings-advanced-ready-light-1440.webp",
         "width": 1440,
-        "height": 1124
+        "height": 1040
       }
     ]
   },

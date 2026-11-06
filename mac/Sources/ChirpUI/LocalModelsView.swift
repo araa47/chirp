@@ -5,6 +5,8 @@ import ChirpCore
 @MainActor
 public final class LocalModelsView: NSView {
     public static let size = NSSize(width: 640, height: 720)
+    /// Under "Use local correction": where to keep the correction model ready.
+    nonisolated public static let keepReadyNote = "The correction model unloads after a pause, so the next clean-up waits while it loads. To skip that wait, turn on \(KeepLoaded.title) in Settings → Clean-up."
     public let speech = NSButton(title: "Download", target: nil, action: nil)
     public let cleanup = NSButton(title: "Download", target: nil, action: nil)
     public let start = NSButton(title: "Start Local Server", target: nil, action: nil)
@@ -41,6 +43,11 @@ public final class LocalModelsView: NSView {
         advanced.widthAnchor.constraint(equalToConstant: Self.size.width - 56).isActive = true
         stack.addArrangedSubview(advanced)
         stack.addArrangedSubview(correction)
+        // The managed model unloads after a pause; the switch that keeps it ready lives with the other clean-up options.
+        let keepReady = NSTextField(wrappingLabelWithString: Self.keepReadyNote)
+        keepReady.font = .systemFont(ofSize: 11); keepReady.textColor = .secondaryLabelColor
+        keepReady.widthAnchor.constraint(equalToConstant: Self.size.width - 56).isActive = true
+        stack.addArrangedSubview(keepReady)
         status.font = .systemFont(ofSize: 12); status.setAccessibilityIdentifier("local-server-status")
         stack.addArrangedSubview(status)
         start.bezelStyle = .rounded; stack.addArrangedSubview(start)

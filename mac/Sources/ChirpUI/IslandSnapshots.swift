@@ -73,6 +73,7 @@ extension Snapshots {
             island("no-speech") { $0.status = HUDStatus.noSpeech; $0.indicator = .none; $0.duration = nil },
             island("blocked") { $0.status = "Notes is recording — stop it to dictate"; $0.indicator = .warning; $0.duration = nil },
             island("learned") { $0.status = "Learned: Kubernetes"; $0.indicator = .sparkle; $0.duration = nil },
+            island("keep-ready-hint") { $0.status = KeepLoadedHint.message; $0.indicator = .sparkle; $0.duration = nil },
             island("debug-idle") { $0.debugRetention = true },
             island("debug-listening") { $0.status = HUDStatus.listening; $0.debugRetention = true; $0.privateSession = true; $0.stable = islandSentence; $0.levels = .demo(peak: 0.5) },
             island("debug-done") { islandOutcome(.inserted(.ax), final: corrected, showChanges: true, to: $0); $0.debugRetention = true },
