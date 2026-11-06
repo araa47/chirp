@@ -325,6 +325,7 @@ private func object(_ json: String) throws -> [String: Any] {
     @Test func aPastedOrUnverifiedInsertionIsNeverReplaced() async {
         let sys = FakeSystem(), board = FakePasteboard()
         sys.ax = .notAttempted
+        sys.field = ""
         let inserter = sys.inserter(board: board)
         #expect(await inserter.insert("raw", undoRaw: "raw", undoWindow: TextInserter.swapWindow) == .inserted(.paste))
         #expect(await inserter.replaceInserted(with: "Raw.") == false)

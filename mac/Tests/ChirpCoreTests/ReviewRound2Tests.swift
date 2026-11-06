@@ -27,13 +27,18 @@ import Testing
         }
     }
 
+    /// The fake clock drives the timers (restore, Use raw); the check after ⌘V polls instantly and sees each paste
+    /// land in a readable field, so these pastes are confirmed and restore as before.
     private func inserter(_ clock: Clock, board: FakePasteboard, bundle: String? = "com.apple.Terminal",
                           ax: AXInsertAttempt = .notAttempted, calls: @escaping (String) -> Void = { _ in }) -> TextInserter {
-        TextInserter(env: InsertionEnvironment(
+        var field = "$ "
+        return TextInserter(env: InsertionEnvironment(
             secureInputEnabled: { false }, axTrusted: { true }, frontmostBundleID: { bundle },
             axInsert: { _ in ax }, axReplace: { _, _, _ in calls("axReplace"); return true },
-            postPaste: { calls("paste"); return true },
-            sleep: { _ in await withCheckedContinuation { clock.sleepers.append($0) } }
+            postPaste: { calls("paste"); field += board.text ?? ""; return true },
+            focusedFieldState: { field },
+            sleep: { _ in await withCheckedContinuation { clock.sleepers.append($0) } },
+            checkSleep: { _ in }
         ), pasteboard: board)
     }
 

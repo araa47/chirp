@@ -247,7 +247,7 @@ public enum LearnWatchPlan: Sendable, Equatable {
         guard !secureField else { return .skip(gate: "secure") }
         switch outcome {
         case .inserted(.ax): return axRange.map(LearnWatchPlan.watch) ?? .find
-        case .inserted(.paste), .insertedUnverified: return .find
+        case .inserted(.paste), .insertedUnverified, .pasteUnconfirmed: return .find
         case .inserted(.copy), .copied, .refusedSecure: return .skip(gate: "notInserted")
         }
     }

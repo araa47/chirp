@@ -84,6 +84,8 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
         s.notesHotkey = settings.notesHotkey
         s.openNotesHotkey = settings.openNotesHotkey
         s.useRawHotkey = settings.useRawHotkey
+        s.pasteLastHotkey = settings.pasteLastHotkey
+        s.openHistoryHotkey = settings.openHistoryHotkey
         s.alwaysShowInDock = settings.alwaysShowInDock
         s.activationMode = settings.activationMode
         s.autoEnter = settings.autoEnter

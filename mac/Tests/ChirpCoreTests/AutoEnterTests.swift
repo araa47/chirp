@@ -43,7 +43,7 @@ final class FakeKeys {
     }
 
     @Test func neverAfterAFailedOrCopiedInsertion() async {
-        for outcome in [InsertionOutcome.copied, .insertedUnverified, .refusedSecure] {
+        for outcome in [InsertionOutcome.copied, .insertedUnverified, .refusedSecure, .pasteUnconfirmed(.notRead), .pasteUnconfirmed(.unchanged)] {
             let keys = FakeKeys()
             #expect(await keys.sender().send(after: outcome, mode: .always, rules: rules, skipped: false) == false)
             #expect(keys.posted == 0, "\(outcome)")

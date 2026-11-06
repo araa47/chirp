@@ -36,6 +36,22 @@ public final class Preferences: @unchecked Sendable {
         get { KeyCombo.resolve(id: defaults.string(forKey: "useRawHotkey"), fallback: .controlOptionZ) }
         set { defaults.set(newValue.id, forKey: "useRawHotkey") }
     }
+    /// Pastes the newest dictation again into the focused field (⌃⌥V by default).
+    public var pasteLastHotkey: KeyCombo {
+        get { KeyCombo.resolve(id: defaults.string(forKey: "pasteLastHotkey"), fallback: .controlOptionV) }
+        set { defaults.set(newValue.id, forKey: "pasteLastHotkey") }
+    }
+    /// Opens Dictation History from any app (⌃⌥H by default).
+    public var openHistoryHotkey: KeyCombo {
+        get { KeyCombo.resolve(id: defaults.string(forKey: "openHistoryHotkey"), fallback: .controlOptionH) }
+        set { defaults.set(newValue.id, forKey: "openHistoryHotkey") }
+    }
+    /// The one-time HUD tip about Paste Last Dictation and History, shown the first time a dictation is left on the
+    /// clipboard (a paste Chirp could not confirm, or a copy).
+    public var explainedRecovery: Bool {
+        get { defaults.bool(forKey: "explainedRecovery") }
+        set { defaults.set(newValue, forKey: "explainedRecovery") }
+    }
     /// Any of Chirp's shortcuts by role.
     public subscript(shortcut shortcut: ChirpShortcut) -> KeyCombo {
         get {
@@ -44,6 +60,8 @@ public final class Preferences: @unchecked Sendable {
             case .notes: notesHotkey
             case .openNotes: openNotesHotkey
             case .useRaw: useRawHotkey
+            case .pasteLast: pasteLastHotkey
+            case .openHistory: openHistoryHotkey
             }
         }
         set {
@@ -52,6 +70,8 @@ public final class Preferences: @unchecked Sendable {
             case .notes: notesHotkey = newValue
             case .openNotes: openNotesHotkey = newValue
             case .useRaw: useRawHotkey = newValue
+            case .pasteLast: pasteLastHotkey = newValue
+            case .openHistory: openHistoryHotkey = newValue
             }
         }
     }

@@ -16,6 +16,8 @@ public enum MenuAction: Equatable, Sendable {
     case toggleShowInNotch
     /// Dictation history: the window, and one recent dictation's Insert Again, Copy and Show in History (its id).
     case showHistory, insertDictation(String), copyDictation(String), openDictation(String)
+    /// The newest dictation, at the top of the menu: Paste Again (the Paste Last Dictation shortcut) and Copy.
+    case pasteLast, copyLast
 
     /// What the AppKit item carries to its action method.
     public var payload: String? {
@@ -87,6 +89,18 @@ public struct RecentDictation: Equatable, Sendable {
     }
 }
 
+/// The newest dictation, at the top of the menu: a one-line preview, never logged. `historyID` is its History entry
+/// (nil with history off: the row then opens nothing).
+public struct LastDictation: Equatable, Sendable {
+    public var preview: String
+    public var date: Date
+    public var historyID: String?
+
+    public init(preview: String, date: Date, historyID: String?) {
+        self.preview = preview; self.date = date; self.historyID = historyID
+    }
+}
+
 /// The header block: the name, a one-line status and the main switch.
 public struct MenuHeader: Equatable, Sendable {
     public var title = "Chirp"
@@ -154,6 +168,11 @@ public struct MenuInputs: Sendable {
     /// Dictation history is on, and its newest dictations (the menu shows `MenuContent.recentDictationLimit`).
     public var historyEnabled = true
     public var recentDictations: [RecentDictation] = []
+    /// The newest dictation (kept in memory even with history off), and the Paste Last Dictation and Dictation History
+    /// shortcuts' keys (nil while not registered).
+    public var lastDictation: LastDictation?
+    public var pasteLastShortcut: String?
+    public var historyShortcut: String?
     /// The moment relative dates in Recent Notes are measured from.
     public var now = Date()
     public var calendar = Calendar.current
@@ -223,9 +242,9 @@ public enum MenuContent {
         return ("Ready · \(m.activationMode == .holdToTalk ? "hold " : "")\(m.hotkey.title)", .normal)
     }
 
-    /// The rows below the header: what to do now (dictate, take notes), the last result's Use raw while it is on
-    /// offer, the two choices people change between dictations, then Settings and Quit. Set-once preferences (sounds,
-    /// the server, About) live in Settings.
+    /// The rows below the header: the newest dictation (to paste again or copy when it did not go in), what to do now
+    /// (dictate, take notes), the last result's Use raw while it is on offer, the two choices people change between
+    /// dictations, then Settings and Quit. Set-once preferences (sounds, the server, About) live in Settings.
     public static func entries(_ m: MenuInputs) -> [MenuEntry] {
         var out: [MenuEntry] = [.separator]
 
@@ -233,6 +252,10 @@ public enum MenuContent {
         let notesBusy = m.notesRecording || m.notesFinishing || m.notesPaused
         if let live = liveNotesRow(m) {
             out.append(live)
+            out.append(.separator)
+        }
+        if let last = lastDictationRows(m) {
+            out += last
             out.append(.separator)
         }
 
@@ -321,6 +344,19 @@ public enum MenuContent {
         ]
     }
 
+    /// The newest dictation: its preview and age (opening it in History), then Paste Again and Copy, one click each.
+    static func lastDictationRows(_ m: MenuInputs) -> [MenuEntry]? {
+        guard let last = m.lastDictation else { return nil }
+        let preview = "“" + truncated(last.preview, limit: 34) + "”"
+        return [
+            MenuEntry(title: preview, value: relativeDate(last.date, now: m.now, calendar: m.calendar),
+                      action: last.historyID.map(MenuAction.openDictation)),
+            MenuEntry(title: "Paste Again", shortcut: m.paused ? nil : m.pasteLastShortcut,
+                      action: m.paused || m.state.isActive ? nil : .pasteLast),
+            MenuEntry(title: "Copy", action: .copyLast),
+        ]
+    }
+
     /// How many dictations Recent Dictations lists.
     public static let recentDictationLimit = 3
 
@@ -342,7 +378,8 @@ public enum MenuContent {
         }
         return [
             MenuEntry(title: "Recent Dictations", submenu: recent),
-            MenuEntry(title: "Dictation History…", shortcut: "⌥⌘H", action: .showHistory, keyEquivalent: "h", keyEquivalentOption: true),
+            m.historyShortcut.map { MenuEntry(title: "Dictation History…", shortcut: $0, action: .showHistory) }
+                ?? MenuEntry(title: "Dictation History…", shortcut: "⌥⌘H", action: .showHistory, keyEquivalent: "h", keyEquivalentOption: true),
         ]
     }
 

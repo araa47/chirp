@@ -16,6 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var historyWindow = HistoryWindowController(history: history)
     private let dock = DockController()
     private let openNotesHotkey = OpenNotesHotkey()
+    /// Paste Last Dictation (⌃⌥V) and Dictation History (⌃⌥H), from any app.
+    private let pasteLastHotkey = ActionHotkey(.pasteLast, id: 6)
+    private let historyHotkey = ActionHotkey(.openHistory, id: 7)
     private lazy var onboardingWindow = OnboardingWindowController(controller: controller)
     private var menu: MenuBarController?
     private var healthTimer: Timer?
@@ -95,6 +98,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// The menu's newest dictation: this run's, else History's newest entry after a relaunch.
+    private func lastDictation() -> LastDictation? {
+        if let last = controller.lastDictation {
+            return LastDictation(preview: HistoryText.preview(last.text, limit: 60), date: last.date,
+                                 historyID: last.historyID?.uuidString)
+        }
+        guard let entry = history.recent(1).first else { return nil }
+        return LastDictation(preview: HistoryText.menuTitle(entry, limit: 60), date: entry.date, historyID: entry.id.uuidString)
+    }
+
+    /// Paste Last Dictation (the shortcut and the menu): through Insert Again, so Chirp steps aside first when one of
+    /// its windows is in front.
+    private func pasteLast() {
+        controller.pasteLast { [historyWindow] text in historyWindow.insertAgain(text) }
+    }
+
     /// History's Add to Notes: the dictation becomes a new note in the library, shown in the Notes window.
     private func addToNotes(_ entry: DictationEntry) {
         guard let library = notes.library else { return }
@@ -121,7 +140,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                            openNote: { [notes, notesWindow] id in notes.showNote(id); notesWindow.show() },
                            recentNotes: { [notes] in notes.recentNotes },
                            notes: { [notes, openNotesHotkey] in var state = notes.menuState; state.openShortcut = openNotesHotkey.title; return state },
-                           setRunning: { [notes, openNotesHotkey] in notes.setRunning($0); openNotesHotkey.setRunning($0) },
+                           setRunning: { [notes, openNotesHotkey, pasteLastHotkey, historyHotkey] in
+                               notes.setRunning($0); openNotesHotkey.setRunning($0)
+                               pasteLastHotkey.setRunning($0); historyHotkey.setRunning($0)
+                           },
                            serverNotice: { [serverWatch] in (serverWatch.notice, serverWatch.message) },
                            fixServer: { [serverWatch] in serverWatch.fix() },
                            showHistory: { [weak self] id in self?.historyWindow.show(selecting: id) },
@@ -139,7 +161,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                guard let entry = history.entries.first(where: { $0.id.uuidString == id }) else { return }
                                NSPasteboard.general.clearContents()
                                NSPasteboard.general.setString(entry.text, forType: .string)
-                           }))
+                           },
+                           lastDictation: { [weak self] in self?.lastDictation() },
+                           pasteLast: { [weak self] in self?.pasteLast() },
+                           copyLast: { [controller] in
+                               guard let text = controller.lastDictationText() else { return }
+                               NSPasteboard.general.clearContents()
+                               NSPasteboard.general.setString(text, forType: .string)
+                           },
+                           pasteLastShortcut: { [pasteLastHotkey] in pasteLastHotkey.title },
+                           historyShortcut: { [historyHotkey] in historyHotkey.title }))
         settingsWindow.privateSession = controller.privateSession
         setUpHistory()
         settingsWindow.library = notes.library
@@ -165,18 +196,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsWindow.catalog = { [controller] in controller.styleCatalog }
         settingsWindow.onHotkeyChange = { [controller, notes] in controller.registerHotkey(); notes.model.dictationKey = settings.hotkey.title }
-        settingsWindow.onRecordingChanged = { [controller, notes, openNotesHotkey] recording in
+        settingsWindow.onRecordingChanged = { [controller, notes, openNotesHotkey, pasteLastHotkey, historyHotkey] recording in
             // A live shortcut would start a dictation or Notes while the user is typing the new one.
             if recording {
                 controller.suspendHotkey(); notes.suspendHotkey(); openNotesHotkey.suspend()
+                pasteLastHotkey.suspend(); historyHotkey.suspend()
             } else {
                 controller.registerHotkey(); notes.registerHotkey(); openNotesHotkey.register()
+                pasteLastHotkey.register(); historyHotkey.register()
             }
         }
-        settingsWindow.onShortcutChange = { [weak self, notes, openNotesHotkey] shortcut in
+        settingsWindow.onShortcutChange = { [weak self, notes, openNotesHotkey, pasteLastHotkey, historyHotkey] shortcut in
             switch shortcut {
             case .notes: notes.registerHotkey(); notes.model.notesKey = settings.notesHotkey.title
             case .openNotes: openNotesHotkey.register()
+            case .pasteLast: pasteLastHotkey.register()
+            case .openHistory: historyHotkey.register()
             case .dictation, .useRaw: break   // dictation has onHotkeyChange; Use raw is registered per offer
             }
             self?.menu?.refreshIcon()
@@ -232,6 +267,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if !openNotesHotkey.register() {
             NSLog("Chirp: could not register the Open Notes hotkey \(settings.openNotesHotkey.title); it may be in use by another app")
+        }
+        pasteLastHotkey.action = { [weak self] in self?.pasteLast() }
+        historyHotkey.action = { [weak self] in self?.historyWindow.show() }
+        for hotkey in [pasteLastHotkey, historyHotkey] {
+            hotkey.onChange = { [weak self] in self?.menu?.refreshIcon() }
+            if !hotkey.register() {
+                NSLog("Chirp: could not register the \(hotkey.shortcut.owner) hotkey \(settings[shortcut: hotkey.shortcut].title); it may be in use by another app")
+            }
         }
 
         Sounds.prepare()   // decode the cues now so the first start sound has no wait

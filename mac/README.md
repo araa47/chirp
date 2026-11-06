@@ -9,7 +9,7 @@ Native Swift 6, SwiftPM, AppKit. No Xcode needed — the Command Line Tools are 
 **Contents**
 
 - [Install](#install) — build, sign, install · [Permissions](#permissions) — first-run Set Up, what each grant is for
-- [Using it](#using-it) — hotkey, HUD, sounds, clean-up, styles, Use raw
+- [Using it](#using-it) — hotkey, HUD, sounds, clean-up, styles, Use raw, getting a dictation back
 - [The menu-bar menu](#the-menu-bar-menu) · [Settings](#settings) · [Pair a phone](#pair-a-phone) · [How text is inserted](#how-text-is-inserted)
 - [Configuration](#configuration) · [Launch at login](#launch-at-login) · [Accessibility](#accessibility) · [Troubleshooting](#troubleshooting)
 - [Develop and test](#develop-and-test) — self-test, unit tests, UI snapshots · [Layout](#layout) · [Known limits](#known-limits) · [Icon and menu-bar glyphs](#icon-and-menu-bar-glyphs)
@@ -102,11 +102,11 @@ The Mac mini has no built-in microphone. Chirp follows the system default input 
 - Registering the hotkey it already has is a no-op: the live registration (and a press under way) stays, so changing the mode or ending the recorder does not tear the event tap down and build it again.
 - **Esc** cancels: the server discards the audio and nothing is inserted. Esc is only captured while a dictation is active.
 - **Length.** A dictation finishes by itself after 119 s of audio, just under the server's 2-minute cap, and its words are inserted as usual (Android and iPhone do the same).
-- **Return** (Settings → Dictation, off by default): **Off**, **Always**, or **In chat apps only**. Chirp presses Return once, right after the text has been inserted, so a chat message sends itself. "Chat apps" are the apps mapped to the **Chat** style under Clean-up → Per-app (editable). Return is sent only after a real insertion (an Accessibility write or a paste), never after a clipboard copy, an "Inserted? ⌘V if empty" result, a secure field or **Use raw**. With clean-up it follows the cleaned text (or the kept raw text); with "Insert raw immediately" it follows the replacement. Hold **⇧** when you stop to skip it for that dictation (not available when your hotkey itself uses ⇧). The HUD adds "· ↵ sent". The Return is posted with no modifiers, so a hotkey modifier still held does not turn it into a shortcut, and is dropped if secure input or a different app took focus in the meantime.
+- **Return** (Settings → Dictation, off by default): **Off**, **Always**, or **In chat apps only**. Chirp presses Return once, right after the text has been inserted, so a chat message sends itself. "Chat apps" are the apps mapped to the **Chat** style under Clean-up → Per-app (editable). Return is sent only after a real insertion (an Accessibility write, a confirmed paste, or a paste the app read into a field Chirp cannot read back), never after a clipboard copy, an "Inserted? ⌘V if empty" result, a paste that most likely failed ("Couldn't confirm it went in"), a secure field or **Use raw**. With clean-up it follows the cleaned text (or the kept raw text); with "Insert raw immediately" it follows the replacement. Hold **⇧** when you stop to skip it for that dictation (not available when your hotkey itself uses ⇧). The HUD adds "· ↵ sent". The Return is posted with no modifiers, so a hotkey modifier still held does not turn it into a shortcut, and is dropped if secure input or a different app took focus in the meantime.
 
-The shortcut recorder (AppKit, no macros, no Input Monitoring) refuses combinations that cannot fire or would break typing, says why, and keeps listening. Refused: a typing key with no modifier or with ⇧ alone, ⇧ on its own, ⌃Space alone (Raycast's default and the input-source switcher), Esc, and a few system shortcuts (⌘Space, ⌘Tab, ⌘Q). Recording a single right-hand modifier keeps that side only (Right ⌥). A modifier the recorder never saw let go (⌘ released in another app after ⌘Tab) is not recorded with the next one: pressing ⌥ afterwards records ⌥, not ⌘. The new shortcut is applied before recording ends, so the old one is not registered again for a moment. Esc, or a click elsewhere, gives up. While it listens, Chirp's own global shortcuts (dictation, New Note, Notes library, Use raw) are released, so pressing one does not start a dictation or Notes. A stored custom shortcut is validated again on load.
+The shortcut recorder (AppKit, no macros, no Input Monitoring) refuses combinations that cannot fire or would break typing, says why, and keeps listening. Refused: a typing key with no modifier or with ⇧ alone, ⇧ on its own, ⌃Space alone (Raycast's default and the input-source switcher), Esc, and a few system shortcuts (⌘Space, ⌘Tab, ⌘Q). Recording a single right-hand modifier keeps that side only (Right ⌥). A modifier the recorder never saw let go (⌘ released in another app after ⌘Tab) is not recorded with the next one: pressing ⌥ afterwards records ⌥, not ⌘. The new shortcut is applied before recording ends, so the old one is not registered again for a moment. Esc, or a click elsewhere, gives up. While it listens, Chirp's own global shortcuts (dictation, New Note, Notes library, Use raw, Paste again, History) are released, so pressing one does not start a dictation or Notes. A stored custom shortcut is validated again on load.
 
-**Settings → Dictation → Shortcuts** holds every global shortcut, each with the same recorder and rules: **Dictation** (the presets and Record Shortcut…), **New note** (⌃⌥N, starts a new note and records), **Notes library** (⌃⌥⇧N, brings the library forward without recording) and **Use raw** (⌃⌥Z), each with **Reset** back to its default. A recorder also refuses keys another Chirp shortcut has ("Already used for Open Notes. Pick another."), Reset says so when the default is taken by now, and a dictation preset another shortcut has is greyed out in the menu. The menu, the Notes window's hints and Clean-up's Undo help show the keys you chose.
+**Settings → Dictation → Shortcuts** holds every global shortcut, each with the same recorder and rules: **Dictation** (the presets and Record Shortcut…), **New note** (⌃⌥N, starts a new note and records), **Notes library** (⌃⌥⇧N, brings the library forward without recording), **Use raw** (⌃⌥Z), **Paste again** (⌃⌥V, pastes your newest dictation into the focused field again) and **History** (⌃⌥H, opens Dictation History), each with **Reset** back to its default. A recorder also refuses keys another Chirp shortcut has ("Already used for Open Notes. Pick another."), Reset says so when the default is taken by now, and a dictation preset another shortcut has is greyed out in the menu. The menu, the Notes window's hints and Clean-up's Undo help show the keys you chose.
 
 ### HUD
 
@@ -151,11 +151,33 @@ The help text under the checkbox comes from `/v1/health`: "Runs on this Mac", "S
 
 ### After clean-up: Use raw
 
-By default the cleaned text is inserted as soon as it arrives and the HUD fades out within 150 ms (no diff hold, no lingering chip); a kept-original note stays at most 1 s. "Use raw" then lives outside the HUD for 5 s:
+By default the cleaned text is inserted as soon as it arrives (no diff hold); a kept-original note stays at most 1 s. "Use raw" then lives outside the HUD for 5 s, and the HUD says so for 2.5 s: **Cleaned · ⌃⌥Z for raw** ("Cleaned · Use raw in the menu" when the hotkey could not be registered). The offer is:
 
 - a global **⌃⌥Z** hotkey (Settings → Dictation → Shortcuts → Use raw), registered only during that window (menu only if the dictation hotkey has the same keys or another app owns it),
 - a **Use Raw for Last Dictation** menu row,
 - a tiny green dot on the menu-bar bird.
+
+Use raw is offered only when clean-up changed your words. When it changed nothing (or clean-up is off, or it failed and the original was kept) the text in the field already is what you said, so there is nothing to put back and nothing is shown. A paste Chirp thinks most likely failed offers no Use raw either: get the text with ⌘V or Paste again instead.
+
+### Getting a dictation back
+
+Chirp never drops a dictation. If it may not have gone in, the HUD says where it is:
+
+- **Pasted · also on the clipboard** (1.6 s): the app took the paste, but Chirp can't read its field back (Chromium and Electron web fields). The text stays on the clipboard as a normal copy instead of your old clipboard coming back, so if a web page dropped it (its field had lost focus), ⌘V puts it in.
+- **Couldn't confirm it went in — press ⌘V** (5 s): no app read the paste, or the field can be read and did not change. The text is on the clipboard.
+- **Inserted? ⌘V if empty** and **Copied — ⌘V**: as before.
+
+Then, from any app:
+
+- **⌃⌥V** (Paste again, Settings → Dictation → Shortcuts) pastes your newest dictation into the focused field again, the way a dictation is inserted. It waits for you to let go of ⌃⌥ first. With history off it still has the newest dictation of this run (kept in memory only); never a private one, one into a secure field, or one into a Never-keep app.
+- **⌃⌥H** (History) opens [Dictation History](#dictation-history), where every dictation is kept.
+- The menu-bar menu starts with the newest dictation: its preview (click to see it in History), **Paste Again** and **Copy**.
+
+The first time a dictation is left on the clipboard the HUD shows a one-time tip naming ⌃⌥V and ⌃⌥H (the keys you chose).
+
+| The newest dictation in the menu |
+| :---: |
+| <a href="../docs/screenshots/mac/menu-last-dictation-light.png"><img src="../docs/screenshots/mac/menu-last-dictation-light.png" width="260" alt="Chirp menu starting with the newest dictation's preview and age, then Paste Again ⌃⌥V and Copy"></a> |
 
 ### Styles
 
@@ -241,7 +263,7 @@ Dictation rolls onto a new socket at a pause after 45 seconds (shorter pauses af
 
 Every dictation you insert is kept on this Mac, so you can find it, copy it or put it in again. History is **on by default**, local only and encrypted: turn it off, change how long it is kept, or list apps it must never keep in **Settings → History & privacy**.
 
-- **Open it** from the menu bar: **Dictation History…** (⌥⌘H while the menu is open), **Recent Dictations ▸** (the last three, each with **Insert Again**, **Copy** and **Show in History**), or Settings → History & privacy → **Open History…**. It is its own window, not a section of the Notes library: a dictation is a short piece of text that belongs to another app, its main action hands the keyboard back to that app, and history is there for people who never open Notes.
+- **Open it** from any app with **⌃⌥H**, or from the menu bar: **Dictation History…**, **Recent Dictations ▸** (the last three, each with **Insert Again**, **Copy** and **Show in History**), or Settings → History & privacy → **Open History…**. It is its own window, not a section of the Notes library: a dictation is a short piece of text that belongs to another app, its main action hands the keyboard back to that app, and history is there for people who never open Notes.
 - **The window.** A search field (it matches what was inserted, what you said and the app), the dictations by day (Today, Yesterday, then the date), each row led by the target app's icon with a two-line preview, the time and a **Cleaned** badge when clean-up changed the words. The detail shows what was inserted, what clean-up changed (removed words struck through, added or changed words underlined, as in the HUD), the app, time, length and style, with **Insert Again** (Chirp steps aside, the app you were in comes back, and the text goes into its focused field the way a dictation does), **Copy**, and under **More**: **Copy Original** (before clean-up), **Add to Notes** (a new note in the Notes library) and **Teach Chirp…** (see [Learn from my edits](#learn-from-my-edits)); and Delete (⌫, with **Undo** for a few seconds).
 - **What is kept:** the inserted text, the raw transcript when clean-up changed it, the app (bundle id and name), the time, its length and the style. After **Use raw**, the entry keeps the raw text that is now in the field.
 - **Never kept:** dictations into a password field (secure input or a secure text field), cancelled dictations, empty ones, and apps on the **Never keep** list (1Password, Bitwarden, Passwords and Keychain Access to begin with; **Restore Defaults** brings them back).
@@ -278,11 +300,15 @@ Chirp                                   [switch]
 ─────────────
 ◉ Recording "Standup" 03:12 — Stop                     only while a note records (⏸ Paused … — Resume while paused)
 ─────────────
+“Ship the fix tonight and tell the…”        2 min      the newest dictation (once there is one): opens it in History
+Paste Again                                  ⌃⌥V
+Copy
+─────────────
 Start Dictation                  Right ⌥ Option
 New Note                                     ⌃⌥N
 ─────────────
 Recent Dictations                                ›     the last three: Insert Again, Copy, Show in History
-Dictation History…                           ⌥⌘H
+Dictation History…                           ⌃⌥H     ⌥⌘H while the menu is open if ⌃⌥H is not registered
 ─────────────
 Recent Notes                                     ›     the five most recently edited notes
 Notes Library…                               ⌥⌘L
@@ -300,14 +326,15 @@ Quit Chirp                                    ⌘Q
 
 | Row | What it does |
 |---|---|
-| Header switch | Pauses and resumes Chirp. Off releases the dictation hotkey (and the Use raw, New Note and Notes library shortcuts), ends a dictation under way, stops a recording note (keeping it), disables Start Dictation and dims the menu-bar bird; on registers the hotkey again. Nothing else, including the shortcut recorder or a changed shortcut, brings the hotkey back while paused. The pause is not remembered: a relaunch resumes. |
+| Header switch | Pauses and resumes Chirp. Off releases the dictation hotkey (and the Use raw, New Note, Notes library, Paste again and History shortcuts), ends a dictation under way, stops a recording note (keeping it), disables Start Dictation and dims the menu-bar bird; on registers the hotkey again. Nothing else, including the shortcut recorder or a changed shortcut, brings the hotkey back while paused. The pause is not remembered: a relaunch resumes. |
 | Status line | Under the name, after a status dot (lily = ready, moon = loading or checking, red = error, a hollow ring = paused): `Ready · Right ⌥ Option`, `Paused`, `Notes · 12:34` while a note records, `Notes · Paused 12:34` while it is paused, `Listening…` (also Connecting…, Finishing…, Polishing…), `Loading model…`, `Server out of date`, `Server unreachable` (red), the current error (red), or `DEBUG: recordings kept` (red) while the server keeps recordings. |
 | Recording row | While a note records, the first row is `◉ Recording "<title>" 03:12 — Stop` and stops it; while it is paused, `⏸ Paused "<title>" 12:34 — Resume`; while the last segment finishes, `◉ Finishing "<title>"…` (disabled). |
 | Start / Stop Dictation | Starts a dictation or finishes the one under way, in either mode (the combo is shown at the right; not while paused or when another app owns the shortcut). Disabled while a note records. |
 | New Note | Always starts a new note and records (⌃⌥N by default, shown unless paused or owned by another app). Disabled during a dictation, while paused, and while a note records, is paused or finishes. |
 | Recent Notes | A submenu of the five most recently edited notes, each with a relative date ("12 min ago", "Yesterday", "Oct 3"); choosing one opens it in the Notes window. "No notes yet" while the library is empty. |
+| Newest dictation | Once there is one: its preview and age (opens it in History; nothing with history off), **Paste Again** (⌃⌥V; into the focused field of the app you were in; not during a dictation or while paused) and **Copy**. |
 | Recent Dictations | The last three dictations, each with a relative time and a submenu: **Insert Again** (into the frontmost app's field; not during a dictation or while paused), **Copy** and **Show in History**. "No dictations yet", or "History is off". |
-| Dictation History… | Opens the [Dictation History](#dictation-history) window (⌥⌘H while the menu is open). |
+| Dictation History… | Opens the [Dictation History](#dictation-history) window (⌃⌥H from any app; ⌥⌘H while the menu is open when ⌃⌥H is not registered). |
 | Notes Library… | Brings the Notes window forward without recording (⌥⌘L while the menu is open; the global Notes library shortcut is ⌃⌥⇧N). |
 | Use Raw for Last Dictation | Its own group for 5 s after a cleaned insertion, with its shortcut (⌃⌥Z by default) when that hotkey is free. |
 | Clean-up | Value: the default style, or Off. Submenu: Clean up Text (checkmark), the styles (checkmark on the default) and Clean-up Settings…. A server with clean-up off shows "Unavailable" and one explanatory line. |
@@ -326,7 +353,7 @@ Settings is one window laid out like System Settings: a sidebar with a search fi
 | Page | Contents |
 |---|---|
 | General | Startup: Launch Chirp at login, Always show Chirp in the Dock. Permissions: Microphone and Accessibility status, with a Fix… button only for one that is missing. Setup: Set Up Chirp… |
-| Dictation | Shortcuts: Dictation (presets and Record Shortcut…, plus the fn/🌐 setup note when fn alone is chosen), New note, Notes library and Use raw, each with Record Shortcut… and Reset. Dictating: Mode (Auto-stop or Hold to talk), Stop after (the auto-stop pause), Microphone (the menu's picker), Word waveform overlay, Spoken commands, Press Return (Off, Always, In chat apps only). Sounds: cues on/off, pack with ▶ previews, volume, the Custom pack's start and stop files. |
+| Dictation | Shortcuts: Dictation (presets and Record Shortcut…, plus the fn/🌐 setup note when fn alone is chosen), New note, Notes library, Use raw, Paste again and History, each with Record Shortcut… and Reset. Dictating: Mode (Auto-stop or Hold to talk), Stop after (the auto-stop pause), Microphone (the menu's picker), Word waveform overlay, Spoken commands, Press Return (Off, Always, In chat apps only). Sounds: cues on/off, pack with ▶ previews, volume, the Custom pack's start and stop files. |
 | History & privacy | Private session. Dictation history: Keep dictation history (on by default), Keep for (1, 7, 30, 90 days or Forever), Never keep (apps whose dictations are never kept), and how many are kept with Open History… and Clear…. Learn from my edits: the switch (on while history is on) and Show Learned…. What Chirp keeps: Notes stay on this Mac. |
 | Clean-up | Clean up dictated text and the default style; Speed: Keep clean-up ready; Style prompts (the per-style prompt editor); Per-app styles with Test; After clean-up: Insert raw immediately, Show changes after clean-up, Offer Use raw for 5 seconds. |
 | Notes | Library: Open Notes Library, Delete notes older than (Never by default, 1 year, 90 days, 30 days), Recently Deleted (how many, Empty…). Audio: Keep audio with notes (off by default), Allow re-transcribing (on by default), Kept audio (total size, Delete…). Export: Export folder (Choose…, Reset). Smart notes: Structure notes and Auto-reorganize, the defaults for new recordings (the ✦ menu in the Notes window changes them while you record). Speakers: Label speakers, the speaker model (on this Mac or not, with Remove), and Saved voices, a detail page with Remember voices of people I name and Forget. |
@@ -368,10 +395,12 @@ The token comes from one seam (`PairingLinkMaker`): `DeviceTokenPairing` (a devi
 ## How text is inserted
 
 1. **Accessibility:** set the focused element's selected text, then poll the readback for up to ~150 ms to confirm the value or caret really changed.
-2. **Paste:** save every pasteboard item, write the text marked `org.nspasteboard.TransientType` and `ConcealedType` (clipboard managers skip it), post ⌘V, and restore the clipboard after ~600 ms, only if nothing else wrote to it meanwhile (the change count is compared right before restoring, so a copy you make in that window is never overwritten).
+2. **Paste:** save every pasteboard item, write the text marked `org.nspasteboard.TransientType` and `ConcealedType` (clipboard managers skip it) and handed over lazily (an `NSPasteboardItemDataProvider`, so Chirp knows when an app reads it), post ⌘V, then check for up to ~600 ms that it arrived: the focused field's length or selection changed, when Accessibility can read it. A confirmed paste restores your clipboard ~600 ms later, only if nothing else wrote to it meanwhile (the change count is compared right before restoring, so a copy you make in that window is never overwritten). An unconfirmed one leaves the text on the clipboard as a normal copy (not restored, never over a copy you made meanwhile) and the HUD says so (see [Getting a dictation back](#getting-a-dictation-back)): "probably in" when the app read it but its field can't be read (Chromium and Electron), "couldn't confirm" when no app read it or a readable field did not change.
 3. **Copy only:** put the text on the clipboard and say so in the HUD.
 
 Step 2 is only reached when the AX write was never attempted (no focused element, attribute not settable, field unreadable, or the call failed). **Chirp never pastes after an AX write was accepted.** If the readback does not confirm it in time (some apps apply the write late), the HUD says "Inserted? ⌘V if empty" and leaves the text on a transient pasteboard, so the text can never be inserted twice.
+
+Each paste logs (no text) the app at insertion and at ⌘V, whether Chirp was active, the change counts, when the pasteboard was read after ⌘V (`read_ms`, or `none`), what the field check found and what happened to the clipboard: `log show --predicate 'subsystem == "dev.chirp.mac"' --info --last 1h | grep -E 'insert target|paste '`.
 
 If secure input is on (a password field, `IsSecureEventInputEnabled()`), Chirp refuses to insert and shows "Secure field". Nothing is copied.
 
@@ -415,6 +444,8 @@ The fix runs `chirp-server setup restart` or `replace`; a `chirp-server` too old
 |---|---|
 | "Copied — press ⌘V" instead of typed text | Accessibility is missing or the app is paste-first; the text is on the clipboard as a fallback. Grant Accessibility and relaunch if needed. |
 | "Inserted? ⌘V if empty" | The AX write was accepted but the readback did not confirm in time; the text waits on a transient pasteboard so it can't be inserted twice. |
+| A dictation didn't appear in a browser or Electron field | The page took the paste but its field had lost focus, which Chirp can't see there. The HUD said "Pasted · also on the clipboard": click the field and press ⌘V, or ⌃⌥V to paste the newest dictation again. Every dictation is in History (⌃⌥H). The log's `paste … read_ms=` line shows the app read the clipboard. |
+| "Couldn't confirm it went in — press ⌘V" | No app read the paste, or the field can be read and did not change; the text is on the clipboard. |
 | "Secure field", nothing inserted | A password field has secure input on; Chirp refuses to insert and copies nothing. |
 | "No microphone signal" | The input was digitally silent for 1.5 s and the session was cancelled. Check the Microphone row / system input device. |
 | Status line "Server out of date" (amber), or Notes says the server is out of date | The process on the port is older than the app; see [An out-of-date server](#an-out-of-date-server). |
@@ -474,7 +505,7 @@ ChirpMac --call-selftest --mic mic.wav --remote remote.wav --url … --token-fil
 
 `ChirpMac --render-snapshots <dir>` draws the HUD in every state (plus Reduce Motion and Increase Contrast variants, and the clean-up flow listening → polishing → changes → inserted), the menu in each state and its submenus, every Settings tab (About included), the Set Up window and the Notes window in each state and the Pair a Phone window in each step to PNGs in light and dark appearance (about 240 files, 10 MB), then exits. It is handled before any `NSApplication`, onboarding or permission code and touches no microphone, Accessibility, pasteboard or TCC API; all inputs are synthetic. The tests render the same set into a temporary directory, with a 250 KB cap per PNG.
 
-Only a curated set is committed in [docs/screenshots/mac](../docs/screenshots/mac): the key HUD states, the Ripple, the menu (ready, recording a note) and its Clean-up and Recent Notes submenus, the Settings pages, the Set Up welcome, and the Notes window (library, recording, search, no results, empty, Recently Deleted, Continued, the transcript inspector playing kept audio and the Organize review sheet), each in light and dark (68 PNGs, about 9 MB). The list is `Snapshots.committedNames`; `ChirpMac --render-snapshots <dir> --curated` writes just those. `scripts/snapshots.sh` refreshes the committed folder (and deletes any other PNG there); `scripts/snapshots.sh all` renders everything into a new temporary directory and prints its path. A test fails when the folder drifts from the list or grows past 4.5 MB.
+Only a curated set is committed in [docs/screenshots/mac](../docs/screenshots/mac): the key HUD states, the Ripple, the menu (ready, recording a note, the newest dictation) and its Clean-up and Recent Notes submenus, the Settings pages, the Set Up welcome, and the Notes window (library, recording, search, no results, empty, Recently Deleted, Continued, the transcript inspector playing kept audio and the Organize review sheet), each in light and dark. The list is `Snapshots.committedNames`; `ChirpMac --render-snapshots <dir> --curated` writes just those. `scripts/snapshots.sh` refreshes the committed folder (and deletes any other PNG there); `scripts/snapshots.sh all` renders everything into a new temporary directory and prints its path. A test fails when the folder drifts from the list or grows past 4.5 MB.
 
 The menu snapshots are built from the same `MenuHeaderView` and `MenuRowView` the live menu uses, in a rounded panel that approximates the menu chrome (an `NSMenu` cannot be drawn offscreen); submenus are drawn like native items (checkmark column). A bird symbol stands in for the app icon in Set Up and About unless run from a checkout (`Assets/AppIcon.png`). The HUD PNGs draw a flat stand-in for the blur, since there is no window to blur through offscreen. Each Settings page is drawn inside the same sidebar shell as the live window, at its fixed size: grouped sections (a small heading above a rounded card, rows separated by hairlines, help under each row). The menu-bar icon animation, the red badge dot, the switch moving and the highlight of a hovered row need a real session, so they are covered by the pure rules in the tests, not by snapshots (the hover snapshot forces a row selected to show the colours).
 

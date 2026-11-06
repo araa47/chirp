@@ -107,7 +107,8 @@ import Testing
         let plain = FinalResult(text: "Move it.")
         let corrected = FinalResult(text: "Move it.", raw: "move it", corrected: true)
         let kept = FinalResult(text: "move it", corrected: false, correctionError: "timeout")
-        let outcomes: [InsertionOutcome] = [.inserted(.ax), .inserted(.paste), .copied, .insertedUnverified, .refusedSecure]
+        let outcomes: [InsertionOutcome] = [.inserted(.ax), .inserted(.paste), .copied, .insertedUnverified, .refusedSecure,
+                                            .pasteUnconfirmed(.unreadable), .pasteUnconfirmed(.notRead)]
         for outcome in outcomes {
             for final in [plain, corrected, kept] {
                 for showChanges in [false, true] {
@@ -116,7 +117,7 @@ import Testing
                     m.status = o.status; m.indicator = o.indicator; m.isError = o.isError; m.showUseRaw = o.showUseRaw
                     m.cleaned = o.cleaned; m.keptOriginal = o.keptOriginal
                     let p = IslandPresentation.of(m, useRawKey: "⌃⌥R")
-                    #expect(p.state == (o.isError ? .notice : .done))
+                    #expect(p.state == (o.isError || o.indicator == .warning ? .notice : .done))
                     #expect(p.chips.contains(.useRaw(key: "⌃⌥R")) == o.showUseRaw)
                     #expect(p.expanded == (p.state == .notice || o.cleaned || o.keptOriginal || o.showUseRaw || !["Inserted", "Inserted raw"].contains(o.status)))
                 }

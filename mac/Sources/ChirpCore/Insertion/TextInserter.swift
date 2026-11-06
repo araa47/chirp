@@ -22,29 +22,43 @@ public struct InsertionEnvironment {
     public var axReplace: (NSRange, String, String) async -> Bool
     /// Posts ⌘V. Returns false if the event could not be created.
     public var postPaste: () -> Bool
+    /// A fingerprint of the focused field (its length and selection, or its text), or nil when it cannot be read (no
+    /// Accessibility, a secure field, Chromium and Electron web fields). A paste is confirmed when it changes.
+    public var focusedFieldState: () -> String?
+    /// Timers: the clipboard restore and the Use raw window.
     public var sleep: (Duration) async -> Void
+    /// The short polls of the check after ⌘V (`sleep` unless given), kept apart so a fake clock for the timers does
+    /// not have to step through them.
+    public var checkSleep: (Duration) async -> Void
 
     public init(secureInputEnabled: @escaping () -> Bool, axTrusted: @escaping () -> Bool,
                 frontmostBundleID: @escaping () -> String?,
                 axInsert: @escaping (String) async -> AXInsertAttempt,
                 axReplace: @escaping (NSRange, String, String) async -> Bool,
                 postPaste: @escaping () -> Bool,
-                sleep: @escaping (Duration) async -> Void = { try? await Task.sleep(for: $0) }) {
+                focusedFieldState: @escaping () -> String? = { nil },
+                sleep: @escaping (Duration) async -> Void = { try? await Task.sleep(for: $0) },
+                checkSleep: ((Duration) async -> Void)? = nil) {
         self.secureInputEnabled = secureInputEnabled
         self.axTrusted = axTrusted
         self.frontmostBundleID = frontmostBundleID
         self.axInsert = axInsert
         self.axReplace = axReplace
         self.postPaste = postPaste
+        self.focusedFieldState = focusedFieldState
         self.sleep = sleep
+        self.checkSleep = checkSleep ?? sleep
     }
 }
 
-/// AX insert → paste (pasteboard saved and restored) → copy-only.
+/// AX insert → paste (checked, then the pasteboard restored; left on it when the paste can't be confirmed) → copy-only.
 @MainActor
 public final class TextInserter {
     /// Slow apps can take a while to read the pasteboard after ⌘V. The change-count guard protects user copies.
     public static let restoreDelay: Duration = .milliseconds(600)
+    /// After ⌘V the field (or the pasteboard read) is checked this often, at most `pasteChecks` times (about 600 ms).
+    public static let pasteCheckInterval: Duration = .milliseconds(40)
+    public static let pasteChecks = 15
     /// How long "Use raw" stays possible; matches the HUD's linger for it.
     public static let undoWindow: Duration = .seconds(5)
     /// How long a raw insertion waits for its cleaned replacement (longer than the client's clean-up timeout).
@@ -113,7 +127,9 @@ public final class TextInserter {
                     continue
                 }
             case .paste:
-                if pasteViaPasteboard(text) { remember(.other); return .inserted(.paste) }
+                guard let outcome = await pasteViaPasteboard(text, app: bundle) else { continue }
+                if outcome.probablyInserted { remember(.other) }
+                return outcome
             case .copy:
                 _ = pasteboard.write(text: text, transient: false)
                 remember(.other)
@@ -190,33 +206,82 @@ public final class TextInserter {
         if generation == undoGeneration { forgetUndo() }
     }
 
-    private func pasteViaPasteboard(_ text: String) -> Bool {
+    /// Pastes `text` with ⌘V and checks that it arrived: the focused field changed (when it can be read), or at least
+    /// an app read the pasteboard. A confirmed paste puts the user's clipboard back after `restoreDelay`; an unconfirmed
+    /// one leaves the text on the clipboard as a normal copy so ⌘V gets it. nil when ⌘V could not be posted.
+    /// The log says what happened (never the text): the app at insertion and at ⌘V, the change counts, when the
+    /// pasteboard was read and what the check found.
+    private func pasteViaPasteboard(_ text: String, app: String?) async -> InsertionOutcome? {
         restoreTask?.cancel()
+        restoreGeneration += 1
+        let before = env.focusedFieldState()
+        let countBefore = pasteboard.changeCount
         // Still inside a restore window and the clipboard still holds our transient text: keep the user's original.
         let saved: [PasteboardItem]
-        if let r = restore, pasteboard.changeCount == r.owned { saved = r.saved } else { saved = pasteboard.snapshot() }
-        let ours = pasteboard.write(text: text, transient: true)
+        if let r = restore, countBefore == r.owned { saved = r.saved } else { saved = pasteboard.snapshot() }
+        let ours = pasteboard.writeTracked(text: text)
         restore = Restore(saved: saved, owned: ours)
+        let frontAtPaste = env.frontmostBundleID()
+        let posted = ProcessInfo.processInfo.systemUptime
         guard env.postPaste() else {
             pasteboard.restore(saved)
             restore = nil
-            return false
+            return nil
         }
-        // Give the target app time to read the pasteboard, then put the user's clipboard back,
-        // but only if nobody else has written to it in the meantime. A newer paste supersedes this task.
-        restoreGeneration += 1
         let generation = restoreGeneration
-        restoreTask = Task { [pasteboard, env] in
-            await env.sleep(Self.restoreDelay)
-            self.finishRestore(generation: generation, pasteboard: pasteboard)
+        var changed = false
+        // Nothing to observe (an unreadable field and a pasteboard that can't tell reads): no point waiting.
+        let checks = before != nil || pasteboard.tracksReads ? Self.pasteChecks : 0
+        for _ in 0..<checks {
+            await env.checkSleep(Self.pasteCheckInterval)
+            if let before, let now = env.focusedFieldState(), now != before { changed = true; break }
+            // An unreadable field: the read is all there is to wait for.
+            if before == nil, pasteboard.trackedReadUptime != nil { break }
         }
-        return true
+        let read = pasteboard.trackedReadUptime
+        let readNote = !pasteboard.tracksReads ? "untracked" : read.map { $0 < posted ? "early" : String(Int((($0 - posted) * 1000).rounded())) } ?? "none"
+        let outcome: InsertionOutcome
+        if changed {
+            outcome = .inserted(.paste)
+        } else if before != nil, env.focusedFieldState() != nil {
+            outcome = .pasteUnconfirmed(.unchanged)
+        } else if pasteboard.tracksReads, read == nil {
+            outcome = .pasteUnconfirmed(.notRead)
+        } else {
+            outcome = .pasteUnconfirmed(.unreadable)
+        }
+        var clipboard: String
+        if case .inserted = outcome, generation == restoreGeneration {
+            clipboard = "restore"
+            // Give a slow app time to finish reading, then put the user's clipboard back,
+            // but only if nobody else has written to it in the meantime. A newer paste supersedes this task.
+            restoreTask = Task { [pasteboard, env] in
+                await env.sleep(Self.restoreDelay)
+                self.finishRestore(generation: generation, pasteboard: pasteboard)
+            }
+        } else if generation == restoreGeneration, pasteboard.changeCount == ours {
+            // Unconfirmed: the text stays where ⌘V finds it, as a normal copy that outlives Chirp. The user's clipboard
+            // is not put back.
+            restore = nil
+            _ = pasteboard.write(text: text, transient: false)
+            clipboard = "kept"
+        } else if generation == restoreGeneration {
+            restore = nil
+            clipboard = "user_copied"
+        } else {
+            clipboard = "superseded"   // a newer paste owns the restore now
+        }
+        let waited = Int(((ProcessInfo.processInfo.systemUptime - posted) * 1000).rounded())
+        chirpLog.info("paste app=\(app ?? "-", privacy: .public) front_at_v=\(frontAtPaste ?? "-", privacy: .public) cc_before=\(countBefore, privacy: .public) cc_ours=\(ours, privacy: .public) read_ms=\(readNote, privacy: .public) field=\(before == nil ? "unreadable" : changed ? "changed" : "unchanged", privacy: .public) wait_ms=\(waited, privacy: .public) outcome=\(outcome.logName, privacy: .public) clipboard=\(clipboard, privacy: .public)")
+        return outcome
     }
 
     private func finishRestore(generation: Int, pasteboard: PasteboardClient) {
         guard generation == restoreGeneration, let r = restore else { return }
         restore = nil
-        if pasteboard.changeCount == r.owned { pasteboard.restore(r.saved) }
+        let ours = pasteboard.changeCount == r.owned
+        if ours { pasteboard.restore(r.saved) }
+        chirpLog.info("paste restore=\(ours ? "done" : "skipped_user_copied", privacy: .public)")
     }
 
     /// Wait for a pending pasteboard restore (tests and shutdown).

@@ -9,6 +9,9 @@ public enum InsertionOutcome: Sendable, Equatable {
     /// The AX write was accepted but never confirmed (some apps apply it late). Nothing was pasted, to avoid
     /// a duplicate; the text waits on a transient pasteboard for ⌘V.
     case insertedUnverified
+    /// ⌘V reached the app but Chirp could not confirm the text arrived. The text stays on the clipboard as a normal copy
+    /// (when nobody copied something else meanwhile), so ⌘V gets it; history and Paste Again have it too.
+    case pasteUnconfirmed(PasteDoubt)
     case copied
     case refusedSecure
 
@@ -17,10 +20,42 @@ public enum InsertionOutcome: Sendable, Equatable {
         switch self {
         case .inserted(let method): method.rawValue
         case .insertedUnverified: "unverified"
+        case .pasteUnconfirmed(let doubt): "paste_unconfirmed_\(doubt.rawValue)"
         case .copied: "copied"
         case .refusedSecure: "secure"
         }
     }
+
+    /// The text was handed to the app and probably arrived: a confirmed insertion, or a paste the app read into a field
+    /// Chirp cannot read back (Chromium, Electron). The Return after inserting and Use raw follow these.
+    public var probablyInserted: Bool {
+        switch self {
+        case .inserted, .pasteUnconfirmed(.unreadable): true
+        default: false
+        }
+    }
+
+    /// The text may not be in the field: the HUD says where it is (the clipboard) and how to get it.
+    public var leftOnClipboard: Bool {
+        switch self {
+        case .insertedUnverified, .pasteUnconfirmed, .copied: true
+        case .inserted, .refusedSecure: false
+        }
+    }
+}
+
+/// Why a paste could not be confirmed.
+public enum PasteDoubt: String, Sendable, Equatable {
+    /// The app read the clipboard, but its field cannot be read back (Chromium and Electron web fields): probably in, but
+    /// a web page whose field lost focus drops it silently.
+    case unreadable
+    /// No app asked for the text after ⌘V: it went nowhere.
+    case notRead
+    /// The field can be read and did not change.
+    case unchanged
+
+    /// The paste most likely failed: the HUD warns instead of fading.
+    public var likelyFailed: Bool { self != .unreadable }
 }
 
 /// Chooses which insertion methods to try, in order. Pure, so it is unit-tested.

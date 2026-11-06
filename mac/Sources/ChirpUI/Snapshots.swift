@@ -214,6 +214,11 @@ public enum Snapshots {
             hud("cleaned-no-raw-button") { applyOutcome(.inserted(.ax), final: final(corrected: true), offerRaw: false, to: $0) },
             hud("copied") { applyOutcome(.copied, final: final(), to: $0) },
             hud("unverified-ax") { applyOutcome(.insertedUnverified, final: final(), to: $0) },
+            hud("paste-unconfirmed") { applyOutcome(.pasteUnconfirmed(.unreadable), final: final(), to: $0) },
+            hud("paste-failed") { applyOutcome(.pasteUnconfirmed(.notRead), final: final(), to: $0) },
+            hud("recovery-tip") {
+                $0.status = "Tip: ⌃⌥V pastes your last dictation again · ⌃⌥H opens History"; $0.indicator = .none
+            },
             hud("secure-field") { applyOutcome(.refusedSecure, final: final(), to: $0) },
             hud("keep-ready-hint") { $0.status = KeepLoadedHint.message; $0.indicator = .sparkle; $0.duration = nil },
             hud("no-mic-signal") { $0.status = "No microphone signal"; $0.isError = true; $0.indicator = .warning },
@@ -573,6 +578,12 @@ public enum Snapshots {
             menu("loading") { $0.health = Health(engine: "parakeet-mlx:tdt-0.6b-v2", ready: false) },
             menu("empty-library") { $0.health = local; $0.recentNotes = [] },
             menu("use-raw") { $0.health = local; $0.cleanupOn = true; $0.rawOfferOpen = true; $0.rawOfferKey = "⌃⌥Z" },
+            menu("last-dictation") {
+                $0.health = local
+                $0.lastDictation = LastDictation(preview: "Ship the fix tonight and tell the team in the release channel",
+                                                 date: sampleNow.addingTimeInterval(-120), historyID: "1")
+                $0.pasteLastShortcut = "⌃⌥V"; $0.historyShortcut = "⌃⌥H"
+            },
             menu("long-names") {
                 $0.health = local; $0.chosenInputUID = "long"
                 $0.inputs = [boya, AudioInput(uid: "long", name: "Studio Display Microphone (Built-in, Aggregate)")]
@@ -592,7 +603,7 @@ public enum Snapshots {
         "hud-flow-2-polishing", "hud-flow-3-diff", "hud-correction-use-raw",
         "hud-wordwave-listening", "hud-wordwave-long", "hud-wordwave-polishing",
         "menu-ready", "menu-notes-recording", "menu-recent-notes-submenu", "menu-cleanup-submenu",
-        "settings-general-ready", "settings-general-missing", "settings-dictation-ready", "settings-dictation-shortcuts-custom",
+        "settings-general-ready", "settings-general-missing", "settings-dictation-shortcuts-custom",
         "settings-dictation-sounds", "settings-cleanup-custom", "settings-notes-library", "settings-notes-downloaded",
         "settings-devices-ready", "settings-advanced-ready", "settings-about-ready", "onboarding-welcome",
         "notes-empty", "notes-library", "notes-recording", "notes-search", "notes-no-results", "notes-deleted",
@@ -600,7 +611,7 @@ public enum Snapshots {
         "notes-transcript-speakers", "notes-transcript-speakers-renamed", "notes-recording-call", "notes-sources-call",
         "notes-speaker-model-downloading", "notes-speaker-model-failed",
         "notes-name-speakers-line", "notes-name-speakers-sheet", "notes-name-speakers-suggest", "notes-name-speakers-remember",
-        "history-cleaned", "history-empty", "menu-recent-dictations-submenu",
+        "history-cleaned", "history-empty", "menu-recent-dictations-submenu", "menu-last-dictation",
         "settings-saved-voices-ready", "settings-saved-voices-empty", "notes-voice-recognised",
     ]
 

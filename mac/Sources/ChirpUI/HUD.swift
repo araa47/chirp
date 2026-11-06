@@ -636,22 +636,43 @@ public struct OutcomePresentation: Equatable, Sendable {
     /// The note when clean-up did not deliver and the raw text was kept stays up this long at most.
     public static let keptNoteLinger = 1.0
 
+    /// How long the "Cleaned · ⌃⌥Z for raw" hint stays (the offer itself lasts `RawOffer.duration`).
+    public static let rawHintLinger = 2.5
+    /// How long "Pasted · also on the clipboard" stays: it shows after every paste into a field Chirp cannot read.
+    public static let unconfirmedLinger = 1.6
+    /// How long the warning for a paste that most likely failed stays.
+    public static let failedLinger = 5.0
+
     /// `offerRaw` is the "Show raw after clean-up" preference: off drops "Use raw" altogether. `showChanges` is "Show
     /// changes after clean-up": on keeps the HUD up with the diff and the Use raw button; off (the default) offers Use
-    /// raw outside the HUD. A successful insertion fades the HUD out at once: the text in the field is the outcome.
-    /// It stays up only to tell the user something: copied, maybe not inserted, a secure field, clean-up kept the
-    /// original, or the changes they asked to see.
+    /// raw outside the HUD, and the HUD says so briefly ("Cleaned · ⌃⌥Z for raw"; `rawKey` nil: the hotkey is not
+    /// registered, so the menu is the way). A successful insertion fades the HUD out at once: the text in the field is
+    /// the outcome. It stays up only to tell the user something: copied, maybe not inserted (and where the text is), a
+    /// secure field, clean-up kept the original, Use raw on offer, or the changes they asked to see.
+    /// When clean-up changed nothing there is nothing to put back, so nothing is offered.
     public static func of(_ outcome: InsertionOutcome, final: FinalResult, offerRaw: Bool = true,
-                          showChanges: Bool = false) -> OutcomePresentation {
+                          showChanges: Bool = false, rawKey: String? = "⌃⌥Z") -> OutcomePresentation {
         let useRaw = final.canUseRaw && offerRaw
         let kept = !final.corrected && final.correctionError != nil
+        let rawHint = "Cleaned · " + (rawKey.map { "\($0) for raw" } ?? "Use raw in the menu")
         return switch outcome {
         case .inserted where showChanges:
             OutcomePresentation(status: "Inserted", showUseRaw: useRaw, cleaned: final.canUseRaw, keptOriginal: kept,
                                 linger: useRaw ? 5 : final.canUseRaw ? 1.8 : kept ? keptNoteLinger : 0)
+        case .pasteUnconfirmed(.unreadable) where showChanges:
+            OutcomePresentation(status: unconfirmedStatus, indicator: .clipboard, showUseRaw: useRaw, cleaned: final.canUseRaw,
+                                keptOriginal: kept, linger: useRaw ? 5 : max(unconfirmedLinger, final.canUseRaw ? 1.8 : 0))
         case .inserted:
-            OutcomePresentation(status: "Inserted", cleaned: final.canUseRaw, keptOriginal: kept,
-                                offersRawOutsideHUD: useRaw, linger: kept ? keptNoteLinger : 0)
+            OutcomePresentation(status: useRaw ? rawHint : "Inserted", cleaned: final.canUseRaw, keptOriginal: kept,
+                                offersRawOutsideHUD: useRaw, linger: useRaw ? rawHintLinger : kept ? keptNoteLinger : 0)
+        case .pasteUnconfirmed(.unreadable):
+            // Probably in (the app read it), but Chirp can't see the field: the text stays on the clipboard too.
+            OutcomePresentation(status: useRaw ? rawHint : unconfirmedStatus, indicator: .clipboard, cleaned: final.canUseRaw,
+                                keptOriginal: kept, offersRawOutsideHUD: useRaw,
+                                linger: useRaw ? rawHintLinger : max(unconfirmedLinger, kept ? keptNoteLinger : 0))
+        case .pasteUnconfirmed:
+            OutcomePresentation(status: failedStatus, indicator: .warning, cleaned: final.canUseRaw, keptOriginal: kept,
+                                linger: failedLinger)
         case .copied:
             OutcomePresentation(status: "Copied — ⌘V", indicator: .clipboard, cleaned: final.canUseRaw, keptOriginal: kept, linger: 3)
         case .insertedUnverified:
@@ -660,6 +681,11 @@ public struct OutcomePresentation: Equatable, Sendable {
             OutcomePresentation(status: "Secure field — not inserted", indicator: .warning, isError: true, linger: 3)
         }
     }
+
+    /// A paste into a field Chirp cannot read back (Chromium, Electron): it is also on the clipboard.
+    public static let unconfirmedStatus = "Pasted · also on the clipboard"
+    /// A paste nobody read, or that left a readable field unchanged.
+    public static let failedStatus = "Couldn't confirm it went in — press ⌘V"
 }
 
 public enum HUDText {
