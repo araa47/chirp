@@ -312,15 +312,14 @@ public final class NotesSession {
         onShowWindow?(focus)
         // Labels are on and the model is missing: fetch it in the background. Recording never waits for it.
         speakers.ensureModel()
-        if speakers.needsLoad {
-            // The models load offline (~0.1 s warm); recording starts as soon as they are ready, or without labels
-            // (or voices) if one is gone or damaged (the status line offers Retry).
-            guard !speakers.isLoading else { return }
-            Task {
-                _ = await speakers.prepare()
-                self.start(focus: focus)
+        if speakers.needsLoad, !speakers.isLoading {
+            // The model loads offline: ~0.1 s warm, but several seconds cold (the first Record after an install
+            // compiles it). Recording never waits for it, or Record would look dead and lose the first words: labels
+            // join the recording once it is ready, as after a download (a gone or damaged model shows Retry).
+            Task { [weak self] in
+                _ = await self?.speakers.prepare()
+                self?.speakersReady()
             }
-            return
         }
         let health = resolvedHealth()
         startError = nil
@@ -628,6 +627,7 @@ public final class NotesSession {
         model.closeReview()
         model.longRunAcknowledged = 0
         model.highlightedParagraph = nil
+        model.composing = false
     }
 
     /// Opens a stored note after all writes for the previous document are durable.
@@ -1057,12 +1057,18 @@ extension NotesSession {
             let note = NotesBrowsedNote(record: NotesJournalRecord(document: NotesDocument(), elapsed: 0), library: library, like: model)
             window.selection = .note(note.model.document.id)
             show(note)
+            // Its editor is created after this request: it takes the keyboard when it appears.
+            note.model.focusOnAppear = true
             note.model.focusRequest += 1
             return
         }
         closeBrowsing()
         reset()
         window.selection = .note(recorder.document.id)
+        // With no notes yet the empty-state art is on screen, not an editor: show the blank note's editor and focus it
+        // as soon as it appears (otherwise New Note looks like it did nothing).
+        model.composing = true
+        model.focusOnAppear = true
         model.focusRequest += 1
     }
 

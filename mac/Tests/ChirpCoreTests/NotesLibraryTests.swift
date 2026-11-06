@@ -59,6 +59,26 @@ private func libraryDirectory() -> URL {
         #expect(entry.updatedAt == updatedAt)
     }
 
+    /// A short note an older build listed as "_(nothing yet)_" is listed by its words after the update, without an edit.
+    @Test func aPlaceholderTitleInTheIndexIsDerivedAgain() async throws {
+        let dir = libraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = NotesLibraryStore(directory: dir)
+        var document = NotesDocument(text: "_(nothing yet)_")
+        document.append(NotesSegment(id: 0, offset: 0, raw: "Hello, one, two, three.", text: "Hello, one, two, three."))
+        try await store.write(NotesJournalRecord(document: document, elapsed: 3))
+        let index = dir.appendingPathComponent("index.json")
+        var old = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: index)) as? [[String: Any]])
+        old[0]["title"] = NotesMarkdown.placeholder
+        try JSONSerialization.data(withJSONObject: old).write(to: index)
+        // The index is newer than the note, so only the placeholder title marks the row stale.
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -60)],
+                                              ofItemAtPath: dir.appendingPathComponent(document.id.uuidString).appendingPathComponent("note.json").path)
+
+        let entry = try #require(try await NotesLibraryStore(directory: dir).list().first)
+        #expect(entry.title == "Hello, one, two, three")
+    }
+
     @Test func optionalCodecSealsIndexRecordsRecoveryAndAudio() async throws {
         let dir = libraryDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -503,6 +523,16 @@ private func libraryDirectory() -> URL {
         #expect(title("", segment: "Person 1: hello there. Bye") == "hello there")
         #expect(title("- Person 1:").hasPrefix("Note, "))
         #expect(title("").hasPrefix("Note, "))
+    }
+
+    /// A short recording the passes found nothing in kept "_(nothing yet)_" as its title (and the window's).
+    @Test func thePlaceholderAndTheNotStructuredNoticeAreNeverTheTitle() {
+        #expect(title("_(nothing yet)_", segment: "Hello, one, two, three.") == "Hello, one, two, three")
+        #expect(title("\(NotesDocument.fallbackHeader)\n\nwe ship friday") == "we ship friday")
+        #expect(title("_(nothing yet)_").hasPrefix("Note, "))
+        var d = NotesDocument(startedAt: Date(timeIntervalSince1970: 0), text: "_(nothing yet)_\n\n- Ship Friday")
+        d.append(NotesSegment(id: 0, offset: 0, raw: "x", text: "x"))
+        #expect(d.title == "Ship Friday" && !d.snippet().contains("nothing yet"))
     }
 
     @Test func aHeadingAndAChosenTitleAreUnchanged() {

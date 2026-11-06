@@ -76,9 +76,16 @@ extension NotesDocument {
     public var sessions: [NotesCaptureBoundary] { libraryMetadata?.sessions ?? [] }
     public var audio: [NotesAudioReference] { libraryMetadata?.audio ?? [] }
 
+    /// The text's lines a title or library row can use: trimmed, without the "nothing substantive" placeholder or the
+    /// "not structured" notice (neither says what the note is about).
+    private var meaningfulLines: [String] {
+        text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0 != NotesMarkdown.placeholder && $0 != Self.fallbackHeader }
+    }
+
     public var title: String {
         if let userTitle { return userTitle }
-        let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+        let lines = meaningfulLines
         if let heading = lines.first(where: { $0.range(of: #"^#{1,6}\s+\S"#, options: .regularExpression) != nil }) {
             return String(heading.drop(while: { $0 == "#" || $0.isWhitespace }).prefix(160))
         }
@@ -103,8 +110,7 @@ extension NotesDocument {
         func heading(_ line: String) -> Bool {
             line.range(of: #"^#{1,6}\s+\S"#, options: .regularExpression) != nil
         }
-        let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !$0.allSatisfy { "-*_ ".contains($0) } }
+        let lines = meaningfulLines.filter { !$0.isEmpty && !$0.allSatisfy { "-*_ ".contains($0) } }
         let titleLine = userTitle == nil ? lines.firstIndex(where: heading) ?? lines.indices.first : nil
         let displayTitle = plain(title)
         var body = ""
@@ -273,8 +279,11 @@ public actor NotesLibraryStore {
             guard let id = UUID(uuidString: url.lastPathComponent) else { continue }
             found.insert(id)
             let modified = (try? file(id).resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantFuture
-            // Decode only records absent/stale in the index, and captures that need crash recovery.
-            guard cached == nil || entries?[id] == nil || entries?[id]?.recording == true || modified >= indexedAt else { continue }
+            // Decode only records absent/stale in the index, and captures that need crash recovery. A row an older build
+            // titled with the placeholder or the "not structured" notice is stale too: its title is derived again.
+            let placeholderTitle = [NotesMarkdown.placeholder, NotesDocument.fallbackHeader].contains(entries?[id]?.title)
+            guard cached == nil || entries?[id] == nil || entries?[id]?.recording == true || placeholderTitle
+                || modified >= indexedAt else { continue }
             let r: NotesJournalRecord
             do { r = try record(id) }
             catch {

@@ -209,6 +209,24 @@ private func libraryDirectory() -> URL {
         await h.stop()
     }
 
+    /// With no notes the window shows the empty-state art, not an editor: New Note must bring up the blank note's
+    /// editor and focus it when it appears (it used to only bump a focus request nobody was listening to).
+    @Test func newNoteOnTheEmptyStateShowsTheEditorAndFocusesItWhenItAppears() async throws {
+        let dir = libraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let h = NotesHarness(library: NotesLibrary(store: NotesLibraryStore(directory: dir)))
+        #expect(h.session.window.isEmpty && h.model.showsEmptyState)
+        let before = h.model.focusRequest
+        h.session.newNote()
+        #expect(!h.model.showsEmptyState && h.model.composing)
+        #expect(h.model.focusOnAppear && h.model.focusRequest == before + 1)
+        // A recorded note hides the art on its own; reset (the next New, a delete) clears the flag.
+        await h.record(); await h.speak(1); await h.stop()
+        #expect(!h.model.showsEmptyState)
+        h.session.reset()
+        #expect(!h.model.composing)
+    }
+
     @Test func deleteMovesToRecentlyDeletedAndUndoBringsItBack() async throws {
         let dir = libraryDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
