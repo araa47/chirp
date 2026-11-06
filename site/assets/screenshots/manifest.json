@@ -1084,7 +1084,7 @@
     ]
   },
   "mac/onboarding-welcome-dark.png": {
-    "sha256": "8c345a004e741793c57bc9894fe1897d63c407f0d9fe4e999207883e663c0ed1",
+    "sha256": "7bbeb29af9c973e5e70f6cd03e637bf092e5630ab8a69fbe752d95e3d7c0b1b2",
     "width": 1440,
     "height": 920,
     "variants": [
@@ -1111,7 +1111,7 @@
     ]
   },
   "mac/onboarding-welcome-light.png": {
-    "sha256": "1871cb93966bbc0601a84a44a09af98f15cc95d8c04e949ee0058ababf8cd37d",
+    "sha256": "0eed32248b769b188b159d2240354c4056960ba352368993fa88c21444829d9f",
     "width": 1440,
     "height": 920,
     "variants": [

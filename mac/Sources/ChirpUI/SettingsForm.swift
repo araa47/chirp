@@ -8,6 +8,9 @@ public struct SettingsState: Sendable {
     public var notesHotkey: KeyCombo = .controlOptionN
     public var openNotesHotkey: KeyCombo = .controlOptionShiftN
     public var useRawHotkey: KeyCombo = .controlOptionZ
+    /// Shortcuts: Paste Last Dictation and Dictation History.
+    public var pasteLastHotkey: KeyCombo = .controlOptionV
+    public var openHistoryHotkey: KeyCombo = .controlOptionH
     /// General: "Always show Chirp in the Dock".
     public var alwaysShowInDock = false
     public var activationMode: ActivationMode = .autoStop
@@ -112,6 +115,8 @@ public struct SettingsState: Sendable {
         case .notes: notesHotkey
         case .openNotes: openNotesHotkey
         case .useRaw: useRawHotkey
+        case .pasteLast: pasteLastHotkey
+        case .openHistory: openHistoryHotkey
         }
     }
 }
@@ -205,7 +210,9 @@ public final class SettingsForm {
     /// Shortcuts: every global shortcut besides dictation, with the same recorder and rules.
     public let notesShortcut = ShortcutControls(.notes, purpose: "Starts a new note and records, from any app.")
     public let openNotes = ShortcutControls(.openNotes, purpose: "Brings the Notes library forward without recording.")
-    public let useRawShortcut = ShortcutControls(.useRaw, purpose: "Puts the original words back for 5 s after a cleaned insertion.")
+    public let useRawShortcut = ShortcutControls(.useRaw, purpose: "Puts the original words back for 5 s after clean-up changed them.")
+    public let pasteLastShortcut = ShortcutControls(.pasteLast, purpose: "Pastes your newest dictation again into the focused field, from any app.")
+    public let openHistoryShortcut = ShortcutControls(.openHistory, purpose: "Opens Dictation History, with every dictation kept on this Mac.")
     public let alwaysInDock = NSButton(checkboxWithTitle: "Always show Chirp in the Dock", target: nil, action: nil)
     /// Under the hotkey: how it works, or why the last recording was refused.
     public let hotkeyHelp = SettingsForm.help("")
@@ -454,6 +461,8 @@ public final class SettingsForm {
                 row("New note", notesShortcut.view, help: notesShortcut.helpView),
                 row("Notes library", openNotes.view, help: openNotes.helpView),
                 row("Use raw", useRawShortcut.view, help: useRawShortcut.helpView),
+                row("Paste again", pasteLastShortcut.view, help: pasteLastShortcut.helpView),
+                row("History", openHistoryShortcut.view, help: openHistoryShortcut.helpView),
             ]),
             SettingsSection("Dictating", [
                 row("Mode", mode, help: modeHelp),
@@ -874,7 +883,9 @@ public final class SettingsForm {
         notesShortcut.show(s.notesHotkey)
         openNotes.show(s.openNotesHotkey)
         useRawShortcut.show(s.useRawHotkey)
-        offerRawHelp.stringValue = "Puts the original words back, with \(s.useRawHotkey.title) or from the menu."
+        pasteLastShortcut.show(s.pasteLastHotkey)
+        openHistoryShortcut.show(s.openHistoryHotkey)
+        offerRawHelp.stringValue = "For 5 s after clean-up changed your words, \(s.useRawHotkey.title) or the menu puts the original back. Nothing is offered when clean-up changed nothing."
     }
 
     /// The other shortcut rows by role.
@@ -884,6 +895,8 @@ public final class SettingsForm {
         case .notes: notesShortcut
         case .openNotes: openNotes
         case .useRaw: useRawShortcut
+        case .pasteLast: pasteLastShortcut
+        case .openHistory: openHistoryShortcut
         }
     }
 

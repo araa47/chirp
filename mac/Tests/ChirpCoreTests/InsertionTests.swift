@@ -16,6 +16,14 @@ final class FakePasteboard: PasteboardClient {
     }
     func restore(_ saved: [PasteboardItem]) { items = saved; changeCount += 1 }
     var text: String? { items.first?["public.utf8-plain-text"].flatMap { String(data: $0, encoding: .utf8) } }
+    /// Read tracking, as `SystemPasteboard` does it: off unless a test turns it on; `appRead()` is an app asking.
+    var tracksReads = false
+    var trackedReadUptime: TimeInterval?
+    func writeTracked(text: String) -> Int {
+        trackedReadUptime = nil
+        return write(text: text, transient: true)
+    }
+    func appRead() { if trackedReadUptime == nil { trackedReadUptime = ProcessInfo.processInfo.systemUptime } }
 }
 
 /// Scriptable stand-in for the system calls; records what was invoked.
@@ -25,6 +33,11 @@ final class FakeSystem {
     var ax: AXInsertAttempt = .verified(NSRange(location: 3, length: 5))
     var axReplaceResult = true
     var pasteResult = true
+    /// The focused field as Accessibility shows it: nil is unreadable (Chromium and Electron web fields).
+    var field: String?
+    /// What ⌘V does in the app: whether it reads the pasteboard, and whether the text lands in the field.
+    var appReadsPaste = true
+    var pasteLands = true
     var calls: [String] = []
 
     func inserter(board: FakePasteboard) -> TextInserter {
@@ -32,7 +45,14 @@ final class FakeSystem {
             secureInputEnabled: { self.secure }, axTrusted: { self.trusted }, frontmostBundleID: { self.bundle },
             axInsert: { _ in self.calls.append("ax"); return self.ax },
             axReplace: { range, expected, new in self.calls.append("axReplace:\(range.location),\(range.length):\(expected)→\(new)"); return self.axReplaceResult },
-            postPaste: { self.calls.append("paste"); return self.pasteResult },
+            postPaste: {
+                self.calls.append("paste")
+                guard self.pasteResult else { return false }
+                if self.appReadsPaste { board.appRead() }
+                if self.appReadsPaste, self.pasteLands, let f = self.field { self.field = f + (board.text ?? "") }
+                return true
+            },
+            focusedFieldState: { self.field },
             // The restore delay is instant, but the undo window must not elapse mid-test (cancelled by forgetUndo).
             sleep: { d in if d >= .seconds(1) { try? await Task.sleep(for: d) } }), pasteboard: board)
     }
@@ -60,11 +80,13 @@ final class FakeSystem {
         // the late-write safety rule correctly prevents an automatic paste fallback.
         sys.ax = .unverified
         let inserter = sys.inserter(board: board)
-        #expect(await inserter.insert("dictated text") == .inserted(.paste))
+        // Their web field can't be read back, so the paste is unconfirmed and the text stays on the clipboard.
+        #expect(await inserter.insert("dictated text") == .pasteUnconfirmed(.unreadable))
         #expect(sys.calls == ["paste"])
         #expect(board.text == "dictated text")
         await inserter.settle()
-        #expect(board.text == "user clipboard")
+        #expect(board.text == "dictated text")
+        #expect(board.lastWriteTransient == false)
     }
 
     @Test(arguments: ["com.openai.codex", "com.citrolabs.ego.lite"])
@@ -105,6 +127,7 @@ final class FakeSystem {
     @Test func fallsBackToPasteOnlyWhenAXWasNotAttempted() async {
         let sys = FakeSystem(), board = FakePasteboard()
         sys.ax = .notAttempted
+        sys.field = "Dear team, "
         let inserter = sys.inserter(board: board)
         #expect(await inserter.insert("hello") == .inserted(.paste))
         #expect(sys.calls == ["ax", "paste"])
@@ -118,8 +141,9 @@ final class FakeSystem {
     @Test func doesNotRestoreIfClipboardChangedMeanwhile() async {
         let sys = FakeSystem(), board = FakePasteboard()
         sys.bundle = "com.apple.Terminal"
+        sys.field = "$ "
         let inserter = sys.inserter(board: board)
-        _ = await inserter.insert("hello")
+        #expect(await inserter.insert("hello") == .inserted(.paste))
         #expect(sys.calls == ["paste"])                 // terminals skip AX
         board.items = [["public.utf8-plain-text": Data("user copied something new".utf8)]]
         board.changeCount += 1                          // the user copied during the restore window

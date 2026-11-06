@@ -39,7 +39,7 @@ public enum HistoryText {
     public static let disclosure = "History is kept on this Mac only, encrypted, and never synced. Turn it off in Settings → History & privacy."
 
     /// Onboarding's line under "Dictate into any app".
-    public static let onboarding = "History keeps them on this Mac only, encrypted; turn it off in Settings → History & privacy."
+    public static let onboarding = "If one doesn’t land, ⌃⌥V pastes it again, and History (⌃⌥H) keeps them on this Mac only, encrypted."
 
     public static func noResults(_ query: String) -> String { "No dictations match “\(query)”" }
 
@@ -81,8 +81,11 @@ public enum HistoryText {
     }
 
     /// A one-line preview for the menu's Recent submenu.
-    public static func menuTitle(_ entry: DictationEntry, limit: Int = 40) -> String {
-        let flat = entry.text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    public static func menuTitle(_ entry: DictationEntry, limit: Int = 40) -> String { preview(entry.text, limit: limit) }
+
+    /// `text` on one line, cut to `limit` characters with "…".
+    public static func preview(_ text: String, limit: Int = 40) -> String {
+        let flat = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         return flat.count > limit ? String(flat.prefix(limit - 1)).trimmingCharacters(in: .whitespaces) + "…" : flat
     }
 }

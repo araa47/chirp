@@ -11,7 +11,7 @@ import Testing
 
     @Test func theDefaultsAreValidDistinctCarbonHotKeys() throws {
         let defaults = ChirpShortcut.allCases.map(\.defaultCombo)
-        #expect(defaults.map(\.title) == ["Right ⌥ Option", "⌃⌥N", "⌃⌥⇧N", "⌃⌥Z"])
+        #expect(defaults.map(\.title) == ["Right ⌥ Option", "⌃⌥N", "⌃⌥⇧N", "⌃⌥Z", "⌃⌥V", "⌃⌥H"])
         for (i, d) in defaults.enumerated() {
             // Only dictation's Right ⌥ needs Accessibility (the event tap); the others are Carbon hot keys.
             #expect(d.needsEventTap == (ChirpShortcut.allCases[i] == .dictation), "\(d.title)")
@@ -82,13 +82,14 @@ import Testing
     @Test func theDictationPageHoldsEveryShortcutAndOtherPagesNone() {
         let form = SettingsForm(SettingsState())
         func contains(_ tab: SettingsTab, _ view: NSView) -> Bool { view.isDescendant(of: form.view(for: tab)) }
-        for view in [form.hotkey, form.recorder, form.notesShortcut.view, form.openNotes.view, form.useRawShortcut.view] {
+        for view in [form.hotkey, form.recorder, form.notesShortcut.view, form.openNotes.view, form.useRawShortcut.view,
+                     form.pasteLastShortcut.view, form.openHistoryShortcut.view] {
             #expect(contains(.dictation, view))
             #expect(!contains(.general, view) && !contains(.notes, view) && !contains(.cleanup, view))
         }
         #expect(contains(.general, form.alwaysInDock))
         #expect(SettingsTab.allCases.firstIndex(of: .dictation) == 1 && SettingsTab.dictation.title == "Dictation")
-        #expect(ChirpShortcut.allCases.compactMap { form.controls(for: $0)?.shortcut } == [.notes, .openNotes, .useRaw])
+        #expect(ChirpShortcut.allCases.compactMap { form.controls(for: $0)?.shortcut } == [.notes, .openNotes, .useRaw, .pasteLast, .openHistory])
     }
 
     @Test func eachRowShowsItsKeysWithResetOnlyAwayFromTheDefault() throws {
@@ -111,7 +112,7 @@ import Testing
         #expect(undo.stringValue.contains("⌃⌥⌘U"))
     }
 
-    @Test(arguments: [ChirpShortcut.notes, .openNotes, .useRaw])
+    @Test(arguments: [ChirpShortcut.notes, .openNotes, .useRaw, .pasteLast, .openHistory])
     func theRecorderRefusesAnotherShortcutsKeysAndKeepsListening(shortcut: ChirpShortcut) throws {
         let form = SettingsForm(SettingsState())
         let c = try #require(form.controls(for: shortcut))

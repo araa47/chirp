@@ -15,11 +15,12 @@ public enum AutoEnter: String, CaseIterable, Sendable {
     /// The style whose per-app rules mark an app as a chat app.
     public static let chatProfile = "chat"
 
-    /// Whether a Return follows this insertion. Pure, so it is unit-tested. Only text that really landed counts (an AX or
-    /// paste insertion): never a clipboard copy, an unverified write or a refused secure field. `skipped` is the
-    /// modifier held at stop. `bundleID` is the app that would receive the key.
+    /// Whether a Return follows this insertion. Pure, so it is unit-tested. Only text that landed counts (an AX or paste
+    /// insertion, or a paste the app read into a field Chirp cannot read back): never a clipboard copy, an unverified
+    /// write, a paste nobody read or that left a readable field unchanged (the Return would send an empty message), or a
+    /// refused secure field. `skipped` is the modifier held at stop. `bundleID` is the app that would receive the key.
     public func shouldSend(after outcome: InsertionOutcome, bundleID: String?, rules: [AppStyleRule], skipped: Bool) -> Bool {
-        guard !skipped, case .inserted = outcome else { return false }
+        guard !skipped, outcome.probablyInserted else { return false }
         switch self {
         case .off: return false
         case .always: return true

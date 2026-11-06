@@ -40,6 +40,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         var recentDictations: () -> [RecentDictation] = { [] }
         var insertDictation: (String) -> Void = { _ in }
         var copyDictation: (String) -> Void = { _ in }
+        /// The newest dictation at the top of the menu, its Paste Again and Copy, and the Paste Last Dictation and
+        /// Dictation History shortcuts (nil while not registered).
+        var lastDictation: () -> LastDictation? = { nil }
+        var pasteLast: () -> Void = {}
+        var copyLast: () -> Void = {}
+        var pasteLastShortcut: () -> String? = { nil }
+        var historyShortcut: () -> String? = { nil }
     }
 
     /// What the menu and the icon need from Live Notes.
@@ -190,6 +197,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         inputs.recentNotes = actions.recentNotes()
         inputs.historyEnabled = actions.historyEnabled()
         inputs.recentDictations = actions.recentDictations()
+        inputs.lastDictation = actions.lastDictation()
+        inputs.pasteLastShortcut = actions.pasteLastShortcut()
+        inputs.historyShortcut = actions.historyShortcut()
         inputs.now = Date()
         inputs.notesHasDocument = notes.hasDocument
         inputs.notesHotkeyRegistered = notes.hotkeyRegistered
@@ -281,6 +291,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .copyDictation: #selector(copyDictation(_:))
         case .openDictation: #selector(openDictation(_:))
         case .toggleShowInNotch: #selector(toggleShowInNotch)
+        case .pasteLast: #selector(pasteLast)
+        case .copyLast: #selector(copyLast)
         }
     }
 
@@ -308,6 +320,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func showSetup() { actions.openSetup() }
     @objc private func quit() { NSApp.terminate(nil) }
     @objc private func showHistory() { actions.showHistory(nil) }
+    @objc private func pasteLast() { actions.pasteLast() }
+    @objc private func copyLast() { actions.copyLast() }
     @objc private func insertDictation(_ sender: NSMenuItem) {
         if let id = sender.representedObject as? String { actions.insertDictation(id) }
     }

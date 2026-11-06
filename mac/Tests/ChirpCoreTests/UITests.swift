@@ -13,13 +13,29 @@ import Testing
         #expect(OutcomePresentation.of(.insertedUnverified, final: plain).status == "Inserted? ⌘V if empty")
         let secure = OutcomePresentation.of(.refusedSecure, final: plain)
         #expect(secure.isError && secure.status == "Secure field — not inserted" && secure.indicator == .warning)
+        let unconfirmed = OutcomePresentation.of(.pasteUnconfirmed(.unreadable), final: plain)
+        #expect(unconfirmed == .init(status: "Pasted · also on the clipboard", indicator: .clipboard,
+                                     linger: OutcomePresentation.unconfirmedLinger))
+        for doubt in [PasteDoubt.notRead, .unchanged] {
+            let failed = OutcomePresentation.of(.pasteUnconfirmed(doubt), final: plain)
+            #expect(failed.status == "Couldn't confirm it went in — press ⌘V" && failed.indicator == .warning && !failed.isError)
+            #expect(failed.linger == OutcomePresentation.failedLinger && !failed.offersRawOutsideHUD)
+        }
     }
 
-    @Test func aCleanedInsertionFadesTheHUDAtOnceAndOffersRawElsewhere() {
+    @Test func aCleanedInsertionSaysHowToGetTheRawWordsBack() {
         let corrected = FinalResult(text: "Hello.", raw: "hello", corrected: true)
         let unchanged = FinalResult(text: "hello", raw: "hello", corrected: true)
         let p = OutcomePresentation.of(.inserted(.ax), final: corrected)
-        #expect(p.linger == 0 && !p.showUseRaw && p.offersRawOutsideHUD && p.cleaned)
+        #expect(p.status == "Cleaned · ⌃⌥Z for raw" && p.linger == OutcomePresentation.rawHintLinger)
+        #expect(!p.showUseRaw && p.offersRawOutsideHUD && p.cleaned)
+        #expect(OutcomePresentation.of(.inserted(.ax), final: corrected, rawKey: "⌃⌥⌘R").status == "Cleaned · ⌃⌥⌘R for raw")
+        #expect(OutcomePresentation.of(.inserted(.ax), final: corrected, rawKey: nil).status == "Cleaned · Use raw in the menu")
+        // A paste into Chromium the app read: Use raw is offered there too.
+        let pasted = OutcomePresentation.of(.pasteUnconfirmed(.unreadable), final: corrected)
+        #expect(pasted.status == "Cleaned · ⌃⌥Z for raw" && pasted.offersRawOutsideHUD && pasted.indicator == .clipboard)
+        // Clean-up that changed nothing has nothing to put back: no hint, no offer.
+        #expect(OutcomePresentation.of(.inserted(.ax), final: unchanged).status == "Inserted")
         let none = OutcomePresentation.of(.inserted(.ax), final: unchanged)
         #expect(!none.showUseRaw && !none.offersRawOutsideHUD)
         #expect(!OutcomePresentation.of(.copied, final: corrected).showUseRaw)
@@ -37,21 +53,23 @@ import Testing
         #expect(!OutcomePresentation.of(.refusedSecure, final: corrected).cleaned)
     }
 
-    @Test func aSuccessfulInsertionNeverLingers() {
+    @Test func aSuccessfulInsertionNeverLingersUnlessUseRawIsOnOffer() {
         let finals = [FinalResult(text: "hello"),                                          // clean-up off
                       FinalResult(text: "hello", raw: "hello", corrected: true),            // clean-up changed nothing
                       FinalResult(text: "Hello.", raw: "hello", corrected: true)]           // cleaned
-        for final in finals {
+        for final in finals.prefix(2) {
             for method in [InsertionMethod.ax, .paste] {
                 #expect(OutcomePresentation.of(.inserted(method), final: final).linger == 0)
             }
         }
+        #expect(OutcomePresentation.of(.inserted(.ax), final: finals[2], offerRaw: false).linger == 0)
         // Show changes keeps the HUD only when there are changes to show.
         #expect(OutcomePresentation.of(.inserted(.ax), final: finals[0], showChanges: true).linger == 0)
         #expect(OutcomePresentation.of(.inserted(.ax), final: finals[1], showChanges: true).linger == 0)
         #expect(OutcomePresentation.of(.inserted(.ax), final: finals[2], showChanges: true).linger > 0)
         // Where the user has to act or be told something, the HUD stays.
-        for outcome in [InsertionOutcome.copied, .insertedUnverified, .refusedSecure] {
+        for outcome in [InsertionOutcome.copied, .insertedUnverified, .refusedSecure, .pasteUnconfirmed(.unreadable),
+                        .pasteUnconfirmed(.notRead), .pasteUnconfirmed(.unchanged)] {
             #expect(OutcomePresentation.of(outcome, final: finals[0]).linger > 0)
         }
     }

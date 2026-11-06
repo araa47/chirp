@@ -13,7 +13,8 @@ public enum SystemInsertion {
             frontmostBundleID: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },
             axInsert: { await axInsert($0) },
             axReplace: { await axReplace(range: $0, expected: $1, replacement: $2) },
-            postPaste: { postCommandKey(CGKeyCode(kVK_ANSI_V)) }
+            postPaste: { postCommandKey(CGKeyCode(kVK_ANSI_V)) },
+            focusedFieldState: { focusedFieldState() }
         )
     }
 
@@ -50,6 +51,21 @@ public enum SystemInsertion {
         guard AXIsProcessTrusted(), let element = focusedElement() else { return false }
         let role = copy(element, "AXRole") as? String, subrole = copy(element, "AXSubrole") as? String
         return role == "AXSecureTextField" || subrole == "AXSecureTextField"
+    }
+
+    /// A cheap fingerprint of the focused field for checking a paste (its length and selection, else its text): nil
+    /// without Accessibility, for a secure field, or when the app does not expose the field (Chromium and Electron web
+    /// fields usually don't). A hung app costs at most 0.25 s per read.
+    static func focusedFieldState() -> String? {
+        guard AXIsProcessTrusted(), !IsSecureEventInputEnabled(), let element = focusedElement() else { return nil }
+        AXUIElementSetMessagingTimeout(element, 0.25)
+        let role = copy(element, "AXRole") as? String, subrole = copy(element, "AXSubrole") as? String
+        guard role != "AXSecureTextField", subrole != "AXSecureTextField" else { return nil }
+        if let count = copy(element, "AXNumberOfCharacters") as? Int {
+            let r = range(element)
+            return "\(count):\(r?.location ?? -1):\(r?.length ?? -1)"
+        }
+        return copy(element, "AXValue") as? String
     }
 
     private static func selectedTextSettable(_ element: AXUIElement) -> Bool {

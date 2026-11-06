@@ -39,6 +39,10 @@ final class DictationController {
     private var capturedSeconds: TimeInterval = 0
     /// The last dictation's history entry, so "Use raw" can record what is really in the field.
     private var lastHistoryID: UUID?
+    /// The newest dictation, for Paste Last Dictation and the menu's first rows: kept in memory even with history off,
+    /// but never from a private dictation, a secure field or a Never-keep app. History's newest entry stands in after
+    /// a relaunch.
+    private(set) var lastDictation: (text: String, date: Date, historyID: UUID?)?
     /// Learn from my edits (on while history is on): watches the field after an insertion, and shapes the next `start`.
     var learning: EditLearning?
 
@@ -581,6 +585,8 @@ final class DictationController {
                 else { hud.model.settle(on: text) }
                 hud.model.status = HUDStatus.inserting
                 hud.model.indicator = .waveform
+                let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                chirpLog.info("insert target=\(self.target.bundleID ?? "-", privacy: .public) front=\(front ?? "-", privacy: .public) chirp_active=\(NSApp.isActive, privacy: .public)")
                 let secure = SystemInsertion.focusedFieldIsSecure()
                 let outcome = await inserter.insert(text, undoRaw: final.canUseRaw && settings.showRawAfterCleanup ? final.raw : nil)
                 keep(outcome, final: final, text: text, secureField: secure)
@@ -640,8 +646,15 @@ final class DictationController {
     /// Shows the outcome, and returns whether the HUD stays up for it (false: it is already fading out).
     @discardableResult
     private func show(_ outcome: InsertionOutcome, final: FinalResult) -> Bool {
-        let p = OutcomePresentation.of(outcome, final: final, offerRaw: settings.showRawAfterCleanup,
+        var p = OutcomePresentation.of(outcome, final: final, offerRaw: settings.showRawAfterCleanup,
                                        showChanges: settings.showChangesAfterCleanup)
+        // Use raw outside the HUD: open the offer first, so the HUD names its hotkey only when it really got it.
+        if p.offersRawOutsideHUD || (p.showUseRaw && !hud.acceptsClicks), inserter.canUseRaw, !isPaused {
+            rawOffer.open(avoiding: settings.hotkey)
+            p = OutcomePresentation.of(outcome, final: final, offerRaw: settings.showRawAfterCleanup,
+                                       showChanges: settings.showChangesAfterCleanup,
+                                       rawKey: rawOffer.hotkeyActive ? settings.useRawHotkey.title : nil)
+        }
         hud.model.status = p.status
         hud.model.indicator = p.indicator
         hud.model.cleaned = p.cleaned
@@ -653,10 +666,31 @@ final class DictationController {
         lastLinger = p.linger
         if p.linger > 0 { hud.show(); hud.hide(after: p.linger) } else { hud.hide() }
         hud.announce(p.status)
-        if p.offersRawOutsideHUD || (p.showUseRaw && !hud.acceptsClicks), inserter.canUseRaw, !isPaused { rawOffer.open(avoiding: settings.hotkey) }
+        if outcome.leftOnClipboard, !settings.explainedRecovery { explainRecovery(after: p.linger) }
         // How each dictation ended and how long the HUD stays for it: never the text.
         chirpLog.info("dictation outcome=\(outcome.logName, privacy: .public) cleaned=\(p.cleaned, privacy: .public) kept=\(p.keptOriginal, privacy: .public) hud_linger=\(p.linger, privacy: .public)")
         return p.linger > 0
+    }
+
+    /// Once, the first time a dictation is left on the clipboard: how to get the newest dictation back later (Paste Last
+    /// Dictation, History), after the outcome has been read.
+    private func explainRecovery(after delay: Double) {
+        settings.explainedRecovery = true
+        let paste = settings.pasteLastHotkey.title, history = settings.openHistoryHotkey.title
+        let tip = "Tip: \(paste) pastes your last dictation again · \(history) opens History"
+        chirpLog.info("dictation recovery tip shown")
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(max(delay, 1.2)))
+            guard let self, !self.machine.state.isActive else { return }
+            self.hud.cancelHide()
+            self.hud.model.reset()
+            self.hud.model.status = tip
+            self.hud.model.indicator = .none
+            self.hud.model.silence()
+            self.hud.show()
+            self.hud.announce(tip)
+            self.hud.hide(after: 6)
+        }
     }
 
     /// Replace the inserted correction with the raw transcript, in place for a verified AX insertion and otherwise
@@ -672,7 +706,11 @@ final class DictationController {
             guard let outcome = await inserter.useRaw() else { return }
             hud.model.isError = outcome == .refusedSecure
             hud.show()
-            if outcome != .refusedSecure, let id = lastHistoryID, let history { Task { await history.usedRaw(id) } }
+            if outcome != .refusedSecure, let id = lastHistoryID, let history {
+                // The history entry now holds the raw words; Paste Last Dictation follows it.
+                if lastDictation?.historyID == id { lastDictation = nil }
+                Task { await history.usedRaw(id) }
+            }
             switch outcome {
             case .inserted: hud.model.status = "Inserted raw"; hud.model.indicator = .success
             case .refusedSecure: hud.model.status = "Secure field — unchanged"; hud.model.indicator = .warning
@@ -691,7 +729,14 @@ extension DictationController {
     /// excluded app, a refused insertion or an empty text). Nothing about it is logged.
     fileprivate func keep(_ outcome: InsertionOutcome, final: FinalResult, text: String, secureField: Bool) {
         lastHistoryID = nil
-        guard !privateDictation, !privateSession.isActive, let history, HistoryPolicy.shouldRecord(enabled: settings.historyEnabled, outcome: outcome, secureField: secureField,
+        guard !privateDictation, !privateSession.isActive else { return }
+        // Paste Last Dictation keeps the newest one in memory by the same rules as history, minus the history switch.
+        if HistoryPolicy.shouldRecord(enabled: true, outcome: outcome, secureField: secureField, bundleID: target.bundleID,
+                                      excluded: settings.historyExcludedApps, text: text) {
+            lastDictation = (text, Date(), nil)
+            onChange?()
+        }
+        guard let history, HistoryPolicy.shouldRecord(enabled: settings.historyEnabled, outcome: outcome, secureField: secureField,
                                                       bundleID: target.bundleID, excluded: settings.historyExcludedApps, text: text)
         else { return }
         let raw = final.corrected ? final.raw.trimmingCharacters(in: .whitespacesAndNewlines) : nil
@@ -699,6 +744,7 @@ extension DictationController {
         let entry = DictationEntry(date: Date(), text: text, raw: raw, bundleID: target.bundleID, appName: target.name,
                                  duration: audio, style: final.corrected ? startOptions.correctionProfile : nil)
         lastHistoryID = entry.id
+        lastDictation?.historyID = entry.id
         Task { await history.record(entry) }
     }
 
@@ -798,6 +844,10 @@ extension DictationController {
     /// into a secure field. It is not kept again.
     func insertAgain(_ text: String) async {
         guard !machine.state.isActive, !isPaused else { NSSound.beep(); return }
+        // From a shortcut (⌃⌥V) its keys may still be held: ⌘V must not arrive as ⌃⌥⌘V.
+        for _ in 0..<50 where !NSEvent.modifierFlags.intersection([.control, .option, .command, .shift]).isEmpty {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
         inserter.forgetUndo()
         rawOffer.close()
         hud.cancelHide()
@@ -805,6 +855,30 @@ extension DictationController {
         hud.model.settle(on: text)
         let outcome = await inserter.insert(text)
         show(outcome, final: FinalResult(text: text))
+    }
+}
+
+extension DictationController {
+    /// The newest dictation's text: this run's (`lastDictation`), else history's newest entry.
+    func lastDictationText() -> String? { lastDictation?.text ?? history?.recent(1).first?.text }
+
+    /// Paste Last Dictation (⌃⌥V by default, and the menu): the newest dictation into the focused field again, through
+    /// `insert` (History's Insert Again, which first steps Chirp aside when its own window is in front). With none, a
+    /// short HUD note says so.
+    func pasteLast(insert: (String) -> Void) {
+        guard let text = lastDictationText() else {
+            hud.cancelHide()
+            hud.model.reset()
+            hud.model.status = "No dictation to paste yet"
+            hud.model.indicator = .none
+            hud.model.silence()
+            hud.show()
+            hud.announce(hud.model.status)
+            hud.hide(after: 1.8)
+            return
+        }
+        chirpLog.info("dictation paste_last")
+        insert(text)
     }
 }
 
