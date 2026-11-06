@@ -279,8 +279,11 @@ public actor NotesLibraryStore {
             guard let id = UUID(uuidString: url.lastPathComponent) else { continue }
             found.insert(id)
             let modified = (try? file(id).resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantFuture
-            // Decode only records absent/stale in the index, and captures that need crash recovery.
-            guard cached == nil || entries?[id] == nil || entries?[id]?.recording == true || modified >= indexedAt else { continue }
+            // Decode only records absent/stale in the index, and captures that need crash recovery. A row an older build
+            // titled with the placeholder or the "not structured" notice is stale too: its title is derived again.
+            let placeholderTitle = [NotesMarkdown.placeholder, NotesDocument.fallbackHeader].contains(entries?[id]?.title)
+            guard cached == nil || entries?[id] == nil || entries?[id]?.recording == true || placeholderTitle
+                || modified >= indexedAt else { continue }
             let r: NotesJournalRecord
             do { r = try record(id) }
             catch {

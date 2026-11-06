@@ -87,4 +87,31 @@ import SwiftUI
         await settle()
         #expect(editors(window.contentView!).first?.string.hasPrefix("typed") == true)
     }
+
+    /// New Note on the empty state: the art gives way to the blank note's editor, and that editor (created after the
+    /// request) becomes the window's first responder, so typing goes straight into the note.
+    @Test func newNoteOnTheEmptyStateFocusesTheEditorThatReplacesTheArt() async throws {
+        let model = NotesModel()
+        let library = NotesLibraryModel()
+        let host = NSHostingView(rootView: NotesView(model: model, library: library))
+        host.frame = NSRect(x: 0, y: 0, width: 1100, height: 700)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = host
+        func settle() async {
+            window.contentView?.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(150))
+            window.contentView?.layoutSubtreeIfNeeded()
+        }
+        func editors(_ v: NSView) -> [NotesTextView] { (v as? NotesTextView).map { [$0] } ?? v.subviews.flatMap(editors) }
+        await settle()
+        #expect(library.isEmpty && model.showsEmptyState && editors(window.contentView!).isEmpty)
+        // What NotesSession.newNote() does to the recorder's model.
+        model.composing = true
+        model.focusOnAppear = true
+        model.focusRequest += 1
+        await settle()
+        let editor = try #require(editors(window.contentView!).first)
+        #expect(window.firstResponder === editor)
+        #expect(!model.focusOnAppear)
+    }
 }
