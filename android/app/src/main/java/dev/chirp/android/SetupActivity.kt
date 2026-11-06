@@ -196,6 +196,7 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
                         checkConnection = { testPairing(save = false) },
                         changePairing = ::openPairing,
                         forgetPairing = ::forgetPairing,
+                        showSetup = ::showSetup,
                         allowWifi = { networkPermission.launch(LOCAL_NETWORK_PERMISSION) },
                         floatingMicSettings = ::openAccessibility,
                         chooseMode = ::chooseMode, picker = ::chooseKeyboard, appSettings = ::openAppSettings,
@@ -242,6 +243,11 @@ open class SetupActivity : ComponentActivity(), AppShortcutHost {
     internal fun advance() {
         val next = setupStep(state.inputEnabled, state.inputSelected, state.mic, state.paired, welcomed = state.step > PAGE_WELCOME, mode = state.inputMode, bubbleEnabled = state.bubbleEnabled, floatingMicSkipped = state.floatingMicSkipped)
         if (next == ONBOARDING_DONE) finishOnboarding() else state.step = next
+    }
+    /** Settings → About → Show setup again: the wizard from Welcome, as on iOS. Back returns to Settings; finishing opens Notes. */
+    private fun showSetup() {
+        state.entryStep = PAGE_WELCOME; state.pairFromShell = true
+        state.shellOpen = false; state.step = PAGE_WELCOME; state.connected = false; state.pairIssue = null
     }
     /** Opens the pair page on its own: from the shell (Pair Mac, Change pairing), a pairing link or a recovery action. Back leaves it. */
     private fun openPairing() {

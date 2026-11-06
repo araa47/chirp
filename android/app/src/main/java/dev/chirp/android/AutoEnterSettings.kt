@@ -14,11 +14,9 @@ internal fun AutoEnterSettings() {
     val store = SettingsStore(LocalContext.current)
     var mode by remember { mutableStateOf(store.autoEnter) }
     Text(stringResource(R.string.auto_enter_title), style = MaterialTheme.typography.titleSmall)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        AutoEnterMode.entries.forEach { choice ->
-            FilterChip(mode == choice, { mode = choice; store.autoEnter = choice }, label = { Text(stringResource(choice.label)) })
-        }
-    }
+    // The shared chip row, so the chosen mode is koi-filled like every other single choice.
+    val labels = AutoEnterMode.entries.associateWith { stringResource(it.label) }
+    dev.chirp.android.ui.ChoiceChips(AutoEnterMode.entries, mode, { labels.getValue(it) }) { mode = it; store.autoEnter = it }
     Text(stringResource(R.string.auto_enter_body),
         style = MaterialTheme.typography.bodySmall)
 }

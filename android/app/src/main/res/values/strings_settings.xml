@@ -214,7 +214,7 @@
     <string name="settings_your_keyboard">Your keyboard</string>
     <!-- %1$s: how long history keeps dictations. -->
     <string name="settings_summary_history_on">History on · keeps %1$s</string>
-    <string name="settings_summary_history_off">Dictation history off</string>
+    <string name="settings_summary_history_off">History off</string>
     <!-- %1$s: the app version. -->
     <string name="settings_summary_version">Chirp %1$s</string>
     <string name="settings_summary_stops_on_pause">stops on pause</string>
@@ -252,10 +252,11 @@
     <string name="settings_forget">Forget</string>
     <string name="settings_cleanup">Clean-up</string>
     <!-- %1$s: the host that runs clean-up when it is not the paired computer. -->
-    <string name="settings_cleanup_summary_host">Polishes punctuation and filler words on %1$s</string>
-    <string name="settings_cleanup_summary_computer">Polishes punctuation and filler words on your computer</string>
+    <string name="settings_cleanup_summary_host">Clean-up sends text to %1$s.</string>
+    <string name="settings_cleanup_summary_computer">Clean-up runs on your computer.</string>
     <string name="settings_cleanup_off_computer">Clean-up is off on your computer</string>
-    <string name="settings_stopping">Stopping</string>
+    <string name="settings_stopping">Stop dictation</string>
+    <string name="stop_about">About Stop dictation</string>
     <string name="settings_spoken_commands">Spoken commands</string>
     <string name="settings_off_by_default">Off by default</string>
     <string name="settings_spoken_commands_info">Ending a dictation with \"new line\" or \"new paragraph\" types a line break instead of the words.</string>
@@ -325,8 +326,9 @@
     <string name="onboarding_allow_mic">Allow microphone</string>
     <string name="onboarding_mic_body">Chirp listens only while you dictate or record a note. Notes and optional kept audio stay on this phone.</string>
     <string name="onboarding_mic_allowed">Microphone allowed</string>
-    <string name="onboarding_mic_denied">Allow the microphone to dictate</string>
-    <string name="onboarding_open_permissions">Open app permissions</string>
+    <string name="onboarding_mic_denied">The microphone is off for Chirp</string>
+    <string name="onboarding_mic_denied_body">Turn it on in Settings to dictate.</string>
+    <string name="onboarding_open_permissions">Open Settings</string>
     <string name="onboarding_mic_tips_title">Your microphone</string>
     <string name="onboarding_mic_tips">The mic opens only when you start dictation or a note and is released when you stop. Dictation history and learning from your edits are on by default, encrypted on this phone; turn history off in Settings → Privacy &amp; history, and learning off in Settings → Dictation. Notes are kept locally; keeping their audio is optional and off by default.</string>
     <string name="onboarding_connected">Connected</string>
@@ -344,9 +346,9 @@
     <string name="onboarding_invalid_code">That isn’t a Chirp pairing code</string>
     <string name="onboarding_scan_again">Scan again</string>
     <string name="onboarding_link_description">Private Chirp pairing link</string>
-    <string name="onboarding_link_label">Pairing link</string>
+    <string name="onboarding_link_label">Secret pairing link</string>
     <string name="onboarding_link_invalid">That isn’t a Chirp pairing link</string>
-    <string name="onboarding_link_hint">Pasting a valid link connects right away</string>
+    <string name="onboarding_link_hint">Pasting a link connects right away.</string>
     <string name="onboarding_pairing_tips_title">Pairing</string>
     <string name="onboarding_pairing_tips">Turn on Tailscale on both devices. QR scanning uses Google Play services; Chirp needs no camera permission. Pasting the link works without the scanner. The pairing is encrypted with Android Keystore, and nothing is saved until your computer answers.</string>
     <string name="onboarding_done">Done</string>
@@ -396,6 +398,12 @@
     <string name="settings_about_row">About %1$s</string>
     <string name="settings_close">Close</string>
     <string name="settings_learn_more">Learn more</string>
+    <!-- Settings → About, as on iOS. -->
+    <string name="settings_about_version">Version</string>
+    <string name="settings_about_privacy">Privacy</string>
+    <string name="settings_about_privacy_summary">What Chirp keeps, and what never leaves this phone</string>
+    <string name="settings_about_privacy_body">Dictation audio lives in memory and goes only to your paired computer while you dictate or record. It is never kept unless you turn on Keep audio with notes (Settings → Notes, off by default), which seals each note’s speech on this phone until you delete it. Notes and dictation history stay on this phone, encrypted, and are never backed up or synced. Dictation history and Learn from my edits are on by default: turn them off in Settings → Privacy &amp; history and Settings → Dictation.</string>
+    <string name="settings_about_show_setup">Show setup again</string>
     <!-- Shown only when the paired server runs with debug retention. -->
     <string name="settings_debug_retention_on">DEBUG RETENTION IS ON — the Chirp server may retain audio and text</string>
 </resources>

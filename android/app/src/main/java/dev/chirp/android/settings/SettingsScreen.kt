@@ -31,6 +31,8 @@ internal enum class SettingsPage(@StringRes val title: Int) {
 
 internal class SettingsActions(
     val checkConnection: () -> Unit = {}, val changePairing: () -> Unit = {}, val forgetPairing: () -> Unit = {},
+    /** About → Show setup again: the onboarding from Welcome; Back returns to Settings. */
+    val showSetup: () -> Unit = {},
     val allowWifi: () -> Unit = {}, val floatingMicSettings: () -> Unit = {}, val keyboardPreferences: () -> Unit = {},
     val chooseMode: (dev.chirp.android.InputMode) -> Unit = {}, val picker: () -> Unit = {},
     val appSettings: () -> Unit = {}, val keyboardSettings: () -> Unit = {},

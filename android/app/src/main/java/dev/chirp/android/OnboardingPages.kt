@@ -73,7 +73,7 @@ internal fun OnboardingPage(page: Int, state: SetupState, actions: OnboardingAct
             else PrimaryAction(stringResource(R.string.onboarding_allow_mic), onClick = actions.grantMic)) {
             Body(stringResource(R.string.onboarding_mic_body))
             if (state.mic) SettingsGroup { CheckRow(stringResource(R.string.onboarding_mic_allowed), true) }
-            else if (state.micDenied) StatusBanner(StatusKind.Warning, stringResource(R.string.onboarding_mic_denied), action = stringResource(R.string.onboarding_open_permissions), onAction = actions.appSettings, live = true)
+            else if (state.micDenied) StatusBanner(StatusKind.Warning, stringResource(R.string.onboarding_mic_denied), body = stringResource(R.string.onboarding_mic_denied_body), action = stringResource(R.string.onboarding_open_permissions), onAction = actions.appSettings, live = true)
             Tips(stringResource(R.string.onboarding_about_microphone), stringResource(R.string.onboarding_mic_tips_title), stringResource(R.string.onboarding_mic_tips))
         }
         else -> PairPage(state, actions)
