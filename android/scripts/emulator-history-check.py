@@ -179,7 +179,8 @@ def check(probe, work, output):
         row(final)
         shot('list-inner-light')
         target = row(final)
-        assert 'Cleaned' in target.get('content-desc', ''), 'Cleaned entry is not announced as cleaned'
+        # The row says "Polished" for a cleaned dictation (the glossary's word since #282).
+        assert 'Polished' in target.get('content-desc', ''), 'Cleaned entry is not announced as polished'
         # The row's longest text is the stored value; compare against it rather than the editor
         # snapshot, which a late commit can distort under host load.
         texts = [(c.get('text') or '') for c in target.iter() if c.get('text')]
