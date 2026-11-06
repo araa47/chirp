@@ -96,6 +96,8 @@ final class ChirpNotesKeyboardUITests: XCTestCase {
     /// and the next resumes. With a field focused and nothing recording it still dictates into the field.
     @MainActor func testDictationKeyDrivesNotesOnTheNotesTab() throws {
         let app = launch()
+        // Paired, so the key can dictate away from Notes (Notes' synthetic server needs no pairing).
+        app.pair(link: XCUIApplication.syntheticPairingLink)
         app.selectChirpTab("Notes")
         XCTAssertTrue(element("chirp.notes.library", app).waitForExistence(timeout: 10))
         pressDictationKey()

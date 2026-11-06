@@ -317,8 +317,8 @@ struct ShortcutListeningBar: ViewModifier {
     }
 
     private var hint: String {
-        shortcuts.shortcut.mode == .hold ? "Let go of \(shortcuts.shortcut.title) to insert · Esc cancels"
-            : "Press \(shortcuts.shortcut.title) again to insert · Esc cancels"
+        shortcuts.shortcut.mode == .hold ? "Let go of \(shortcuts.shortcut.title) to insert · ⌘. cancels"
+            : "Press \(shortcuts.shortcut.title) again to insert · ⌘. cancels"
     }
 
     private var bar: some View {
@@ -354,7 +354,7 @@ struct HardwareShortcutSettings: View {
                           summary: shortcut.enabled ? shortcut.instruction : "Off",
                           symbol: "keyboard",
                           infoTitle: "Keyboard shortcut",
-                          infoBody: "Works with a hardware keyboard while Chirp is open. The text goes into the Chirp field you are typing in, or onto Dictate when no field has focus. Esc cancels. A modifier key on its own only counts when you press no other key with it, so ⌥ shortcuts and special characters keep working.",
+                          infoBody: "Works with a hardware keyboard while Chirp is open. The text goes into the Chirp field you are typing in, or onto Dictate when no field has focus. ⌘. cancels. A modifier key on its own only counts when you press no other key with it, so ⌥ shortcuts and special characters keep working.",
                           identifier: "chirp.hwkey.enabled",
                           set: { shortcuts.update(shortcut.with(enabled: $0)) })
             }

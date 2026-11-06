@@ -283,7 +283,7 @@ struct DictateView: View {
                 }
             }
             if hardwareKeyboard, sizeClass == .regular {
-                Text(shortcuts.shortcut.enabled ? "\(shortcuts.shortcut.mode == .hold ? "Hold" : "Press") \(shortcuts.shortcut.title) or ⌘Return to dictate · Esc to cancel"
+                Text(shortcuts.shortcut.enabled ? "\(shortcuts.shortcut.mode == .hold ? "Hold" : "Press") \(shortcuts.shortcut.title) or ⌘Return to dictate · ⌘. to cancel"
                      : "⌘Return to dictate · ⌘. to cancel").font(.footnote).foregroundStyle(Color.chirp.inkMuted)
                     .accessibilityIdentifier("chirp.dictation.shortcutsHint")
             }

@@ -60,10 +60,15 @@ final class ChirpHardwareKeyboardUITests: XCTestCase {
     /// simulators drop synthesized key events, which the Esc probe detects.
     @MainActor func testDictationMenuShortcuts() throws {
         let app = pairedApp()
+        // The simulator attaches its hardware keyboard on the first synthesized key, which is lost: without this the
+        // Esc probe below was that key and the test always skipped.
+        app.typeKey(.escape, modifierFlags: [])
+        Thread.sleep(forTimeInterval: 1.5)
         let status = app.staticTexts["sessionStatus"], transcript = app.staticTexts["transcript"]
         app.buttons["chirp.dictation.start"].tap()
         XCTAssertTrue(waitFor(status, "label == 'Listening…'"))
-        app.typeKey(.escape, modifierFlags: [])
+        // ⌘. probes for key events: iPadOS keeps Esc for itself, so an Esc probe never reached the app.
+        app.typeKey(".", modifierFlags: .command)
         guard waitFor(status, "label == 'Ready'", timeout: 3) else {
             throw XCTSkip("Synthesized hardware key events do not reach the app: no hardware keyboard is connected to this simulator.")
         }
