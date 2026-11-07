@@ -645,21 +645,22 @@ receive hardware key presses. So there are two ways to dictate into another app:
   text, so press ⌘V to paste.
 - **A dictation key.** One key, such as ⌃⌥D, that does the same in any app.
 
-### Floating bubble
+### Floating mic
 
-Dictate's **Floating bubble** button shows a small window that stays on top of
-every app: Chirp's status (*Ready*, *Listening… 0:12*, *Polishing…*,
-*Copied · press ⌘V*) with a ▶ / ❚❚ button that starts and stops dictation. The
-text is copied, as with Toggle, so press ⌘V where you want it. Tap the window to
-show its buttons, drag it to an edge to tuck it away, × closes it. Showing it
-starts a keyboard session, so the microphone stays ready (and its indicator on)
-while it is up.
+Dictate's **Floating mic** button puts one mic on top of every app: a small
+square that is orange when ready, red with a clock while it listens, and green
+with a check once the text is copied. Tap it, then ▶ to dictate and ❚❚ to stop;
+press ⌘V where you want the text. Drag it to an edge to tuck it away, × closes
+it. Showing it starts a keyboard session, so the microphone stays ready (and its
+indicator on) while it is up. With no session running, the first tap starts
+one and the second shows the mic.
 
-![Floating bubble over the Home Screen](../docs/screenshots/ios/ipad-floating-bubble.png)
+![Floating mic over the Home Screen](../docs/screenshots/ios/ipad-floating-bubble.png)
 
 iOS lets no app draw over other apps (Android's dictation bubbles, Typeless's
-included, use that), so the bubble is a Picture in Picture window Chirp renders
-itself (`ios/App/FloatingBubble.swift`). Typeless's iOS keyboard keeps a hidden
+included, use that), so the mic is a Picture in Picture window Chirp renders
+itself (`ios/App/FloatingBubble.swift`), and no app can paste into another:
+for text typed straight into the field, dictate with Chirp Keyboard. Typeless's iOS keyboard keeps a hidden
 PiP window for a related reason: while one is up, iOS treats the app as in
 use, which matters for starting the microphone from another app. superwhisper
 and Wispr Flow on iOS are keyboards only (Wispr with a timed session, like

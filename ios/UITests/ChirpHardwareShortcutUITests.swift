@@ -192,16 +192,16 @@ final class ChirpHardwareShortcutUITests: XCTestCase {
         let toggle = app.buttons["chirp.bubble.toggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "Dictate has no floating bubble control")
         toggle.tap()
-        XCTAssertTrue(waitFor(toggle, "label == 'Hide floating bubble'", timeout: 15),
+        XCTAssertTrue(waitFor(toggle, "label == 'Hide floating mic'", timeout: 15),
                       "The bubble did not start: \(app.staticTexts["chirp.bubble.failure"].exists ? app.staticTexts["chirp.bubble.failure"].label : toggle.label)")
         XCTAssertTrue(waitFor(app.staticTexts["sessionStatus"], "label == 'Ready'"), "Showing the bubble starts a session")
         XCUIDevice.shared.press(.home)
         sleep(2)
-        screenshot("Floating bubble over the Home Screen, \(name)")
+        screenshot("Floating mic over the Home Screen, \(name)")
         app.activate()
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-        if toggle.label == "Hide floating bubble" { toggle.tap() }
-        XCTAssertTrue(waitFor(toggle, "label == 'Floating bubble'", timeout: 10), "Hide did not close the bubble")
+        if toggle.label == "Hide floating mic" { toggle.tap() }
+        XCTAssertTrue(waitFor(toggle, "label == 'Floating mic'", timeout: 10), "Hide did not close the bubble")
         app.endChirpSession()
     }
 

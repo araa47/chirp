@@ -41,7 +41,8 @@ final class FloatingBubble: NSObject, ObservableObject {
     /// The system's reason the last start failed.
     private var lastError: String?
 
-    static let size = CGSize(width: 640, height: 220)
+    /// Square: the window is just a mic.
+    static let size = CGSize(width: 320, height: 320)
 
     var supported: Bool { AVPictureInPictureController.isPictureInPictureSupported() }
 
@@ -88,7 +89,7 @@ final class FloatingBubble: NSObject, ObservableObject {
                 catch { failure = (error as? LocalizedError)?.errorDescription ?? "Couldn’t start a session."; return }
             }
             refresh()
-            guard possible else { failure = "Tap Floating bubble again to show it."; return }
+            guard possible else { failure = "Tap Floating mic again to show it."; return }
             for _ in 0..<50 where !active { try? await Task.sleep(for: .milliseconds(100)) }
             if !active, failure == nil { failure = lastError ?? "Picture in Picture didn’t start." }
         }
@@ -127,18 +128,16 @@ final class FloatingBubble: NSObject, ObservableObject {
     // MARK: Frames
 
     private func state() -> BubbleCard.State {
-        guard let model else { return .init(title: "Chirp", detail: "Open Chirp", tone: .idle, clock: nil) }
+        guard let model else { return .init(tone: .idle, clock: nil) }
         let listening = model.phase == .listening || model.phase == .connecting
         if listening { if listeningSince == nil { listeningSince = .now } } else { listeningSince = nil }
         let clock = listeningSince.map { DictateView.clock(Date().timeIntervalSince($0)) }
         switch model.phase {
-        case .connecting: return .init(title: "Connecting…", detail: "Press ❚❚ to stop", tone: .listening, clock: clock)
-        case .listening: return .init(title: "Listening…", detail: "Press ❚❚ to stop and copy", tone: .listening, clock: clock)
-        case .correcting: return .init(title: "Polishing…", detail: "One moment", tone: .polishing, clock: nil)
-        case .finished: return .init(title: outcome ?? "Copied · press ⌘V", detail: "Press ▶ to dictate again", tone: .done, clock: nil)
-        case .armed: return .init(title: outcome ?? "Ready", detail: "Press ▶ to dictate", tone: .idle, clock: nil)
-        case .idle: return .init(title: outcome ?? "Microphone off", detail: "Press ▶ to start", tone: .idle, clock: nil)
-        case .failed: return .init(title: outcome ?? "Session unavailable", detail: "Open Chirp", tone: .error, clock: nil)
+        case .connecting, .listening: return .init(tone: .listening, clock: clock)
+        case .correcting: return .init(tone: .polishing, clock: nil)
+        case .finished: return .init(tone: outcome == nil || outcome?.hasPrefix("Copied") == true ? .done : .error, clock: nil)
+        case .armed, .idle: return .init(tone: outcome == nil ? .idle : .error, clock: nil)
+        case .failed: return .init(tone: .error, clock: nil)
         }
     }
 
@@ -232,44 +231,44 @@ extension FloatingBubble: AVPictureInPictureSampleBufferPlaybackDelegate {
                                                 completion completionHandler: @escaping () -> Void) { completionHandler() }
 }
 
-/// What the bubble draws: always dark, so it reads over any app.
+/// What the bubble draws: one mic, the whole window in its state's colour. Koi when ready, `record` red with the clock while
+/// listening, moon while polishing, a green check once the text is copied; the system's ▶ / ❚❚ is the button.
 struct BubbleCard: View {
     enum Tone { case idle, listening, polishing, done, error }
-    struct State: Equatable { var title: String; var detail: String; var tone: Tone; var clock: String? }
+    struct State: Equatable { var tone: Tone; var clock: String? }
     let state: State
 
-    private var accent: Color {
+    private var fill: Color {
         switch state.tone {
-        case .idle: Color(red: 1.0, green: 0.54, blue: 0.30)
-        case .listening: Color(red: 1.0, green: 0.36, blue: 0.36)
-        case .polishing: Color(red: 0.62, green: 0.68, blue: 1.0)
-        case .done: Color(red: 0.42, green: 0.85, blue: 0.62)
-        case .error: Color(red: 1.0, green: 0.42, blue: 0.42)
+        case .idle: Color(red: 0.95, green: 0.42, blue: 0.11)      // koiDecor
+        case .listening: Color(red: 0.86, green: 0.15, blue: 0.15) // record
+        case .polishing: Color(red: 0.45, green: 0.50, blue: 0.85) // moon
+        case .done: Color(red: 0.13, green: 0.60, blue: 0.40)      // lily
+        case .error: Color(red: 0.40, green: 0.42, blue: 0.48)
+        }
+    }
+    private var symbol: String {
+        switch state.tone {
+        case .idle: "mic.fill"
+        case .listening: "waveform"
+        case .polishing: "ellipsis"
+        case .done: "checkmark"
+        case .error: "exclamationmark"
         }
     }
 
     var body: some View {
-        HStack(spacing: 28) {
-            ZStack {
-                Circle().fill(accent.opacity(0.18))
-                Image(systemName: state.tone == .listening ? "waveform" : state.tone == .done ? "doc.on.clipboard" : "mic.fill")
-                    .font(.system(size: 64, weight: .semibold)).foregroundStyle(accent)
-            }
-            .frame(width: 140, height: 140)
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 14) {
-                    Text(state.title).font(.system(size: 46, weight: .bold)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.5)
-                    if let clock = state.clock {
-                        Text(clock).font(.system(size: 40, weight: .medium).monospacedDigit()).foregroundStyle(.white.opacity(0.7))
-                    }
+        ZStack {
+            // The whole window is the button's colour, so it reads as one mic, not a card.
+            fill
+            VStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 104, weight: .bold)).foregroundStyle(.white)
+                if let clock = state.clock {
+                    Text(clock).font(.system(size: 34, weight: .semibold).monospacedDigit()).foregroundStyle(.white.opacity(0.9))
                 }
-                Text(state.detail).font(.system(size: 32, weight: .medium)).foregroundStyle(.white.opacity(0.72)).lineLimit(1).minimumScaleFactor(0.5)
             }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(red: 0.06, green: 0.08, blue: 0.13))
     }
 }
 
@@ -300,18 +299,18 @@ struct FloatingBubbleControl: View {
         VStack(alignment: .leading, spacing: ChirpSpacing.s8) {
             HStack(spacing: ChirpSpacing.s12) {
                 BubbleSource()
-                    .frame(width: 96, height: 33)
+                    .frame(width: 36, height: 36)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .accessibilityHidden(true)
-                Button(bubble.active ? "Hide floating bubble" : "Floating bubble", systemImage: bubble.active ? "pip.exit" : "pip.enter") {
+                Button(bubble.active ? "Hide floating mic" : "Floating mic", systemImage: bubble.active ? "pip.exit" : "pip.enter") {
                     if bubble.active { bubble.hide() } else { bubble.show() }
                 }
                 .buttonStyle(.pondTonal)
                 .disabled(!model.paired || model.working)
                 .accessibilityIdentifier("chirp.bubble.toggle")
-                LearnMore(title: "Floating bubble") {
-                    Text("A small window that stays on top of every app. Press ▶ in it to dictate and ❚❚ to stop: the text is copied, so press ⌘V where you want it. Tap it to show its buttons; drag it to an edge to tuck it away.")
-                    Text("It is a Picture in Picture window, the only kind iOS lets an app keep over other apps. It keeps a keyboard session running, so the microphone stays ready while it is up. Close it with its × or here.")
+                LearnMore(title: "Floating mic") {
+                    Text("A small mic that stays on top of every app. Tap it, then ▶ to dictate and ❚❚ to stop. It turns red while it listens and green when the text is copied: press ⌘V where you want it. Drag it to an edge to tuck it away.")
+                    Text("iOS lets no app draw over other apps or paste into them, so the mic is a Picture in Picture window, and its buttons are the system’s. It keeps a keyboard session running, so the microphone stays ready while it is up. To have the text typed in for you, dictate with Chirp Keyboard instead.")
                 }
             }
             if let failure = bubble.failure {
