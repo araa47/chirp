@@ -14,9 +14,11 @@ extension StartChirpIntent: ForegroundContinuableIntent {}
 
 /// Opens Chirp only when it must: to pair or ask for the microphone. A paired Chirp with the microphone starts
 /// and stops without leaving the editor, arming a session first when none runs.
-@MainActor private func continueInForegroundIfNeeded(_ intent: some ForegroundContinuableIntent) async throws {
-    guard SessionCoordinator.shared.needsForegroundToStart else { return }
+/// True when it brought Chirp to the front.
+@MainActor private func continueInForegroundIfNeeded(_ intent: some ForegroundContinuableIntent) async throws -> Bool {
+    guard SessionCoordinator.shared.needsForegroundToStart else { return false }
     try await continueInForeground(intent)
+    return true
 }
 
 @MainActor private func continueInForeground(_ intent: some ForegroundContinuableIntent) async throws {
@@ -29,17 +31,17 @@ extension StartChirpIntent: ForegroundContinuableIntent {}
 /// microphone or the Live Activity), Chirp opens and tries once more on screen. A computer that does not answer
 /// fails the same way on screen, so that error is returned as it is.
 @MainActor func startOrToggle(_ intent: some ForegroundContinuableIntent, _ action: SessionAction) async throws -> String {
-    try await continueInForegroundIfNeeded(intent)
+    let onScreen = try await continueInForegroundIfNeeded(intent)
     let coordinator = SessionCoordinator.shared
     let background = coordinator.startsSessionInBackground
-    do { return try await coordinator.perform(action: action) }
+    do { return try await coordinator.perform(action: action, onScreen: onScreen) }
     catch {
         switch error as? SessionFailure {
-        case .mac?, .connection?, .timeout?, .notesRecording?: throw error
+        case .mac?, .connection?, .timeout?, .notesRecording?, .busy?: throw error
         default:
             guard background, !coordinator.armed else { throw error }
             try await continueInForeground(intent)
-            return try await coordinator.perform(action: action)
+            return try await coordinator.perform(action: action, onScreen: true)
         }
     }
 }
