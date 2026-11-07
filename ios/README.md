@@ -667,6 +667,13 @@ Chirp's keyboard session). The system draws the window's buttons, so UI tests
 check that it shows and stays up over the Home Screen, not its ▶ button. The
 system also draws ±10 s buttons, which do nothing here.
 
+The microphone (dictation and Live Notes) uses the play-and-record audio
+category with the measurement mode: a Picture in Picture window can't run in a
+record-only session, which is what stopped the bubble on the first iPad run.
+As before, it doesn't mix, so other apps' audio stops while Chirp listens.
+iPadOS 27 has no Picture in Picture setting to check (Settings search finds
+none), so a failure shows the system's own reason.
+
 ### Set up a dictation key
 
 When a hardware keyboard is attached, Dictate offers **Set up a dictation key**
