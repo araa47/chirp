@@ -339,6 +339,9 @@ final class ChirpSettingsUITests: XCTestCase {
 
     /// Off fences new dictations while keeping the old ones accessible; Delete history works while off.
     @MainActor func testTurningHistoryOffIsConfirmed() {
+        // The screenshots switch the system appearance; put back what the device had (a real iPad was left Light).
+        let original = XCUIDevice.shared.appearance
+        defer { XCUIDevice.shared.appearance = original }
         let app = pairedApp()
         app.openSettingsPage("chirp.settings.privacy")
         let toggle = element("chirp.history.enabled", in: app)
@@ -377,7 +380,6 @@ final class ChirpSettingsUITests: XCTestCase {
         XCTAssertTrue(waitFor(toggle, "value == '0'"), "Deletion keeps the switch off")
         app.selectChirpTab("History")
         XCTAssertTrue(app.staticTexts["History is off"].waitForExistence(timeout: 5))
-        XCUIDevice.shared.appearance = .light
     }
 
     /// At the largest accessibility text size the Settings home and Dictation pages must not run past either
