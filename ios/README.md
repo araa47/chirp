@@ -671,16 +671,19 @@ You don't need to start a session first: when none runs, Toggle starts one in
 the background (it is an audio-recording intent, which iPadOS lets begin
 recording from another app while its Live Activity shows). It opens Chirp only
 to pair or ask for the microphone, or if iPadOS refuses to start the
-microphone in the background. While Chirp Keyboard owns the current dictation,
+microphone in the background. Toggle and Chirp's App Shortcuts are defined in
+the app only (`ios/Intents/AppShortcuts.swift`); a copy in the widget extension
+made Shortcuts open Chirp without starting (#368's first device run). While Chirp Keyboard owns the current dictation,
 Toggle refuses rather than stopping or copying it. Stop that dictation in the
 keyboard.
 
 Why it takes two steps (checked on an iPad Pro on iPadOS 27.2 and the iOS 27
 simulator, 2026-11-07):
 - Full Keyboard Access → Commands lists only shortcuts from your Shortcuts
-  library. With none it has no Shortcuts section at all, and Chirp's built-in
-  App Shortcuts ("Toggle dictation with Chirp") are not listed, so the
-  shortcut has to exist.
+  library, by name (on the test iPad: 20 of them, "New Shortcut", "New
+  Shortcut 1" and so on). Chirp's built-in App Shortcuts ("Toggle dictation
+  with Chirp") are not listed, so the shortcut has to exist, and renaming it
+  is what makes it findable there.
 - An app cannot add a shortcut to the library for you: importing a shortcut
   file needs one signed for a fixed bundle ID, and Chirp's bundle ID differs
   per personal install. `shortcuts://create-shortcut` is the closest an app
