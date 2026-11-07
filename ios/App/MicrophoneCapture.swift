@@ -44,6 +44,13 @@ enum SessionFailure: Error, LocalizedError, Equatable {
 
 @MainActor
 final class MicrophoneCapture: SessionAudio {
+    /// Play and record rather than record: a Picture in Picture window (the floating bubble) can't run in a
+    /// record-only session, and iOS stopped it as soon as the session armed. Like `.record` it doesn't mix, so
+    /// other apps' audio still stops while Chirp listens; `.measurement` keeps the input unprocessed.
+    nonisolated static let category: AVAudioSession.Category = .playAndRecord
+    nonisolated static let mode: AVAudioSession.Mode = .measurement
+    nonisolated static let options: AVAudioSession.CategoryOptions = [.allowBluetoothHFP]
+
     private let engine = AVAudioEngine()
     private let sink = CaptureSink()
     private var tapped = false
@@ -52,7 +59,7 @@ final class MicrophoneCapture: SessionAudio {
     func arm(onInterruption: @escaping @Sendable () -> Void) throws {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.record, mode: .measurement, options: [.allowBluetoothHFP])
+            try session.setCategory(Self.category, mode: Self.mode, options: Self.options)
             try session.setActive(true)
             let input = engine.inputNode
             let format = input.outputFormat(forBus: 0)

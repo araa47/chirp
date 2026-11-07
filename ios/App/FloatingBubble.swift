@@ -38,6 +38,8 @@ final class FloatingBubble: NSObject, ObservableObject {
     /// The last start/stop the bubble asked for, shown on the card ("Copied", or why it could not start).
     private var outcome: String?
     private var listeningSince: Date?
+    /// The system's reason the last start failed.
+    private var lastError: String?
 
     static let size = CGSize(width: 640, height: 220)
 
@@ -54,39 +56,41 @@ final class FloatingBubble: NSObject, ObservableObject {
         refresh()
     }
 
-    /// Gets the window ready while Dictate shows the control: an audio session, the controller and a first frame.
-    /// iOS only starts Picture in Picture straight from a tap, so `show()` can't wait for any of this.
+    /// Gets the window ready while Dictate shows the control: the controller and a first frame. It leaves the
+    /// audio session alone, so opening Dictate never interrupts what else is playing.
     func prepareSource() {
         guard supported else { return }
-        // Picture in Picture needs an active audio session. A keyboard session has one (play and record);
-        // otherwise a silent, mixable playback session stands in (it plays nothing and interrupts nothing).
-        let audio = AVAudioSession.sharedInstance()
-        if audio.category != .playAndRecord {
-            try? audio.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try? audio.setActive(true)
-        }
         prepare()
         refresh()
     }
 
-    /// Shows the window from the tap, then starts a keyboard session if none runs, so ▶ can dictate at once.
+    /// Shows the window from the tap (iOS only starts Picture in Picture straight from one), then starts a keyboard
+    /// session if none runs, so ▶ can dictate at once. The window needs an active audio session that allows
+    /// playback; the tap sets the microphone's own one (`MicrophoneCapture.category`), so arming the session
+    /// afterwards changes nothing under the window.
     func show() {
         failure = nil
         guard supported else { failure = "This device doesn’t support Picture in Picture."; return }
         prepareSource()
-        guard let controller, controller.isPictureInPicturePossible else {
-            failure = "Picture in Picture isn’t available right now. Check Settings → General → Picture in Picture."
-            return
+        if let model, !model.armed {
+            let audio = AVAudioSession.sharedInstance()
+            do {
+                try audio.setCategory(MicrophoneCapture.category, mode: MicrophoneCapture.mode, options: MicrophoneCapture.options)
+                try audio.setActive(true)
+            } catch { failure = "The microphone is busy. Try again in a moment."; return }
         }
-        controller.startPictureInPicture()
+        guard let controller else { return }
+        let possible = controller.isPictureInPicturePossible
+        if possible { controller.startPictureInPicture() }
         Task { @MainActor in
             if let model, !model.armed {
                 do { try await model.armSession() }
-                catch { failure = (error as? LocalizedError)?.errorDescription ?? "Couldn’t start a session." }
+                catch { failure = (error as? LocalizedError)?.errorDescription ?? "Couldn’t start a session."; return }
             }
             refresh()
+            guard possible else { failure = "Tap Floating bubble again to show it."; return }
             for _ in 0..<50 where !active { try? await Task.sleep(for: .milliseconds(100)) }
-            if !active, failure == nil { failure = "Picture in Picture didn’t start." }
+            if !active, failure == nil { failure = lastError ?? "Picture in Picture didn’t start." }
         }
     }
 
@@ -202,7 +206,8 @@ extension FloatingBubble: AVPictureInPictureControllerDelegate {
         Task { @MainActor in self.active = false }
     }
     nonisolated func pictureInPictureController(_ controller: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
-        Task { @MainActor in self.active = false; self.failure = "Picture in Picture didn’t start." }
+        let reason = error.localizedDescription
+        Task { @MainActor in self.active = false; self.lastError = "Picture in Picture didn’t start: \(reason)"; self.failure = self.lastError }
     }
     /// Tapping the window's "back to app" button opens Chirp.
     nonisolated func pictureInPictureController(_ controller: AVPictureInPictureController,
