@@ -26,6 +26,9 @@ struct DictateView: View {
     @State private var editing = false
     @State private var cleanupConsent = false
     @State private var saveNotice = ""
+    @State private var keySetup = false
+    @AppStorage(DictationKey.offerDismissedKey) private var keyOfferDismissed = false
+    @AppStorage(DictationKey.workedKey) private var keyWorked = false
     @FocusState private var editorFocused: Bool
 
     var active: Bool { [.connecting, .listening, .correcting].contains(model.phase) }
@@ -67,6 +70,7 @@ struct DictateView: View {
             if phase != .finished { edited = nil; editing = false; saveNotice = "" }
         }
         .onChange(of: model.text) { _, _ in if model.phase == .finished, !editing { edited = nil } }
+        .sheet(isPresented: $keySetup) { DictationKeySetup(model: model) }
         .onReceive(NotificationCenter.default.publisher(for: .GCKeyboardDidConnect)) { _ in hardwareKeyboard = true }
         .onReceive(NotificationCenter.default.publisher(for: .GCKeyboardDidDisconnect)) { _ in hardwareKeyboard = Self.keyboardAttached }
     }
@@ -77,6 +81,9 @@ struct DictateView: View {
                 statusLine
                 cleanupPicker
                 banner
+                if showKeyOffer {
+                    DictationKeyOffer(open: { keySetup = true }, dismiss: { keyOfferDismissed = true })
+                }
                 page
                 // At accessibility text sizes the controls scroll with the page instead of covering it.
                 if typeSize.isAccessibilitySize { controls }
@@ -93,6 +100,12 @@ struct DictateView: View {
             .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
         }
         .scrollBounceBehavior(.basedOnSize)
+    }
+
+    /// A hardware keyboard is attached and the key isn't set up: offer it once, on a calm page.
+    private var showKeyOffer: Bool {
+        hardwareKeyboard && model.paired && !keyOfferDismissed && !keyWorked && model.phase != .finished && !active
+            && !DictationKey.offerHiddenForTests
     }
 
     // MARK: Top

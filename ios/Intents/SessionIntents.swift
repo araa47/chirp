@@ -13,12 +13,36 @@ private func unavailableIntentMessage() throws -> String { throw IntentSetupErro
 extension StartChirpIntent: ForegroundContinuableIntent {}
 extension ToggleChirpDictationIntent: ForegroundContinuableIntent {}
 
-/// Opens Chirp only when no session runs yet; an armed session starts and stops without leaving the editor.
+/// Opens Chirp only when it must: to pair or ask for the microphone. A paired Chirp with the microphone starts
+/// and stops without leaving the editor, arming a session first when none runs.
 @MainActor private func continueInForegroundIfNeeded(_ intent: some ForegroundContinuableIntent) async throws {
     guard SessionCoordinator.shared.needsForegroundToStart else { return }
+    try await continueInForeground(intent)
+}
+
+@MainActor private func continueInForeground(_ intent: some ForegroundContinuableIntent) async throws {
     let dialog: IntentDialog = "Open Chirp to start a session."
     if #available(iOS 26.0, *) { try await intent.continueInForeground(dialog, alwaysConfirm: false) }
     else { try await intent.requestToContinueInForeground(dialog) }
+}
+
+/// Start or Toggle. When it arms a new session from another app and iOS refuses that in the background (the
+/// microphone or the Live Activity), Chirp opens and tries once more on screen. A computer that does not answer
+/// fails the same way on screen, so that error is returned as it is.
+@MainActor private func startOrToggle(_ intent: some ForegroundContinuableIntent, _ action: SessionAction) async throws -> String {
+    try await continueInForegroundIfNeeded(intent)
+    let coordinator = SessionCoordinator.shared
+    let background = coordinator.startsSessionInBackground
+    do { return try await coordinator.perform(action: action) }
+    catch {
+        switch error as? SessionFailure {
+        case .mac?, .connection?, .timeout?, .notesRecording?: throw error
+        default:
+            guard background, !coordinator.armed else { throw error }
+            try await continueInForeground(intent)
+            return try await coordinator.perform(action: action)
+        }
+    }
 }
 #endif
 
@@ -27,14 +51,13 @@ extension ToggleChirpDictationIntent: ForegroundContinuableIntent {}
 struct StartChirpIntent: AudioRecordingIntent, LiveActivityIntent {
     static var title: LocalizedStringResource { "Start Chirp dictation" }
     static var description: IntentDescription {
-        IntentDescription("Starts dictation in a running Chirp session, or opens Chirp to set one up. The microphone stays active until you end the session.")
+        IntentDescription("Starts dictation, starting a Chirp session first when none is running. Opens Chirp only to pair or allow the microphone. The microphone stays active until you end the session.")
     }
     @available(iOS 26.0, *) static var supportedModes: IntentModes { [.background, .foreground(.dynamic)] }
 
     @MainActor func perform() async throws -> some IntentResult & ProvidesDialog {
         #if CHIRP_APP
-        try await continueInForegroundIfNeeded(self)
-        let message = try await SessionCoordinator.shared.perform(action: .start)
+        let message = try await startOrToggle(self, .start)
         #else
         let message = try unavailableIntentMessage()
         #endif
@@ -57,18 +80,17 @@ struct StopChirpIntent: AudioRecordingIntent, LiveActivityIntent {
     }
 }
 
-/// Runs in the background so a hardware-keyboard shortcut can drive dictation from any app: starts in an
-/// armed session, or stops and copies the final for ⌘V. With no session it opens Chirp to set one up.
+/// Runs in the background so a hardware-keyboard shortcut can drive dictation from any app: starts (arming a session
+/// when none runs), or stops and copies the final for ⌘V. It opens Chirp only to pair or allow the microphone.
 struct ToggleChirpDictationIntent: AudioRecordingIntent, LiveActivityIntent {
     static var title: LocalizedStringResource { "Toggle Chirp dictation" }
     static var description: IntentDescription {
-        IntentDescription("Starts dictation while a Chirp session is running, or stops it and copies the text so you can paste it. Assign it a keyboard shortcut to dictate from any app.")
+        IntentDescription("Starts dictation, or stops it and copies the text so you can paste it. Starts a Chirp session first when none is running. Give it a key in Full Keyboard Access to dictate from any app.")
     }
     @available(iOS 26.0, *) static var supportedModes: IntentModes { [.background, .foreground(.dynamic)] }
     @MainActor func perform() async throws -> some IntentResult & ProvidesDialog {
         #if CHIRP_APP
-        try await continueInForegroundIfNeeded(self)
-        let message = try await SessionCoordinator.shared.perform(action: .toggle)
+        let message = try await startOrToggle(self, .toggle)
         #else
         let message = try unavailableIntentMessage()
         #endif

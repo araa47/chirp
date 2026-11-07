@@ -3,6 +3,7 @@
     "App/ChirpApp.swift",
     "App/DebugFixtures.swift",
     "App/DictateView.swift",
+    "App/DictationKeySetup.swift",
     "App/HardwareShortcut.swift",
     "App/LiveNotesActivity.swift",
     "App/LiveNotesAudio.swift",

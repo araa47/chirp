@@ -711,8 +711,19 @@ final class SessionCoordinator: ObservableObject {
         guard !whole.isEmpty, phase == .finished else { return }; copyText(whole); notice = "Copied."
     }
 
-    /// Cold setup and permission requests need Chirp on screen; an armed session starts from anywhere.
-    var needsForegroundToStart: Bool { !armed && !appActive() }
+    /// An armed session starts from anywhere. With none, a paired Chirp that already has the microphone starts one
+    /// from another app too: Toggle and Start are AudioRecordingIntents, which may begin recording in the background
+    /// as long as the session's Live Activity starts with it. Pairing and the permission prompt need Chirp on screen.
+    var needsForegroundToStart: Bool { !armed && !appActive() && !(paired && permissionGranted()) }
+    /// Chirp may use the microphone (iOS's answer, or the synthetic one in tests).
+    var microphoneAllowed: Bool { permissionGranted() }
+    /// A start now would arm a new session from another app, without Chirp on screen.
+    var startsSessionInBackground: Bool { !armed && !appActive() && paired && permissionGranted() }
+
+    /// What a Toggle run did, for the dictation-key setup's live check.
+    struct ToggleRun: Equatable { let started: Bool; let at: Date }
+    /// The last Toggle Chirp dictation run (a key, Spotlight or Shortcuts); nil until one runs.
+    @Published private(set) var lastToggle: ToggleRun?
 
     func perform(action: SessionAction) async throws -> String {
         switch action {
@@ -731,9 +742,11 @@ final class SessionCoordinator: ObservableObject {
             if utterance != nil, stream != nil {
                 // Keyboard dictation is never copied, so the shortcut leaves it to Chirp Keyboard.
                 guard utteranceSource != .keyboard else { return "Chirp Keyboard is dictating. Stop it in the keyboard." }
+                lastToggle = ToggleRun(started: false, at: now())
                 return try await perform(action: .stop)
             }
             _ = try await perform(action: .start)
+            lastToggle = ToggleRun(started: true, at: now())
             return "Recording. Run Toggle Chirp dictation again to stop and copy."
         case .cancel: cancelDictation(); return "Dictation cancelled."
         case .end: endSession(); return "Session ended. Microphone off."

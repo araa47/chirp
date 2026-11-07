@@ -154,6 +154,9 @@ enum OnboardingTestMode {
         if args.contains("--chirp-onboarding") { UserDefaults.standard.set(false, forKey: Onboarding.doneKey) }
         if args.contains("--chirp-skip-onboarding") { UserDefaults.standard.set(true, forKey: Onboarding.doneKey) }
         if args.contains("--chirp-setup-card") { UserDefaults.standard.set(false, forKey: "chirp.setupCard.dismissed") }
+        if args.contains("--chirp-dictation-key-offer") {
+            UserDefaults.standard.set(false, forKey: DictationKey.offerDismissedKey); UserDefaults.standard.set(false, forKey: DictationKey.workedKey)
+        }
     }
 }
 

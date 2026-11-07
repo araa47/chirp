@@ -41,6 +41,8 @@ struct Onboarding: View {
     var finish: () -> Void
     @State private var page = Page.welcome
     @State private var microphone = AVAudioApplication.shared.recordPermission
+    @State private var keySetup = false
+    @AppStorage(DictationKey.offerDismissedKey) private var keyOfferDismissed = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -231,6 +233,11 @@ struct Onboarding: View {
                     Text("Open Chirp Keyboard once in any app and this step shows as done.")
                     OtherAppsGuide()
                 }
+            }
+            // An iPad with a Magic Keyboard hides on-screen keyboards, so a key is the quicker way in.
+            if DictateView.keyboardAttached, !keyOfferDismissed, !DictationKey.offerHiddenForTests {
+                DictationKeyOffer(open: { keySetup = true }, dismiss: { keyOfferDismissed = true })
+                    .sheet(isPresented: $keySetup) { DictationKeySetup(model: model) }
             }
         }
     }

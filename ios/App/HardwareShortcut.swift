@@ -67,6 +67,10 @@ final class HardwareShortcutController: ObservableObject {
     private var preferencesWatch: AnyCancellable?
     private var resignWatch: AnyCancellable?
 
+    #if DEBUG
+    var debugModel: SessionCoordinator? { model }
+    #endif
+
     func attach(_ model: SessionCoordinator) {
         guard self.model !== model else { return }
         self.model = model
@@ -346,6 +350,9 @@ struct ShortcutListeningBar: ViewModifier {
 /// other apps with a key.
 struct HardwareShortcutSettings: View {
     @ObservedObject var shortcuts: HardwareShortcutController
+    @ObservedObject var model: SessionCoordinator
+    @AppStorage(DictationKey.workedKey) private var keyWorked = false
+    @State private var keySetup = false
     private var shortcut: HardwareShortcut { shortcuts.shortcut }
 
     var body: some View {
@@ -399,50 +406,45 @@ struct HardwareShortcutSettings: View {
                 }
             }
             SettingsGroup(title: "In other apps") {
+                ActionRow(title: "Set up a dictation key",
+                          summary: keyWorked ? "Toggle Chirp dictation has run" : "One key to start and stop dictation in any app",
+                          symbol: keyWorked ? "checkmark.circle" : "command", identifier: "chirp.hwkey.setupKey") { keySetup = true }
                 SettingsItem { HardwareKeyboardOtherAppsGuide() }
             }
         }
+        .sheet(isPresented: $keySetup) { DictationKeySetup(model: model) }
         .navigationTitle("Hardware keyboard")
         .onDisappear { shortcuts.stopRecording() }
     }
 }
 
 /// Outside Chirp only a press-to-start-and-stop key is possible (#259): iPadOS has no system-wide keys for apps, and
-/// a keyboard extension such as Chirp Keyboard never receives hardware key presses. Full Keyboard Access can give a
-/// key to a Shortcuts shortcut that runs Toggle Chirp dictation; the text is copied for ⌘V.
+/// a keyboard extension such as Chirp Keyboard never receives hardware key presses. Set up a dictation key gives the
+/// steps; this is the why.
 struct HardwareKeyboardOtherAppsGuide: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: ChirpSpacing.s12) {
-            Text("Outside Chirp a key can start and stop dictation, but not hold to talk: iPadOS has no system-wide keys for apps, and on-screen keyboards such as Chirp Keyboard don’t receive hardware keys.")
-                .font(.subheadline)
-            step(1, "mic.badge.plus", "In Chirp, start a keyboard session (Dictate → Start keyboard session) so Chirp can listen from other apps.")
-            step(2, "square.stack.3d.up", "In the Shortcuts app, make a shortcut with Chirp’s Toggle Chirp dictation action.")
-            step(3, "accessibility", "Open Settings → Accessibility → Keyboards & Typing → Full Keyboard Access and turn it on. Open Commands, choose your shortcut and press the keys for it, such as ⌃⌥D.")
-            step(4, "doc.on.clipboard", "In any app, press the keys to start, and again to stop. The text is copied: press ⌘V to paste it.")
-            Text("Full Keyboard Access also lets Tab and the arrow keys move a focus ring around the screen; Auto-Hide on its page hides the ring when you aren’t using it. You can also run Toggle Chirp dictation from Spotlight (⌘Space).")
-                .font(.footnote).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: ChirpSpacing.s8) {
+            Text("Outside Chirp a key can start and stop dictation, but not hold to talk: iPadOS has no system-wide keys for apps, and on-screen keyboards such as Chirp Keyboard don’t receive hardware keys. The key runs Toggle Chirp dictation through Full Keyboard Access; the text is copied for ⌘V.")
+            Text("Without a key, press ⌘Space in any app, type Toggle dictation and press Return.")
         }
+        .font(.footnote).foregroundStyle(Color.chirp.inkMuted)
         .padding(.vertical, ChirpSpacing.s4)
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("chirp.hwkey.otherApps")
-    }
-
-    private func step(_ number: Int, _ symbol: String, _ text: String) -> some View {
-        Label { Text(text) } icon: { Image(systemName: symbol).foregroundStyle(Color.chirp.koi) }
-            .font(.subheadline)
-            .accessibilityLabel("Step \(number). \(text)")
     }
 }
 
 #if DEBUG
 /// UI tests only (`--chirp-hwkey-seam`): the test runner presses and lets go of keys with Darwin notifications
-/// (`dev.chirp.ios.debug.hwkey.down`, `up`, `escape`, `rightCommand`), fed to `simulate` like a `UIPress`. Nothing to
+/// (`dev.chirp.ios.debug.hwkey.down`, `up`, `escape`, `rightCommand`), fed to `simulate` like a `UIPress`, and
+/// `toggle` runs Toggle Chirp dictation as a Full Keyboard Access key would. Nothing to
 /// tap, so no bar or keyboard over it can swallow a press.
 @MainActor enum HardwareShortcutSeam {
     private static var observations: [DarwinObservation] = []
 
     static func start() {
         guard HardwareShortcutController.seam, observations.isEmpty else { return }
-        observations = ["down", "up", "escape", "rightCommand"].map { name in
+        observations = ["down", "up", "escape", "rightCommand", "toggle"].map { name in
             DarwinSignal(name: "dev.chirp.ios.debug.hwkey." + name).observe { Task { @MainActor in fire(name) } }
         }
     }
@@ -453,6 +455,8 @@ struct HardwareKeyboardOtherAppsGuide: View {
         case "down": shortcuts.simulate(began: true)
         case "up": shortcuts.simulate(began: false)
         case "escape": shortcuts.simulate(began: true, key: HIDKey.escape, modifiers: [])
+        // A Full Keyboard Access key running Toggle Chirp dictation (the intent's own path).
+        case "toggle": Task { _ = try? await shortcuts.debugModel?.perform(action: .toggle) }
         default:
             // Right ⌘ pressed and let go on its own (what the recorder records).
             shortcuts.simulate(began: true, key: HIDKey.rightCommand, modifiers: .command)

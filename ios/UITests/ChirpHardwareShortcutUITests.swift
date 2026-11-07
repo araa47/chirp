@@ -127,6 +127,60 @@ final class ChirpHardwareShortcutUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Off"].waitForExistence(timeout: 5), "The switch row does not say Off")
     }
 
+    /// Set up a dictation key: Dictate offers it once with a hardware keyboard; the sheet's live check sees Toggle start
+    /// (no session needed) and stop, and the test field takes the text. Closing the offer hides it for good.
+    @MainActor func testDictationKeySetup() {
+        let name = ProcessInfo.processInfo.environment["CHIRP_HWKEY_APPEARANCE"] ?? "light"
+        let app = launch(["--chirp-dictation-key-offer"])
+        app.pair(link: XCUIApplication.syntheticPairingLink)
+        app.selectChirpTab("Dictate")
+        let offer = app.buttons["chirp.dictationKey.offer.open"]
+        XCTAssertTrue(offer.waitForExistence(timeout: 5), "Dictate did not offer a dictation key with a hardware keyboard")
+        screenshot("Dictation key offer on Dictate, \(name)")
+        offer.tap()
+        let status = app.descendants(matching: .any)["chirp.dictationKey.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["chirp.dictationKey.shortcuts"].exists && app.buttons["chirp.dictationKey.settings"].exists)
+        sleep(1)
+        screenshot("Set up a dictation key, \(name)")
+        seam("toggle", app)
+        XCTAssertTrue(waitFor(status, "label BEGINSWITH 'Your key works.'"), "Toggle without a session did not start: \(status.label)")
+        seam("toggle", app)
+        XCTAssertTrue(waitFor(status, "label == 'Copied. Press ⌘V in the field below.'", timeout: 10), "Toggle did not stop and copy: \(status.label)")
+        let field = app.descendants(matching: .any)["chirp.dictationKey.field"]
+        field.tap()
+        field.typeText("Synthetic words.")
+        XCTAssertTrue(waitFor(status, "label == 'All set. Your key works in any app.'"))
+        screenshot("Dictation key works, \(name)")
+        app.buttons["chirp.dictationKey.done"].tap()
+        XCTAssertFalse(app.buttons["chirp.dictationKey.offer.open"].waitForExistence(timeout: 2), "The offer stays after the key worked")
+        app.endChirpSession()
+    }
+
+    /// Closing the offer hides it for good; Settings → Dictation → Keyboard shortcut still opens the setup.
+    @MainActor func testDictationKeyOfferDismissAndSettingsEntry() {
+        let app = launch(["--chirp-dictation-key-offer"])
+        app.pair(link: XCUIApplication.syntheticPairingLink)
+        app.selectChirpTab("Dictate")
+        let dismiss = app.buttons["chirp.dictationKey.offer.dismiss"]
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 5))
+        dismiss.tap()
+        XCTAssertFalse(app.buttons["chirp.dictationKey.offer.open"].waitForExistence(timeout: 2))
+        app.openDictation()
+        let link = app.buttons["chirp.settings.hardwareShortcut"]
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        if !link.isHittable { app.swipeUp() }
+        link.tap()
+        let setup = app.buttons["chirp.hwkey.setupKey"]
+        XCTAssertTrue(setup.waitForExistence(timeout: 5))
+        if !setup.isHittable { app.swipeUp() }
+        setup.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["chirp.dictationKey.status"].waitForExistence(timeout: 5))
+        app.buttons["chirp.dictationKey.done"].tap()
+        app.selectChirpTab("Dictate")
+        XCTAssertFalse(app.buttons["chirp.dictationKey.offer.open"].exists, "A closed offer came back")
+    }
+
     /// iPad evidence: the settings page and Dictate listening to a held Right ⌥. Run once per appearance with the
     /// simulator set beforehand (`simctl ui UUID appearance dark` plus `TEST_RUNNER_CHIRP_HWKEY_APPEARANCE=dark`), so
     /// no crossfade is captured.
