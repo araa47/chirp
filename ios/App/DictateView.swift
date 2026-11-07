@@ -296,6 +296,7 @@ struct DictateView: View {
                         .multilineTextAlignment(.center)
                 }
             }
+            if !active, FloatingBubble.shared.supported { FloatingBubbleControl(model: model) }
             if hardwareKeyboard, sizeClass == .regular {
                 Text(shortcuts.shortcut.enabled ? "\(shortcuts.shortcut.mode == .hold ? "Hold" : "Press") \(shortcuts.shortcut.title) or ⌘Return to dictate · ⌘. to cancel"
                      : "⌘Return to dictate · ⌘. to cancel").font(.footnote).foregroundStyle(Color.chirp.inkMuted)

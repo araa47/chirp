@@ -181,6 +181,30 @@ final class ChirpHardwareShortcutUITests: XCTestCase {
         XCTAssertFalse(app.buttons["chirp.dictationKey.offer.open"].exists, "A closed offer came back")
     }
 
+    /// The floating bubble: Dictate shows it (starting a session), it stays up over the Home Screen as a Picture in
+    /// Picture window, and Hide closes it. Its play/pause button belongs to the system's PiP window, which UI tests
+    /// can't press; its toggle is the same `perform(.toggle)` the other tests cover.
+    @MainActor func testFloatingBubbleShowsOverOtherApps() {
+        let name = ProcessInfo.processInfo.environment["CHIRP_HWKEY_APPEARANCE"] ?? "light"
+        let app = launch()
+        app.pair(link: XCUIApplication.syntheticPairingLink)
+        app.selectChirpTab("Dictate")
+        let toggle = app.buttons["chirp.bubble.toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "Dictate has no floating bubble control")
+        toggle.tap()
+        XCTAssertTrue(waitFor(toggle, "label == 'Hide floating bubble'", timeout: 15),
+                      "The bubble did not start: \(app.staticTexts["chirp.bubble.failure"].exists ? app.staticTexts["chirp.bubble.failure"].label : toggle.label)")
+        XCTAssertTrue(waitFor(app.staticTexts["sessionStatus"], "label == 'Ready'"), "Showing the bubble starts a session")
+        XCUIDevice.shared.press(.home)
+        sleep(2)
+        screenshot("Floating bubble over the Home Screen, \(name)")
+        app.activate()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        if toggle.label == "Hide floating bubble" { toggle.tap() }
+        XCTAssertTrue(waitFor(toggle, "label == 'Floating bubble'", timeout: 10), "Hide did not close the bubble")
+        app.endChirpSession()
+    }
+
     /// iPad evidence: the settings page and Dictate listening to a held Right ⌥. Run once per appearance with the
     /// simulator set beforehand (`simctl ui UUID appearance dark` plus `TEST_RUNNER_CHIRP_HWKEY_APPEARANCE=dark`), so
     /// no crossfade is captured.
