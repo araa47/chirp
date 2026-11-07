@@ -291,9 +291,9 @@ struct OtherAppsGuide: View {
                   systemImage: "hand.tap")
             Label("With a hardware keyboard: iPadOS hides on-screen keyboards. Press the globe key (or Control-Space) until Chirp is chosen, then use the small keyboard bar at the bottom of the screen to show it. Chirp Keyboard doesn't receive hardware keys, so it has no hold-to-talk key.",
                   systemImage: "keyboard")
-            Label("From any app with a hardware keyboard: start a session here, then press ⌘Space, type Toggle dictation and press Return. Do it again to stop. The text is copied, so press ⌘V to paste.",
+            Label("From any app with a hardware keyboard: press ⌘Space, type Toggle dictation and press Return. Do it again to stop. The text is copied, so press ⌘V to paste. If no session is running, Toggle starts one.",
                   systemImage: "magnifyingglass")
-            Label("One key for it: in the Shortcuts app, make a shortcut with Chirp's Toggle Chirp dictation action. Then go to Settings → Accessibility → Keyboards & Typing → Full Keyboard Access, turn it on, open Commands and give that shortcut a key combination.",
+            Label("One key for it: Settings → Dictation → Keyboard shortcut → Set up a dictation key walks you through it in two steps and tests the key.",
                   systemImage: "command")
             Label("Inside Chirp: hold Right ⌥ Option to dictate into the field you are typing in (change it in Settings → Dictation → Keyboard shortcut). ⌘Return starts or stops dictation, ⌘. cancels, ⌘⇧K starts a keyboard session and ⌘⇧E ends it. Hold ⌘ to see every shortcut.",
                   systemImage: "keyboard.badge.ellipsis")

@@ -182,7 +182,7 @@ struct DictationPage: View {
                 NavRow(title: "Keyboard shortcut",
                        summary: shortcuts.shortcut.enabled ? shortcuts.shortcut.instruction : "Off",
                        symbol: "keyboard", identifier: "chirp.settings.hardwareShortcut") {
-                    HardwareShortcutSettings(shortcuts: shortcuts)
+                    HardwareShortcutSettings(shortcuts: shortcuts, model: model)
                 }
             }
             SettingsGroup(title: "Press Return after dictating") {
@@ -232,8 +232,8 @@ struct KeyboardPage: View {
             switch self {
             case .onScreen: "Tap a text field in any app, touch and hold the globe key and choose Chirp. Tap Start dictation, then Stop dictation. The text appears where you were typing. Tap the globe key to go back to your usual keyboard."
             case .hardware: "iPadOS hides on-screen keyboards when a hardware keyboard is attached. Press the globe key (or Control-Space) until Chirp is chosen, then use the small keyboard bar at the bottom of the screen to show it. Chirp Keyboard doesn’t receive hardware keys, so outside Chirp a key can only start and stop (One key for it), not hold."
-            case .anyApp: "Start a session here, then press ⌘Space, type Toggle dictation and press Return. Do it again to stop. The text is copied, so press ⌘V to paste."
-            case .oneKey: "In the Shortcuts app, make a shortcut with Chirp’s Toggle Chirp dictation action. Then go to Settings → Accessibility → Keyboards & Typing → Full Keyboard Access, turn it on, open Commands and give that shortcut a key combination."
+            case .anyApp: "With a hardware keyboard, press ⌘Space in any app, type Toggle dictation and press Return. Do it again to stop. The text is copied, so press ⌘V to paste. If no session is running, Toggle starts one."
+            case .oneKey: "Give Toggle Chirp dictation a key: a shortcut in the Shortcuts app, and a key for it in Full Keyboard Access."
             case .inside: "Hold Right ⌥ Option to dictate into the field you are typing in (Settings → Dictation → Keyboard shortcut). ⌘Return starts or stops dictation, ⌘. cancels, ⌘⇧K starts a keyboard session and ⌘⇧E ends it. Hold ⌘ to see every shortcut."
             }
         }
@@ -274,7 +274,7 @@ struct KeyboardPage: View {
             }
         }
         .sheet(item: $sheet) { way in
-            InfoSheet(title: way.title) { Text(way.body) }
+            if way == .oneKey { DictationKeySetup(model: model) } else { InfoSheet(title: way.title) { Text(way.body) } }
         }
     }
 }
@@ -325,8 +325,8 @@ struct ShortcutsPage: View {
             SettingsItem {
                 Text("New note, Record, Pause and the Dictation and Go shortcuts work in every Chirp tab; the others work in Notes. Hold ⌘ to see the available shortcuts.").font(.footnote).foregroundStyle(Color.chirp.inkMuted)
                 LearnMore(title: "Global shortcut", label: "Set one key for it") {
-                    Text("From any app with a hardware keyboard: start a session in Chirp, then press ⌘Space, type Toggle dictation and press Return. Do it again to stop. The text is copied, so press ⌘V to paste.")
-                    Text("For one key: in the Shortcuts app, make a shortcut with Chirp’s Toggle Chirp dictation action. Then go to Settings → Accessibility → Keyboards & Typing → Full Keyboard Access, turn it on, open Commands and give that shortcut a key combination.")
+                    Text("From any app with a hardware keyboard: press ⌘Space, type Toggle dictation and press Return. Do it again to stop. The text is copied, so press ⌘V to paste. If no session is running, Toggle starts one.")
+                    Text("For one key: Settings → Dictation → Keyboard shortcut → Set up a dictation key, or Keyboard → One key for it.")
                 }
             }
         }.navigationTitle("Keyboard shortcuts")

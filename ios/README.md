@@ -339,12 +339,10 @@ own class at launch with the Objective-C runtime (no private API).
 
 **Other apps.** iPadOS has no system-wide keys for apps, and on-screen keyboards,
 Chirp Keyboard included, never receive hardware key presses (#259 has the
-findings). Outside Chirp a key can only **start and stop**, not hold: make a
-Shortcuts shortcut with **Toggle Chirp dictation**, then give it a key in
-Settings → Accessibility → Keyboards & Typing → Full Keyboard Access →
-Commands. Press it to start, again to stop; the text is copied, so press ⌘V.
-A keyboard session must be running. Settings → Dictation → Keyboard shortcut
-has the same steps.
+findings). Outside Chirp a key can only **start and stop**, not hold. **Set up
+a dictation key** (offered once on Dictate and in onboarding when a hardware
+keyboard is attached, and always in Settings → Dictation → Keyboard shortcut)
+walks through it: see [iPad with a hardware keyboard](#ipad-with-a-hardware-keyboard).
 
 The app never writes the clipboard by
 itself. **Long dictation** runs past the server's
@@ -642,19 +640,56 @@ receive hardware key presses. So there are two ways to dictate into another app:
 - **Show Chirp Keyboard.** Press the globe key (or Control-Space) until Chirp is
   chosen, then use the small keyboard bar at the bottom of the screen to show
   it, and tap Start/Stop dictation. Text goes in at the cursor as usual.
-- **Toggle from anywhere.** Start a session in Chirp, then from any app press
-  ⌘Space, type *Toggle dictation* and press Return; do it again to stop. Chirp
-  copies the final text, so press ⌘V to paste.
-- **A global shortcut key.** In the Shortcuts app, make a shortcut with Chirp's
-  **Toggle Chirp dictation** action. Then Settings → Accessibility →
-  **Keyboards & Typing** → **Full Keyboard Access** → on → **Commands**, and give
-  that shortcut a key combination (iOS lists Shortcuts-app shortcuts there once
-  you have made one). Press it to start; press it again to stop and copy.
+- **Toggle from anywhere.** From any app press ⌘Space, type *Toggle
+  dictation* and press Return; do it again to stop. Chirp copies the final
+  text, so press ⌘V to paste.
+- **A dictation key.** One key, such as ⌃⌥D, that does the same in any app.
 
-With a session armed, Toggle runs in the background without leaving your app.
-With no session it opens Chirp to set one up (permission and setup need Chirp
-on screen). While Chirp Keyboard owns the current dictation, Toggle refuses
-rather than stopping or copying it. Stop that dictation in the keyboard.
+### Set up a dictation key
+
+When a hardware keyboard is attached, Dictate offers **Set up a dictation key**
+once (and onboarding's keyboard page does too); it is always in Settings →
+Dictation → Keyboard shortcut and Settings → Keyboard → One key for it. The
+sheet has two steps, each one button away, and a live test:
+
+1. **Make the shortcut.** *Open Shortcuts* opens a new shortcut. On iPadOS 27
+   it opens on "Describe a shortcut": tap **Editor** at the top right. Find
+   **Toggle Chirp dictation** in the actions on the right (search, or Chirp
+   under Apps) and tap it. Rename the shortcut (tap its name) to *Chirp
+   dictation*; otherwise Settings lists it as "New Shortcut N".
+2. **Give it a key.** *Open Settings*, then Accessibility → **Keyboards &
+   Typing** → **Full Keyboard Access** → on → **Commands** → Shortcuts →
+   *Chirp dictation*, and press your keys. Auto-Hide on that page hides the focus
+   ring Full Keyboard Access adds for Tab and the arrow keys.
+3. **Try it.** Press the key: the sheet says "Your key works. Listening…";
+   press it again: "Copied"; ⌘V into its field: "All set". It also shows
+   whether Chirp is paired and has the microphone, the two things the key needs.
+
+![Set up a dictation key on iPad](../docs/screenshots/ios/ipad-dictation-key-setup.png)
+
+You don't need to start a session first: when none runs, Toggle starts one in
+the background (it is an audio-recording intent, which iPadOS lets begin
+recording from another app while its Live Activity shows). It opens Chirp only
+to pair or ask for the microphone, or if iPadOS refuses to start the
+microphone in the background. While Chirp Keyboard owns the current dictation,
+Toggle refuses rather than stopping or copying it. Stop that dictation in the
+keyboard.
+
+Why it takes two steps (checked on an iPad Pro on iPadOS 27.2 and the iOS 27
+simulator, 2026-11-07):
+- Full Keyboard Access → Commands lists only shortcuts from your Shortcuts
+  library. With none it has no Shortcuts section at all, and Chirp's built-in
+  App Shortcuts ("Toggle dictation with Chirp") are not listed, so the
+  shortcut has to exist.
+- An app cannot add a shortcut to the library for you: importing a shortcut
+  file needs one signed for a fixed bundle ID, and Chirp's bundle ID differs
+  per personal install. `shortcuts://create-shortcut` is the closest an app
+  can get.
+- Apps cannot open a Settings page other than their own (`App-prefs:` paths
+  land on Settings' first page), so *Open Settings* opens Settings and the
+  path is spelled out.
+- The text is copied, not typed: with a hardware keyboard attached, iPadOS
+  hides Chirp Keyboard, so there is no keyboard in the field to insert it.
 
 ## Companion controls (Action Button, Control Center, Shortcuts)
 
@@ -675,9 +710,9 @@ characters), "● Recording 3:12" with the `record` dot, and Pause/Resume and a
 and the expanded view adds the label and the End/Stop buttons. Enable Live
 Activities for Chirp in system settings or session start refuses.
 
-Companion start runs in the background when a session is armed. With no
-session it opens Chirp for permission and setup rather than recording cold in
-the background. Companion
+Companion start runs in the background. With no session it starts one there
+when Chirp is paired and has the microphone, and opens Chirp only for pairing,
+the permission prompt, or when iPadOS refuses background recording. Companion
 **Stop** (and **Toggle** when it stops) is the one path that explicitly copies its own fresh final to the
 clipboard; keyboard and in-app dictation never write the clipboard implicitly.
 Nothing transcript-like ever appears on the lock screen.

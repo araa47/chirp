@@ -173,18 +173,32 @@ struct SessionCoordinatorTests {
     }
 
     /// With no session and Chirp in the background, start and toggle need the foreground; nothing arms.
-    @Test func toggleWithoutSessionInBackgroundNeedsForeground() async throws {
-        let f = try await fixture(); defer { f.clean() }
+    @Test func toggleWithoutPermissionInBackgroundNeedsForeground() async throws {
+        let f = try await fixture(permission: false); defer { f.clean() }
         f.values.active = false
-        #expect(f.model.needsForegroundToStart)
+        #expect(f.model.needsForegroundToStart && !f.model.startsSessionInBackground)
         await #expect(throws: SessionFailure.setup) { try await f.model.perform(action: .toggle) }
         await #expect(throws: SessionFailure.setup) { try await f.model.perform(action: .start) }
-        #expect(!f.model.armed && f.values.transports.isEmpty)
+        #expect(!f.model.armed && f.values.transports.isEmpty && f.model.lastToggle == nil)
         f.values.active = true
-        #expect(!f.model.needsForegroundToStart)
-        try await f.model.armSession()
+        #expect(!f.model.needsForegroundToStart, "On screen Chirp asks for the microphone itself")
+    }
+
+    /// A dictation key pressed in another app with no session: a paired Chirp with the microphone arms one in the
+    /// background and starts, so the key works without opening Chirp first.
+    @Test func toggleWithoutSessionStartsOneInBackground() async throws {
+        let f = try await fixture(); defer { f.clean() }
         f.values.active = false
-        #expect(!f.model.needsForegroundToStart, "An armed session starts from any app")
+        #expect(!f.model.needsForegroundToStart && f.model.startsSessionInBackground)
+        _ = try await f.model.perform(action: .toggle)
+        #expect(f.model.armed && f.model.lastToggle?.started == true)
+        #expect(!f.model.needsForegroundToStart && !f.model.startsSessionInBackground, "An armed session starts from any app")
+        try await ready(f)
+        let stopping = Task { try await f.model.perform(action: .toggle) }
+        try await Task.sleep(for: .milliseconds(10))
+        f.transport.push(#"{"type":"final","text":"From the key."}"#)
+        #expect(try await stopping.value == "Copied. Paste with ⌘V.")
+        #expect(f.values.copied == ["From the key."] && f.model.lastToggle?.started == false)
     }
 
     @Test func toggleStopWithEmptyFinalNeverCopies() async throws {
