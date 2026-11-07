@@ -298,7 +298,8 @@ final class SessionCoordinator: ObservableObject {
     func armSession() async throws {
         guard !otherCaptureActive() else { throw SessionFailure.notesRecording }
         if armed { try reconcileOrThrow(); return }
-        guard !working, let config, services != nil else { throw SessionFailure.setup }
+        guard !working else { throw SessionFailure.busy }
+        guard let config, services != nil else { throw SessionFailure.setup }
         working = true
         let ticket = lifecycle
         defer { working = false }
@@ -343,7 +344,7 @@ final class SessionCoordinator: ObservableObject {
 
     /// `autoStop` false: a hold-to-talk key ends this dictation, so a pause never does.
     func begin(source: DictationSource = .app, id: UUID = UUID(), autoStop: Bool = true) async throws {
-        guard !startingUtterance, stream == nil else { throw SessionFailure.setup }
+        guard !startingUtterance, stream == nil else { throw SessionFailure.busy }
         startingUtterance = true
         defer { startingUtterance = false }
         let ticket = lifecycle
@@ -725,10 +726,13 @@ final class SessionCoordinator: ObservableObject {
     /// The last Toggle Chirp dictation run (a key, Spotlight or Shortcuts); nil until one runs.
     @Published private(set) var lastToggle: ToggleRun?
 
-    func perform(action: SessionAction) async throws -> String {
+    /// `onScreen`: the intent already brought Chirp to the front (`continueInForeground`), so the start goes ahead
+    /// even if `applicationState` still reads inactive for a moment. Each refusal names its cause: not paired,
+    /// no microphone, or a start already under way (`.busy`), so Shortcuts' dialog says which.
+    func perform(action: SessionAction, onScreen: Bool = false) async throws -> String {
         switch action {
         case .start:
-            guard !needsForegroundToStart else { throw SessionFailure.setup }
+            if !onScreen, needsForegroundToStart { throw paired ? SessionFailure.permission : SessionFailure.setup }
             try await begin(source: .companion)
             return "Recording. Stop Chirp to copy the final text."
         case .stop:
@@ -745,7 +749,7 @@ final class SessionCoordinator: ObservableObject {
                 lastToggle = ToggleRun(started: false, at: now())
                 return try await perform(action: .stop)
             }
-            _ = try await perform(action: .start)
+            _ = try await perform(action: .start, onScreen: onScreen)
             lastToggle = ToggleRun(started: true, at: now())
             return "Recording. Run Toggle Chirp dictation again to stop and copy."
         case .cancel: cancelDictation(); return "Dictation cancelled."

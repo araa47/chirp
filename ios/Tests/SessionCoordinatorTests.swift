@@ -177,11 +177,32 @@ struct SessionCoordinatorTests {
         let f = try await fixture(permission: false); defer { f.clean() }
         f.values.active = false
         #expect(f.model.needsForegroundToStart && !f.model.startsSessionInBackground)
-        await #expect(throws: SessionFailure.setup) { try await f.model.perform(action: .toggle) }
-        await #expect(throws: SessionFailure.setup) { try await f.model.perform(action: .start) }
+        // Paired, so the refusal names the microphone rather than "pair your computer".
+        await #expect(throws: SessionFailure.permission) { try await f.model.perform(action: .toggle) }
+        await #expect(throws: SessionFailure.permission) { try await f.model.perform(action: .start) }
         #expect(!f.model.armed && f.values.transports.isEmpty && f.model.lastToggle == nil)
         f.values.active = true
         #expect(!f.model.needsForegroundToStart, "On screen Chirp asks for the microphone itself")
+    }
+
+    /// After the intent brought Chirp to the front, the start goes ahead even if the app still reads inactive.
+    @Test func onScreenStartSkipsTheBackgroundCheck() async throws {
+        let f = try await fixture(permission: false); defer { f.clean() }
+        f.values.active = false
+        #expect(f.model.needsForegroundToStart)
+        // It reaches the real permission request (which this fixture denies) instead of refusing up front.
+        await #expect(throws: SessionFailure.permission) { try await f.model.perform(action: .toggle, onScreen: true) }
+        #expect(!f.model.armed)
+    }
+
+    /// A second start while the first is still setting up says so, instead of "pair your computer".
+    @Test func toggleDuringAStartSaysBusy() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        let first = Task { try await f.model.perform(action: .toggle) }
+        await Task.yield()
+        await #expect(throws: SessionFailure.busy) { try await f.model.perform(action: .start) }
+        _ = try await first.value
+        #expect(f.model.armed)
     }
 
     /// A dictation key pressed in another app with no session: a paired Chirp with the microphone arms one in the
