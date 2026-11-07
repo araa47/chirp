@@ -44,7 +44,7 @@ struct ChirpScene: View {
             #endif
         }
         .modifier(ShortcutListeningBar(model: coordinator, shortcuts: .shared))
-        .onAppear { HardwareShortcutController.shared.attach(coordinator) }
+        .onAppear { HardwareShortcutController.shared.attach(coordinator); FloatingBubble.shared.attach(coordinator) }
     }
     private var root: some View {
         ChirpRootView(model: coordinator, notes: .current(for: coordinator), tab: $tab)

@@ -645,6 +645,28 @@ receive hardware key presses. So there are two ways to dictate into another app:
   text, so press ⌘V to paste.
 - **A dictation key.** One key, such as ⌃⌥D, that does the same in any app.
 
+### Floating bubble
+
+Dictate's **Floating bubble** button shows a small window that stays on top of
+every app: Chirp's status (*Ready*, *Listening… 0:12*, *Polishing…*,
+*Copied · press ⌘V*) with a ▶ / ❚❚ button that starts and stops dictation. The
+text is copied, as with Toggle, so press ⌘V where you want it. Tap the window to
+show its buttons, drag it to an edge to tuck it away, × closes it. Showing it
+starts a keyboard session, so the microphone stays ready (and its indicator on)
+while it is up.
+
+![Floating bubble over the Home Screen](../docs/screenshots/ios/ipad-floating-bubble.png)
+
+iOS lets no app draw over other apps (Android's dictation bubbles, Typeless's
+included, use that), so the bubble is a Picture in Picture window Chirp renders
+itself (`ios/App/FloatingBubble.swift`). Typeless's iOS keyboard keeps a hidden
+PiP window for a related reason: while one is up, iOS treats the app as in
+use, which matters for starting the microphone from another app. superwhisper
+and Wispr Flow on iOS are keyboards only (Wispr with a timed session, like
+Chirp's keyboard session). The system draws the window's buttons, so UI tests
+check that it shows and stays up over the Home Screen, not its ▶ button. The
+system also draws ±10 s buttons, which do nothing here.
+
 ### Set up a dictation key
 
 When a hardware keyboard is attached, Dictate offers **Set up a dictation key**
