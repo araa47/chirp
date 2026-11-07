@@ -31,6 +31,7 @@
     "App/Settings/SettingsRows.swift",
     "App/Settings/StylesViews.swift",
     "App/SpeakerViews.swift",
+    "Intents/AppShortcuts.swift",
     "Intents/ChirpActivityAttributes.swift",
     "Intents/ChirpLiveActivity.swift",
     "Intents/NotesActivityAttributes.swift",

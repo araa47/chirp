@@ -62,6 +62,9 @@ for extension in ('ChirpKeyboard','ChirpWidgets'):
     assert not any('CHIRP_APP' in s.get('SWIFT_ACTIVE_COMPILATION_CONDITIONS','') for s in settings(extension))
 assert 'Intents/ChirpLiveActivity.swift' in members('ChirpIOS')
 assert 'Intents/ChirpLiveActivity.swift' not in members('ChirpWidgets')
+# Toggle and the App Shortcuts list are app-only: an extension copy made Shortcuts run the extension's "Open Chirp…"
+# Toggle instead of the app's (iPad, iPadOS 27.2). The extension's buttons never use them.
+assert 'Intents/AppShortcuts.swift' in members('ChirpIOS') and 'Intents/AppShortcuts.swift' not in members('ChirpWidgets')
 # The widgets compile Pond.swift (colour tokens only; it imports SwiftUI/UIKit, never ChirpCore) straight in.
 assert members('ChirpWidgets') == {'Widgets/ChirpWidgets.swift','Widgets/NotesActivityWidget.swift','Widgets/ActivityViews.swift',
                                   'Intents/SessionIntents.swift','Intents/ChirpActivityAttributes.swift','Intents/NotesIntents.swift',
