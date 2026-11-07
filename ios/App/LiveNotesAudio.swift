@@ -49,7 +49,8 @@ final class NotesMicrophone: NotesAudio {
         self.frame = frame; self.event = event
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .measurement, options: [.allowBluetoothHFP])
+            // The dictation microphone's category, so a floating bubble (Picture in Picture) survives a recording.
+            try session.setCategory(MicrophoneCapture.category, mode: MicrophoneCapture.mode, options: MicrophoneCapture.options)
             try session.setActive(true)
             try openEngine()
         } catch { stop(); throw SessionFailure.audio }
