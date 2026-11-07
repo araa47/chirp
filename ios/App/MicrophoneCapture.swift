@@ -20,12 +20,15 @@ protocol SessionAudio: AnyObject {
 
 enum SessionFailure: Error, LocalizedError, Equatable {
     case setup, permission, audio, connection, expired, cancelled, timeout, noResult, storage, notesRecording
+    /// A start (or setup step) is already under way; the second request does not queue behind it.
+    case busy
     /// A classified reachability failure; its message names the likely cause.
     case mac(ConnectionIssue)
     var errorDescription: String? {
         switch self {
         case .mac(let issue): issue.message
         case .setup: "Open Chirp to pair your computer and start a session."
+        case .busy: "Chirp is still starting the last dictation. Try again in a moment."
         case .permission: "Open Chirp and allow microphone access in Settings."
         case .audio: "Microphone unavailable. Open Chirp to start again."
         case .connection: "Connection failed. Check Tailscale and your computer."
