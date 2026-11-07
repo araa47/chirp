@@ -154,7 +154,9 @@ final class ChirpUITests: XCTestCase {
 
     @MainActor func testDictationStyleShowsRawAndCurrentStyle() {
         let app = pairedApp()
-        defer { app.terminate(); XCUIDevice.shared.appearance = .light }
+        // Put back the appearance the device had, not Light: a real iPad was left Light by this.
+        let original = XCUIDevice.shared.appearance
+        defer { app.terminate(); XCUIDevice.shared.appearance = original }
         app.openSettingsPage("chirp.settings.dictation")
         for (appearance, name) in [(XCUIDevice.Appearance.light, "light"), (.dark, "dark")] {
             XCUIDevice.shared.appearance = appearance
