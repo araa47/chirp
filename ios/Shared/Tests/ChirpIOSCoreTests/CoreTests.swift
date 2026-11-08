@@ -283,6 +283,21 @@ struct BridgeTests {
         try app.endSession(); #expect(try keyboard.state() == nil)
         #expect(throws: CoreError.staleGeneration) { try app.publish(BridgeState(generation: generation, phase: .armed, leaseUntil: clock.now() + 8)) }
     }
+    /// The keyboard may adopt only the dictation the app offers (adoptable), and only that one.
+    @Test func adoptOnlyTheOfferedDictation() throws {
+        let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let clock = TestClock(), secrets = MemorySecretStore(), generation = UUID(), utterance = UUID()
+        let app = try SharedBridge(root: root, secrets: secrets, role: .app, now: clock.now)
+        let keyboard = try SharedBridge(root: root, secrets: secrets, role: .keyboard, now: clock.now)
+        let adopt = { (id: UUID) in BridgeCommand(generation: generation, utteranceID: id, action: .adopt, createdAt: clock.now(), expiresAt: clock.now() + 10) }
+        try app.publish(BridgeState(generation: generation, phase: .listening, utteranceID: utterance, leaseUntil: clock.now() + 8))
+        #expect(throws: CoreError.invalidState) { try keyboard.send(adopt(utterance)) }
+        try app.publish(BridgeState(generation: generation, phase: .listening, utteranceID: utterance, leaseUntil: clock.now() + 8, adoptable: true))
+        #expect(throws: CoreError.foreignUtterance) { try keyboard.send(adopt(UUID())) }
+        let offered = adopt(utterance)
+        try keyboard.send(offered)
+        #expect(try app.takeCommands(generation: generation) == [offered])
+    }
     @Test func expiryLeaseAndGenerationFence() throws {
         let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let clock = TestClock(), secrets = MemorySecretStore(), generation = UUID(), utterance = UUID()

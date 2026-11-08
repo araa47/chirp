@@ -49,6 +49,46 @@ final class ChirpKeyboardUITests: XCTestCase {
         XCTAssertFalse(app.buttons["chirp.keyboard.undo"].exists, "Nothing to undo once sent")
     }
 
+    /// Auto-insert: with Chirp Keyboard showing in a field, a dictation Toggle starts (what a dictation key or the
+    /// floating mic does) is typed into that field by the keyboard, live, instead of copied.
+    @MainActor func testKeyboardTypesAToggleDictation() throws {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["--chirp-ui-test", "--chirp-keyboard-host", "--chirp-hwkey-seam"]
+        app.launch()
+        defer {
+            app.activate()
+            if app.buttons["chirp.host.end"].exists { app.buttons["chirp.host.end"].tap() }
+            app.terminate()
+        }
+        let field = app.textViews["chirp.host.text"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        let setup = app.staticTexts["chirp.host.setup"]
+        let prepared = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", "Preparing synthetic shared session"), object: setup)
+        XCTAssertEqual(XCTWaiter.wait(for: [prepared], timeout: 10), .completed)
+        if setup.label.contains("unavailable") || setup.label.contains("could not arm") { throw XCTSkip(setup.label) }
+        try enableKeyboardInSettings()
+        app.activate()
+        field.tap()
+        try selectChirpKeyboard(in: app)
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.6)).tap()
+        let primary = app.buttons["chirp.keyboard.primary"]
+        let armed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Start dictation"), object: primary)
+        XCTAssertEqual(XCTWaiter.wait(for: [armed], timeout: 10), .completed)
+        let toggle = {
+            CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+                                                 CFNotificationName("dev.chirp.ios.debug.hwkey.toggle" as CFString), nil, nil, true)
+        }
+        toggle()
+        XCTAssertTrue(wait(for: field, key: "value", equalTo: "Host prefix. synthetic words"),
+                      "The keyboard did not type the Toggle dictation's words: \(String(describing: field.value))")
+        keep(app, "keyboard-typing-toggle-dictation")
+        toggle()
+        XCTAssertTrue(wait(for: field, key: "value", equalTo: "Host prefix. Synthetic words."),
+                      "The final must replace the typed partial: \(String(describing: field.value))")
+    }
+
     /// Screenshots of the Live Activity on the lock screen and in the Dynamic Island, from synthetic sample activities
     /// (Debug simulator builds). Attachments only; it fails only if the app cannot start.
     @MainActor func testLiveActivityScreenshots() throws {

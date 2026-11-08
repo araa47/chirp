@@ -675,6 +675,19 @@ As before, it doesn't mix, so other apps' audio stops while Chirp listens.
 iPadOS 27 has no Picture in Picture setting to check (Settings search finds
 none), so a failure shows the system's own reason.
 
+### Typed in, not pasted, when Chirp Keyboard is showing
+
+If Chirp Keyboard is on screen in a field when the floating mic, Toggle or a
+dictation key starts dictating, the keyboard takes that dictation: the words
+appear in the field as you speak and the polished final replaces them, as with
+the keyboard's own mic. Nothing is copied, and Toggle says "Typed into the
+field." Without Chirp Keyboard on screen (with a hardware keyboard attached,
+iPadOS hides it until you show it from the keyboard bar), the text is copied
+for ⌘V as before. The keyboard never takes one into a secure field, or while it
+has a dictation of its own, or right after you typed. Under the hood the app
+offers the dictation in the shared mailbox (`adoptable`) and the keyboard
+answers `adopt`, which the mailbox accepts only for the offered dictation.
+
 ### Set up a dictation key
 
 When a hardware keyboard is attached, Dictate offers **Set up a dictation key**

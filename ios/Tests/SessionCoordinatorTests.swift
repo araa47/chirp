@@ -222,6 +222,37 @@ struct SessionCoordinatorTests {
         #expect(f.values.copied == ["From the key."] && f.model.lastToggle?.started == false)
     }
 
+    /// Chirp Keyboard showing in a field adopts a dictation Toggle (a key, the floating mic) started: it types the text,
+    /// so nothing is copied and Toggle says where the text went.
+    @Test func keyboardAdoptsAToggleDictation() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        try await f.model.armSession()
+        _ = try await f.model.perform(action: .toggle)
+        try await ready(f)
+        let keyboard = try keyboardView(f)
+        let state = try #require(try keyboard.state())
+        #expect(state.adoptable == true, "A live Toggle dictation is offered to the keyboard")
+        let id = try #require(state.utteranceID)
+        try keyboard.send(BridgeCommand(generation: state.generation, utteranceID: id, action: .adopt,
+                                        createdAt: Date(), expiresAt: Date().addingTimeInterval(10)))
+        // The app takes commands on its heartbeat (every 2 s).
+        for _ in 0..<60 where (try? keyboard.state()?.adoptable) == true { try await Task.sleep(for: .milliseconds(100)) }
+        #expect(try keyboard.state()?.adoptable == nil, "Adopted: no longer offered")
+        let stopping = Task { try await f.model.perform(action: .toggle) }
+        try await Task.sleep(for: .milliseconds(10))
+        f.transport.push(#"{"type":"final","text":"Typed by the keyboard."}"#)
+        #expect(try await stopping.value == "Typed into the field.")
+        #expect(f.values.copied.isEmpty && f.model.notice == "Typed into the field.")
+    }
+
+    /// A dictation the keyboard or the app started is never offered: only Toggle's (companion) ones are.
+    @Test func onlyToggleDictationsAreOffered() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        try await f.model.begin(source: .app)
+        try await ready(f)
+        #expect(try keyboardView(f).state()?.adoptable == nil)
+    }
+
     @Test func toggleStopWithEmptyFinalNeverCopies() async throws {
         let f = try await fixture(); defer { f.clean() }
         try await f.model.armSession()

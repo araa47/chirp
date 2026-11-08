@@ -79,6 +79,8 @@ final class SessionCoordinator: ObservableObject {
     private var lifecycle = UUID()
     private var utterance: UUID?
     private var companion: UUID?
+    /// A companion dictation Chirp Keyboard adopted: it types the text into its field, so nothing is copied.
+    private var typedByKeyboard: UUID?
     private var utteranceSource: DictationSource?
     private var privateUtterance = false
     private var sequence = 0
@@ -662,7 +664,10 @@ final class SessionCoordinator: ObservableObject {
             do { historyID = try services?.history.record(text: whole, raw: wholeRaw, corrected: result.corrected)?.id }
             catch { notice = SessionFailure.storage.localizedDescription; record(.storage) }
         }
-        if companion == id { copyText(whole); companion = nil; notice = "Copied final text." }
+        if companion == id {
+            if typedByKeyboard == id { notice = "Typed into the field." } else { copyText(whole); notice = "Copied final text." }
+            companion = nil
+        }
         else { notice = result.corrected ? "Polished. Copy or share when ready." : "Finished. Copy or share when ready." }
         for waiter in waiters.removeValue(forKey: id) ?? [] { waiter.resume() }
         rawExpiresAt = now().addingTimeInterval(5)
@@ -689,7 +694,7 @@ final class SessionCoordinator: ObservableObject {
     private func clearUtterance(error: Error = SessionFailure.cancelled) {
         eventTask?.cancel(); eventTask = nil; deadline?.cancel(); deadline = nil
         utteranceLimit?.cancel(); utteranceLimit = nil; rawExpiry?.cancel(); rawExpiry = nil
-        audio.discard(); stream = nil; utterance = nil; companion = nil; utteranceSource = nil
+        audio.discard(); stream = nil; utterance = nil; companion = nil; typedByKeyboard = nil; utteranceSource = nil
         text = ""; raw = ""; words = []; canUseRaw = false; ready = false; stopRequested = false
         sequence = 0; lastServerSequence = -1; historyID = nil
         for segment in finishing { segment.cancel() }
@@ -738,9 +743,10 @@ final class SessionCoordinator: ObservableObject {
         case .stop:
             guard let id = utterance, stream != nil else { throw SessionFailure.noResult }
             let copies = companion == id // Only a companion-owned utterance copies; keyboard/app paths never copy.
+            let typed = typedByKeyboard == id
             stopDictation()
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in waiters[id, default: []].append(continuation) }
-            return copies ? "Copied. Paste with ⌘V." : "Dictation finished."
+            return typed ? "Typed into the field." : copies ? "Copied. Paste with ⌘V." : "Dictation finished."
         case .toggle:
             // One action for a hardware-keyboard shortcut: start in an armed session, or stop and copy.
             if utterance != nil, stream != nil {
@@ -762,6 +768,11 @@ final class SessionCoordinator: ObservableObject {
         let expected = lifecycle
         Task { if expected == lifecycle { await activityUpdate(value.rawValue, debugRetention) } }
     }
+    /// A live companion dictation no keyboard types yet: a visible Chirp Keyboard may adopt it.
+    private var adoptable: Bool {
+        guard let id = utterance, companion == id, typedByKeyboard != id else { return false }
+        return phase == .connecting || phase == .listening
+    }
     private func publishState() {
         guard armed, let services else { return }
         do {
@@ -769,7 +780,8 @@ final class SessionCoordinator: ObservableObject {
                 leaseUntil: now().addingTimeInterval(8), sessionExpiresAt: expiresAt, debugRetention: debugRetention,
                 privacyMode: preferences.privacyMode, styleID: preferences.styleID,
                 availableStyleIDs: profiles.isEmpty ? ["default"] : profiles.map(\.id), errorCode: lastError,
-                spokenCommands: preferences.spokenCommands == true ? true : nil, autoEnter: preferences.autoEnter))
+                spokenCommands: preferences.spokenCommands == true ? true : nil, autoEnter: preferences.autoEnter,
+                adoptable: adoptable ? true : nil))
             signal.post()
         } catch { endSession(code: .storage) }
     }
@@ -803,6 +815,9 @@ final class SessionCoordinator: ObservableObject {
                 case .useRaw: if command.utteranceID == utterance { useRaw() }
                 case .style(let id): if stream == nil { selectStyle(id) }
                 case .privacy(let enabled): preferences.privacyMode = enabled; savePreferences(); publishState()
+                case .adopt:
+                    // Chirp Keyboard is showing in a field and takes this companion dictation: it types the text.
+                    if let id = command.utteranceID, id == utterance, companion == id { typedByKeyboard = id; publishState() }
                 }
             }
         } catch { endSession(code: .storage) }

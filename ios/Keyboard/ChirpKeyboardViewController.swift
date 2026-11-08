@@ -28,6 +28,8 @@ final class ChirpKeyboardViewController: KeyboardInputViewController {
     private var visible = false
     private var rawUntil: Date?
     private var typingUntil: Date?
+    /// The companion dictation this keyboard last considered adopting (taken or not): one try per dictation.
+    private var consideredAdoption: UUID?
     private var kept = false
     private var notice: String?
     private var noticeUntil: Date?
@@ -250,6 +252,7 @@ final class ChirpKeyboardViewController: KeyboardInputViewController {
             }
             fallback = nil
             if startPending && Date() >= (pendingUntil ?? .distantPast) { invalidateOwnership() }
+            adoptIfOffered(current)
             if let generation = policy.generation, let utterance = policy.utteranceID {
                 if let active = current.utteranceID, active != utterance {
                     if !startPending { invalidateOwnership() }
@@ -360,6 +363,22 @@ final class ChirpKeyboardViewController: KeyboardInputViewController {
 
     /// Light feedback on start/stop. Keyboards without Full Access may not use haptics, so skip them.
     private func tick() { if hasFullAccess { haptic.impactOccurred() } }
+
+    /// The floating mic, Toggle or a dictation key started a dictation for another app while this keyboard is showing in a
+    /// field: take it, so its words are typed here (live, like the keyboard's own) instead of copied. Once per
+    /// dictation, never into a secure field, never while the keyboard owns one or the user has just typed.
+    private func adoptIfOffered(_ state: BridgeState) {
+        guard state.adoptable == true, let id = state.utteranceID, id != consideredAdoption,
+              state.phase == .connecting || state.phase == .listening,
+              policy.generation == nil, !startPending,
+              textDocumentProxy.isSecureTextEntry != true,
+              Date() >= (typingUntil ?? .distantPast) else { return }
+        consideredAdoption = id
+        finishWatch()
+        guard policy.begin(generation: state.generation, utteranceID: id, context: context(), now: Date()) else { return }
+        rawUntil = nil; rawRequested = false
+        send(.adopt, utteranceID: id)
+    }
 
     /// Typing next to a dictation the keyboard owns releases it first (its text stays; nothing more lands there).
     private func userWillType() {

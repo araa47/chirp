@@ -3,6 +3,9 @@ import Foundation
 public enum BridgeRole: Sendable { case app, keyboard }
 public enum BridgeAction: Codable, Sendable, Equatable {
     case start, stop, cancel, end, useRaw, style(String), privacy(Bool)
+    /// The keyboard takes a dictation the app started for another app (the floating mic, Toggle, a key): it types the
+    /// text into the field it is showing in, so the app doesn't copy it.
+    case adopt
 }
 public enum BridgeResultKind: String, Codable, Sendable { case partial, correcting, final, raw }
 public struct BridgeState: Codable, Sendable, Equatable {
@@ -20,14 +23,17 @@ public struct BridgeState: Codable, Sendable, Equatable {
     public var spokenCommands: Bool?
     /// The keyboard's auto-Enter mode (raw value of `AutoEnterMode`); nil is off.
     public var autoEnter: String?
+    /// The current dictation was started for another app (the floating mic, Toggle, a key) and nothing types it yet,
+    /// so a visible Chirp Keyboard may adopt it. Optional so older mailboxes still decode.
+    public var adoptable: Bool?
     public init(generation: UUID, phase: SessionPhase, utteranceID: UUID? = nil, leaseUntil: Date,
                 sessionExpiresAt: Date? = nil, debugRetention: Bool = false, privacyMode: Bool = false,
                 styleID: String = "default", availableStyleIDs: [String] = ["default"], errorCode: DiagnosticCode? = nil,
-                spokenCommands: Bool? = nil, autoEnter: String? = nil) {
+                spokenCommands: Bool? = nil, autoEnter: String? = nil, adoptable: Bool? = nil) {
         self.generation = generation; self.phase = phase; self.utteranceID = utteranceID; self.leaseUntil = leaseUntil
         self.sessionExpiresAt = sessionExpiresAt; self.debugRetention = debugRetention; self.privacyMode = privacyMode
         self.styleID = styleID; self.availableStyleIDs = availableStyleIDs; self.errorCode = errorCode
-        self.spokenCommands = spokenCommands; self.autoEnter = autoEnter
+        self.spokenCommands = spokenCommands; self.autoEnter = autoEnter; self.adoptable = adoptable
     }
 }
 public struct BridgeCommand: Codable, Sendable, Equatable, Identifiable {
@@ -191,6 +197,10 @@ public final class SharedBridge: Sendable {
                 d.utterances.append(Receipt(id: command.utteranceID!, expiresAt: now().addingTimeInterval(Self.maximumTTL)))
             case .stop, .cancel, .useRaw:
                 guard let id = command.utteranceID, id == state.utteranceID else { throw CoreError.foreignUtterance }
+            case .adopt:
+                // Only the dictation the app offers, while it is live.
+                guard let id = command.utteranceID, id == state.utteranceID else { throw CoreError.foreignUtterance }
+                guard state.adoptable == true else { throw CoreError.invalidState }
             case .style(let id): guard state.availableStyleIDs.contains(id) else { throw CoreError.invalidState }
             case .end, .privacy: break
             }
