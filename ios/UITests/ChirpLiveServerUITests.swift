@@ -90,6 +90,38 @@ final class ChirpLiveServerUITests: XCTestCase {
         XCTAssertTrue(banner.waitForExistence(timeout: 15), "Deep-link pairing failed")
     }
 
+    /// The first words survive: speech that starts the moment dictation does (buffered until the server is ready), and
+    /// speech that starts after "Listening…" (as when a person waits for it), both keep "Chirp test one". On the
+    /// operator's iPad the opening words of a dictation went missing once; this pins where they could be lost.
+    @MainActor func testLiveFirstWordsSurvive() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let early = env["CHIRP_LIVE_FIRST_AUDIO"], let late = env["CHIRP_LIVE_FIRST_LATE_AUDIO"] else {
+            throw XCTSkip("First-words run only: set TEST_RUNNER_CHIRP_LIVE_FIRST_AUDIO and TEST_RUNNER_CHIRP_LIVE_FIRST_LATE_AUDIO.")
+        }
+        for (file, name) in [(early, "speech from the start"), (late, "speech after Listening")] {
+            let app = launch(audio: file)
+            pair(app)
+            app.selectChirpTab("Dictate")
+            app.buttons["chirp.dictation.start"].tap()
+            allowSystemAlert()
+            let stop = app.buttons["chirp.dictation.stop"]
+            XCTAssertTrue(stop.waitForExistence(timeout: 15))
+            let transcript = app.staticTexts["transcript"]
+            XCTAssertTrue(waitFor(transcript, "label CONTAINS[c] 'lazy dog'", timeout: 30), "\(name): the sentence never finished")
+            stop.tap()
+            XCTAssertTrue(waitFor(app.staticTexts["sessionStatus"], "label == 'Finished'", timeout: 30))
+            print("CHIRP-FIRST \(name): \(transcript.label)")
+            // The opening sentence ("Chirp test one", which the model may write "… test 1" or hear "Chirp" as another word)
+            // must come before "quick": that is what was missing on the iPad.
+            let heard = transcript.label.lowercased()
+            let opening = heard.range(of: "quick").map { String(heard[..<$0.lowerBound]) } ?? ""
+            XCTAssertTrue(opening.contains("test"), "\(name): first words lost: \(transcript.label)")
+            screenshot("First words, \(name)", app)
+            endSession(app)
+            app.terminate()
+        }
+    }
+
     @MainActor func testLivePairDictateCleanupRawHistoryAndEnd() {
         let app = launch()
         pair(app)
