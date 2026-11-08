@@ -23,21 +23,21 @@ jobs:
       run:
         working-directory: android
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: "21"
       # Same SDK pieces as android/scripts/setup-toolchain.sh, plus the NDK the keyboard module pins.
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools platforms;android-37.2 build-tools;37.0.0 ndk;28.0.13004108
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       # No keystore secret: the release APK is built unsigned (the build warns and carries on).
       - run: ./gradlew lint testDebugUnitTest assembleDebug assembleRelease
       - name: Upload reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-reports
           retention-days: 7
