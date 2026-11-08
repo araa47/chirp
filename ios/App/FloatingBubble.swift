@@ -115,6 +115,29 @@ final class FloatingBubble: NSObject, ObservableObject {
         controller.requiresLinearPlayback = true // no ±10 s skip buttons: there is nothing to skip
         controller.canStartPictureInPictureAutomaticallyFromInline = false
         self.controller = controller
+        applyControls()
+    }
+
+    // MARK: Buttons or indicator only
+
+    /// Settings → Dictation → Floating mic → Record button. Off (the default): the window shows no buttons at all, only
+    /// the pill's state, and dictation starts and stops with a dictation key or Toggle. On: a tap shows iOS's buttons,
+    /// whose Stop records and stops; iOS adds its ±10 s buttons too, and no API keeps one without the others.
+    static let buttonsKey = "chirp.floatingMic.buttons"
+    static var showsButtons: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--chirp-floating-mic-buttons") { return true }
+        #endif
+        return !canHideButtons || UserDefaults.standard.bool(forKey: buttonsKey)
+    }
+    /// Hiding the buttons uses an unofficial controller setting (`controlsStyle`: 0 all buttons, 1 none), fine for a
+    /// personal install, not for the App Store. Where iOS lacks it, the window keeps its buttons.
+    static var canHideButtons: Bool { AVPictureInPictureController.instancesRespond(to: NSSelectorFromString("setControlsStyle:")) }
+
+    /// Applies the setting to the window, also while it is up.
+    func applyControls() {
+        guard let controller, Self.canHideButtons else { return }
+        controller.setValue(Self.showsButtons ? 0 : 1, forKey: "controlsStyle")
     }
 
     /// The system's button (shown as ❚❚, see `pictureInPictureControllerIsPlaybackPaused`): each press records when idle
@@ -310,7 +333,7 @@ struct FloatingBubbleControl: View {
                 .disabled(!model.paired || model.working)
                 .accessibilityIdentifier("chirp.bubble.toggle")
                 LearnMore(title: "Floating mic") {
-                    Text("A small pill that stays on top of every app: ⏺ when ready, ⏹ with a soft ring while it listens, a check once the text is copied (press ⌘V where you want it). Tap it, then the system’s ▶ to record and ❚❚ to stop. Pinch it smaller, or drag it to an edge to tuck it away.")
+                    Text("A small pill that stays on top of every app: ⏺ when ready, ⏹ with a soft ring while it listens, a check once the text is copied (press ⌘V where you want it). Start and stop with your dictation key or Toggle. With Settings → Dictation → Floating mic → Record button on, tapping the pill also shows a Stop button that records and stops. Pinch it smaller, or drag it to an edge to tuck it away.")
                     Text("iOS lets no app draw over other apps or paste into them, so the mic is a Picture in Picture window, and its buttons are the system’s. It keeps a keyboard session running, so the microphone stays ready while it is up. To have the text typed in for you, dictate with Chirp Keyboard instead.")
                 }
             }
