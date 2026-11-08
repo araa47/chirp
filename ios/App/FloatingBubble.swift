@@ -117,7 +117,7 @@ final class FloatingBubble: NSObject, ObservableObject {
         Task { @MainActor in
             do {
                 let message = try await model.perform(action: .toggle)
-                outcome = message.hasPrefix("Copied") ? "Copied · press ⌘V" : nil
+                outcome = message.hasPrefix("Copied") || message.hasPrefix("Typed") ? "Copied · press ⌘V" : nil
             } catch {
                 outcome = (error as? LocalizedError)?.errorDescription ?? "Couldn’t start."
             }
