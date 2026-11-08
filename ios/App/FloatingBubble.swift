@@ -33,8 +33,6 @@ final class FloatingBubble: NSObject, ObservableObject {
     private var watch: AnyCancellable?
     private var ticker: Timer?
     private var format: CMVideoFormatDescription?
-    /// Read by the playback delegate off the main actor.
-    private let paused = OSAllocatedUnfairLock(initialState: true)
     /// The last start/stop the bubble asked for, shown on the card ("Copied", or why it could not start).
     private var outcome: String?
     private var listeningSince: Date?
@@ -42,7 +40,19 @@ final class FloatingBubble: NSObject, ObservableObject {
     private var lastError: String?
 
     /// Square: the window is just a mic.
-    static let size = CGSize(width: 320, height: 320)
+    static var size: CGSize {
+        #if DEBUG
+        // UI tests compare how big iPadOS makes the window for each shape: `--chirp-bubble-size 480x160`.
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "--chirp-bubble-size"), i + 1 < args.count {
+            let parts = args[i + 1].split(separator: "x").compactMap { Double($0) }
+            if parts.count == 2 { return CGSize(width: parts[0], height: parts[1]) }
+        }
+        #endif
+        // A 3:1 pill: the smallest window iPadOS gives by default (measured on iPadOS 27: 1:1 → 400×400 pt, 2:1 → 400×200,
+        // 3:1 → 408×136, 4:1 → 544×136; the height stops at 136 pt). People can pinch it smaller still.
+        return CGSize(width: 600, height: 200)
+    }
 
     var supported: Bool { AVPictureInPictureController.isPictureInPictureSupported() }
 
@@ -107,11 +117,10 @@ final class FloatingBubble: NSObject, ObservableObject {
         self.controller = controller
     }
 
-    /// The play/pause button: start dictation when idle, stop and copy when listening. Toggle's own rules apply.
+    /// The system's button (shown as ❚❚, see `pictureInPictureControllerIsPlaybackPaused`): each press records when idle
+    /// and stops and copies while listening. Toggle's own rules apply; a press while polishing does nothing.
     fileprivate func pressed(play: Bool) {
-        guard let model else { return }
-        let listening = [.connecting, .listening].contains(model.phase)
-        guard play != listening else { return }
+        guard let model, model.phase != .correcting else { return }
         outcome = nil
         refresh()
         Task { @MainActor in
@@ -144,7 +153,6 @@ final class FloatingBubble: NSObject, ObservableObject {
     private func refresh() {
         guard let model else { return }
         let listening = [.connecting, .listening].contains(model.phase)
-        paused.withLock { $0 = !listening }
         controller?.invalidatePlaybackState()
         enqueue(state())
         // A running clock needs a frame a second; otherwise frames follow the session's changes.
@@ -224,48 +232,41 @@ extension FloatingBubble: AVPictureInPictureSampleBufferPlaybackDelegate {
         CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
     }
     nonisolated func pictureInPictureControllerIsPlaybackPaused(_ controller: AVPictureInPictureController) -> Bool {
-        paused.withLock { $0 }
+        // Always "playing": iOS keeps its controls on screen over paused content, and fades them while it plays, so
+        // the window rests as just the pill. A tap shows the system's ❚❚; pressing it records or stops (`pressed`).
+        false
     }
     nonisolated func pictureInPictureController(_ controller: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions) {}
     nonisolated func pictureInPictureController(_ controller: AVPictureInPictureController, skipByInterval skipInterval: CMTime,
                                                 completion completionHandler: @escaping () -> Void) { completionHandler() }
 }
 
-/// What the bubble draws: one mic, the whole window in its state's colour. Koi when ready, `record` red with the clock while
-/// listening, moon while polishing, a green check once the text is copied; the system's ▶ / ❚❚ is the button.
+/// What the bubble draws: a quiet pill, no text. A small red ⏺ when ready, ⏹ with a soft ring while listening, grey
+/// dots while polishing, a small green check once the text is copied. Low contrast so it sits over any app unnoticed.
 struct BubbleCard: View {
     enum Tone { case idle, listening, polishing, done, error }
     struct State: Equatable { var tone: Tone; var clock: String? }
     let state: State
 
-    private var fill: Color {
-        switch state.tone {
-        case .idle: Color(red: 0.95, green: 0.42, blue: 0.11)      // koiDecor
-        case .listening: Color(red: 0.86, green: 0.15, blue: 0.15) // record
-        case .polishing: Color(red: 0.45, green: 0.50, blue: 0.85) // moon
-        case .done: Color(red: 0.13, green: 0.60, blue: 0.40)      // lily
-        case .error: Color(red: 0.40, green: 0.42, blue: 0.48)
-        }
-    }
-    private var symbol: String {
-        switch state.tone {
-        case .idle: "mic.fill"
-        case .listening: "waveform"
-        case .polishing: "ellipsis"
-        case .done: "checkmark"
-        case .error: "exclamationmark"
-        }
-    }
+    private static let record = Color(red: 0.93, green: 0.27, blue: 0.27)
 
     var body: some View {
         ZStack {
-            // The whole window is the button's colour, so it reads as one mic, not a card.
-            fill
-            VStack(spacing: 6) {
-                Image(systemName: symbol).font(.system(size: 104, weight: .bold)).foregroundStyle(.white)
-                if let clock = state.clock {
-                    Text(clock).font(.system(size: 34, weight: .semibold).monospacedDigit()).foregroundStyle(.white.opacity(0.9))
+            Color(red: 0.11, green: 0.12, blue: 0.14)
+            switch state.tone {
+            case .idle:
+                Circle().fill(Self.record).frame(width: 72, height: 72)
+            case .listening:
+                ZStack {
+                    Circle().stroke(Self.record.opacity(0.35), lineWidth: 10).frame(width: 128, height: 128)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Self.record).frame(width: 56, height: 56)
                 }
+            case .polishing:
+                HStack(spacing: 18) { ForEach(0..<3, id: \.self) { _ in Circle().fill(Color.white.opacity(0.45)).frame(width: 18, height: 18) } }
+            case .done:
+                Image(systemName: "checkmark").font(.system(size: 64, weight: .bold)).foregroundStyle(Color(red: 0.35, green: 0.78, blue: 0.55))
+            case .error:
+                Image(systemName: "exclamationmark").font(.system(size: 60, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -299,7 +300,7 @@ struct FloatingBubbleControl: View {
         VStack(alignment: .leading, spacing: ChirpSpacing.s8) {
             HStack(spacing: ChirpSpacing.s12) {
                 BubbleSource()
-                    .frame(width: 36, height: 36)
+                    .frame(width: 54, height: 18)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .accessibilityHidden(true)
                 Button(bubble.active ? "Hide floating mic" : "Floating mic", systemImage: bubble.active ? "pip.exit" : "pip.enter") {
@@ -309,7 +310,7 @@ struct FloatingBubbleControl: View {
                 .disabled(!model.paired || model.working)
                 .accessibilityIdentifier("chirp.bubble.toggle")
                 LearnMore(title: "Floating mic") {
-                    Text("A small mic that stays on top of every app. Tap it, then ▶ to dictate and ❚❚ to stop. It turns red while it listens and green when the text is copied: press ⌘V where you want it. Drag it to an edge to tuck it away.")
+                    Text("A small pill that stays on top of every app: ⏺ when ready, ⏹ with a soft ring while it listens, a check once the text is copied (press ⌘V where you want it). Tap it, then the system’s ▶ to record and ❚❚ to stop. Pinch it smaller, or drag it to an edge to tuck it away.")
                     Text("iOS lets no app draw over other apps or paste into them, so the mic is a Picture in Picture window, and its buttons are the system’s. It keeps a keyboard session running, so the microphone stays ready while it is up. To have the text typed in for you, dictate with Chirp Keyboard instead.")
                 }
             }

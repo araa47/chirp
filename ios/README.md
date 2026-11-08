@@ -647,15 +647,22 @@ receive hardware key presses. So there are two ways to dictate into another app:
 
 ### Floating mic
 
-Dictate's **Floating mic** button puts one mic on top of every app: a small
-square that is orange when ready, red with a clock while it listens, and green
-with a check once the text is copied. Tap it, then ▶ to dictate and ❚❚ to stop;
-press ⌘V where you want the text. Drag it to an edge to tuck it away, × closes
-it. Showing it starts a keyboard session, so the microphone stays ready (and its
-indicator on) while it is up. With no session running, the first tap starts
-one and the second shows the mic.
+Dictate's **Floating mic** button puts a small, quiet pill on top of every app:
+a red ⏺ when ready, ⏹ in a soft ring while it listens, grey dots while it
+polishes, a green check once the text is copied (press ⌘V where you want it).
+No text. Tap the pill for the system's button (iOS draws it, labelled Stop):
+the first press records, the next stops. Pinch it smaller or drag it to an edge
+to tuck it away; × closes it. Showing it starts a keyboard session, so the
+microphone stays ready (and its indicator on) while it is up. With no session
+running, the first tap starts one and the second shows the pill.
 
-![Floating mic over the Home Screen](../docs/screenshots/ios/ipad-floating-bubble.png)
+iOS picks the window's size; the app picks only its shape, and a 3:1 pill is the
+smallest it gets by default (iPadOS 27 simulator, landscape: 1:1 → 400×400 pt,
+2:1 → 400×200, 3:1 → 408×136, 4:1 → 544×136). The pill reports itself as playing
+live content, because iOS keeps its controls on screen over paused content and
+fades them while it plays; that is also why the button reads Stop.
+
+![Floating mic resting over the Home Screen](../docs/screenshots/ios/ipad-floating-bubble.png) ![Floating mic listening](../docs/screenshots/ios/ipad-floating-bubble-listening.png)
 
 iOS lets no app draw over other apps (Android's dictation bubbles, Typeless's
 included, use that), so the mic is a Picture in Picture window Chirp renders

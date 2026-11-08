@@ -196,13 +196,56 @@ final class ChirpHardwareShortcutUITests: XCTestCase {
                       "The bubble did not start: \(app.staticTexts["chirp.bubble.failure"].exists ? app.staticTexts["chirp.bubble.failure"].label : toggle.label)")
         XCTAssertTrue(waitFor(app.staticTexts["sessionStatus"], "label == 'Ready'"), "Showing the bubble starts a session")
         XCUIDevice.shared.press(.home)
-        sleep(2)
+        sleep(7) // the system's controls fade: the resting pill
         screenshot("Floating mic over the Home Screen, \(name)")
+        // Record from the window, as a person would: tap it for the system's button, press it; again to stop.
+        let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let window = sb.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'PIP-SBInteractionPassThroughView'")).firstMatch
+        let press = { () -> Bool in
+            let button = sb.buttons.matching(NSPredicate(format: "label ==[c] 'Stop' OR label ==[c] 'Pause' OR label ==[c] 'Play'")).firstMatch
+            if !button.exists, window.exists { window.tap(); sleep(1) }
+            let labels = sb.buttons.allElementsBoundByIndex.filter { $0.frame.intersects(window.frame) }.map { "\($0.identifier)|\($0.label)" }
+            print("CHIRP-PIP buttons over the window: \(labels)")
+            guard button.waitForExistence(timeout: 3) else { return false }
+            button.tap(); return true
+        }
+        if press() {
+            sleep(7)
+            screenshot("Floating mic listening, \(name)")
+            XCTAssertTrue(press(), "No system button to stop with")
+            sleep(5)
+            screenshot("Floating mic after stop, \(name)")
+        }
         app.activate()
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         if toggle.label == "Hide floating mic" { toggle.tap() }
         XCTAssertTrue(waitFor(toggle, "label == 'Floating mic'", timeout: 10), "Hide did not close the bubble")
         app.endChirpSession()
+    }
+
+    /// How big iPadOS makes the floating mic's window for each content shape (it picks the size; the app picks the shape).
+    @MainActor func testFloatingMicWindowSizes() throws {
+        guard ProcessInfo.processInfo.environment["CHIRP_BUBBLE_SIZES"] == "1" else {
+            throw XCTSkip("Measurement run only: set TEST_RUNNER_CHIRP_BUBBLE_SIZES=1 (about 3 minutes).")
+        }
+        for size in ["320x320", "480x240", "600x200", "640x160", "720x120", "200x400"] {
+            let app = launch(["--chirp-bubble-size", size])
+            app.pair(link: XCUIApplication.syntheticPairingLink)
+            app.selectChirpTab("Dictate")
+            let toggle = app.buttons["chirp.bubble.toggle"]
+            guard toggle.waitForExistence(timeout: 5) else { continue }
+            toggle.tap()
+            if !waitFor(toggle, "label == 'Hide floating mic'", timeout: 6) { toggle.tap(); _ = waitFor(toggle, "label == 'Hide floating mic'", timeout: 10) }
+            XCUIDevice.shared.press(.home); sleep(3)
+            let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let window = sb.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'PIP-SBInteractionPassThroughView'")).firstMatch
+            print("CHIRP-SIZE content=\(size) window=\(window.exists ? NSCoder.string(for: window.frame) : "none")")
+            screenshot("Floating mic \(size)")
+            app.activate()
+            if toggle.waitForExistence(timeout: 5), toggle.label == "Hide floating mic" { toggle.tap(); sleep(1) }
+            app.endChirpSession()
+            app.terminate()
+        }
     }
 
     /// iPad evidence: the settings page and Dictate listening to a held Right ⌥. Run once per appearance with the
