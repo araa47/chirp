@@ -186,7 +186,7 @@ final class ChirpHardwareShortcutUITests: XCTestCase {
     /// can't press; its toggle is the same `perform(.toggle)` the other tests cover.
     @MainActor func testFloatingBubbleShowsOverOtherApps() {
         let name = ProcessInfo.processInfo.environment["CHIRP_HWKEY_APPEARANCE"] ?? "light"
-        let app = launch()
+        let app = launch(["--chirp-floating-mic-buttons"]) // Settings → Floating mic → Record button on
         app.pair(link: XCUIApplication.syntheticPairingLink)
         app.selectChirpTab("Dictate")
         let toggle = app.buttons["chirp.bubble.toggle"]
@@ -220,6 +220,35 @@ final class ChirpHardwareShortcutUITests: XCTestCase {
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         if toggle.label == "Hide floating mic" { toggle.tap() }
         XCTAssertTrue(waitFor(toggle, "label == 'Floating mic'", timeout: 10), "Hide did not close the bubble")
+        app.endChirpSession()
+    }
+
+    /// Indicator only (the default): the floating mic's window has no buttons at all, so a tap shows no ±10 s, Stop or
+    /// Play; dictation starts and stops with a dictation key or Toggle.
+    @MainActor func testFloatingMicIndicatorOnly() {
+        let app = launch()
+        app.pair(link: XCUIApplication.syntheticPairingLink)
+        app.selectChirpTab("Dictate")
+        let toggle = app.buttons["chirp.bubble.toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        toggle.tap()
+        if !waitFor(toggle, "label == 'Hide floating mic'", timeout: 6) { toggle.tap() }
+        XCTAssertTrue(waitFor(toggle, "label == 'Hide floating mic'", timeout: 15))
+        XCUIDevice.shared.press(.home); sleep(3)
+        let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let window = sb.descendants(matching: .any).matching(identifier: "PIP-SBInteractionPassThroughView").firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 5), "The floating mic is not up")
+        window.tap(); sleep(1)
+        let buttons = sb.buttons.allElementsBoundByIndex.filter { $0.frame.intersects(window.frame) }.map(\.label)
+        XCTAssertTrue(buttons.allSatisfy { !["Stop", "Play", "Pause"].contains($0) && !$0.contains("10 seconds") },
+                      "Indicator only shows no playback buttons: \(buttons)")
+        screenshot("Floating mic, indicator only")
+        // Toggle (what a dictation key runs) still drives it.
+        seam("toggle", app); sleep(3)
+        screenshot("Floating mic, indicator only, listening")
+        seam("toggle", app); sleep(3)
+        app.activate()
+        if toggle.waitForExistence(timeout: 5), toggle.label == "Hide floating mic" { toggle.tap() }
         app.endChirpSession()
     }
 

@@ -178,6 +178,7 @@ struct DictationPage: View {
                           identifier: "chirp.settings.spokenCommands",
                           set: { on in model.preferences.spokenCommands = on ? true : nil; model.savePreferences() })
             }
+            FloatingMicGroup()
             SettingsGroup(title: "Hardware keyboard") {
                 NavRow(title: "Keyboard shortcut",
                        summary: shortcuts.shortcut.enabled ? shortcuts.shortcut.instruction : "Off",
@@ -470,6 +471,26 @@ struct AboutPage: View {
                 Text("Nothing persistent by default: audio is not written to disk unless you turn on Keep audio with notes (Settings → Notes), which seals each note’s speech on this device until you delete it. History is opt-in, encrypted on this device only and never backed up or synced. Audio goes to your paired computer only while you dictate or record; idle audio is discarded. If your computer is unreachable during a Notes recording, up to the last ten minutes wait in memory, never on disk.")
                 Text("Diagnostics are content-free: version, OS, phase, fixed local error codes, durations and counts — no transcripts, prompts, audio, addresses, network names or credentials. No telemetry, no background sync, no analytics.")
             }
+        }
+    }
+}
+
+/// Settings → Dictation → Floating mic: a record button on the floating window, or indicator only.
+struct FloatingMicGroup: View {
+    @AppStorage(FloatingBubble.buttonsKey) private var buttons = false
+    var body: some View {
+        SettingsGroup(title: "Floating mic") {
+            SwitchRow(title: "Record button",
+                      isOn: FloatingBubble.canHideButtons ? buttons : true,
+                      summary: !FloatingBubble.canHideButtons ? "This iOS always shows the window’s buttons"
+                          : buttons ? "Tap the mic for a Stop button that records and stops (iOS adds ±10 s buttons)"
+                          : "Indicator only: start and stop with your dictation key or Toggle",
+                      symbol: "record.circle",
+                      infoTitle: "Record button",
+                      infoBody: "Off, the floating mic only shows what Chirp is doing: ⏺ ready, ⏹ listening, a check once copied. Start and stop with your dictation key or Toggle. On, tapping it shows iOS’s own buttons: Stop records and stops, and iOS adds rewind and fast-forward buttons that do nothing here. iOS offers either all of its buttons or none.",
+                      identifier: "chirp.settings.floatingMicButtons",
+                      disabled: !FloatingBubble.canHideButtons,
+                      set: { buttons = $0; FloatingBubble.shared.applyControls() })
         }
     }
 }

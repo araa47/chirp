@@ -82,6 +82,20 @@ final class ChirpSettingsUITests: XCTestCase {
     }
 
     /// All seven categories are there with a live summary, each opens its page, and iPhone pushes back.
+    /// Settings → Dictation → Floating mic → Record button: off by default (indicator only), and it toggles.
+    @MainActor func testFloatingMicRecordButtonToggles() {
+        let app = launch()
+        app.openDictation()
+        let row = app.descendants(matching: .any).matching(identifier: "chirp.settings.floatingMicButtons").firstMatch
+        for _ in 0..<4 where !(row.exists && row.isHittable) { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        let initial = row.value as? String
+        ChirpNotesUITests.flip(row)
+        XCTAssertTrue(waitFor(row, "value != '\(initial ?? "")'"), "The switch did not toggle")
+        ChirpNotesUITests.flip(row)
+        XCTAssertTrue(waitFor(row, "value == '\(initial ?? "")'"), "The switch did not toggle back")
+    }
+
     @MainActor func testSevenCategoriesOpenTheirPages() {
         let app = pairedApp()
         app.selectChirpTab("Settings")

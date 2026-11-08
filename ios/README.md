@@ -650,8 +650,13 @@ receive hardware key presses. So there are two ways to dictate into another app:
 Dictate's **Floating mic** button puts a small, quiet pill on top of every app:
 a red ⏺ when ready, ⏹ in a soft ring while it listens, grey dots while it
 polishes, a green check once the text is copied (press ⌘V where you want it).
-No text. Tap the pill for the system's button (iOS draws it, labelled Stop):
-the first press records, the next stops. Pinch it smaller or drag it to an edge
+No text. By default it is an indicator only: it shows no buttons at all, and
+you start and stop with your dictation key or Toggle. With **Settings →
+Dictation → Floating mic → Record button** on, tapping it shows iOS's own
+buttons: Stop records and stops, and iOS adds rewind and fast-forward buttons
+that do nothing here (iOS offers all of its buttons or none; hiding them uses
+an unofficial controller setting, fine for this personal install, and where
+iOS lacks it the window keeps its buttons). Pinch it smaller or drag it to an edge
 to tuck it away; × closes it. Showing it starts a keyboard session, so the
 microphone stays ready (and its indicator on) while it is up. With no session
 running, the first tap starts one and the second shows the pill.
