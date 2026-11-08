@@ -15,7 +15,7 @@ Naming: `iphone-…` and `ipad-…` are the device; a `-dark` suffix (or `iphone
 - `iphone-settings-*`, `ipad-settings-*`: the Settings pages (home, Connection, Dictation, Keyboard, the style prompt editor).
 - `iphone-onboarding-*`, `iphone-dark-onboarding-*`, `iphone-ax5-onboarding-*`, `ipad-onboarding-1-welcome.png`, `ipad-dark-onboarding-1-welcome.png`: first run (welcome, pair, microphone, keyboard).
 - `ipad-sidebar-*`, `ipad-dark-sidebar-*`: the iPad sidebar (Notes, Dictate, History, Settings) expanded and collapsed.
-- `ipad-floating-bubble.png`: the floating mic (Picture in Picture) over the Home Screen, the system’s ▶ showing (`ChirpHardwareShortcutUITests.testFloatingBubbleShowsOverOtherApps`).
+- `ipad-floating-bubble.png`, `ipad-floating-bubble-listening.png`: the floating mic (Picture in Picture) resting over the Home Screen and while it listens (`ChirpHardwareShortcutUITests.testFloatingBubbleShowsOverOtherApps`).
 - `ipad-dictation-key-setup.png`, `ipad-dark-dictation-key-setup.png`: Set up a dictation key over Dictate, with the hardware-keyboard offer behind it (`ChirpHardwareShortcutUITests.testDictationKeySetup`, `TEST_RUNNER_CHIRP_HWKEY_APPEARANCE`).
 - `iphone-session-capsule.png`, `iphone-dark-session-capsule.png`, `iphone-live-activity-*`, `iphone-dynamic-island-*`: the armed-session capsule, Live Activities and Dynamic Island (`.jpg`).
 - `strip-compare-*`: Chirp Keyboard's top row beside Android's keyboard strip, for each device and appearance. Rebuild them from current captures with `uv run --with pillow python ios/scripts/strip-compare.py` (the script's docstring says where each side comes from).
