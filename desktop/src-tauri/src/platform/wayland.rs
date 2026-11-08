@@ -122,7 +122,9 @@ async fn listen(
         binding.trigger_description()
     )));
     loop {
+        // Biased: when a press and its release are both queued, deliver the press first.
         tokio::select! {
+            biased;
             event = activated.next() => {
                 let event = event.ok_or("Desktop shortcut connection closed")?;
                 if belongs_to(&path, event.session_handle().as_str(), event.shortcut_id()) {
