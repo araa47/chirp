@@ -29,6 +29,12 @@ stop() {
 trap stop EXIT INT TERM
 say -o "$WORK/s.aiff" "So, um, schedule the team review for Tuesday morning and invite the whole design group."
 ffmpeg -loglevel error -i "$WORK/s.aiff" -ar 16000 -ac 1 -c:a pcm_s16le "$WORK/s.wav"
+# First words (#376 follow-up): the opening sentence from the start, and after 2.5 s of silence (speech after "Listening…").
+say -o "$WORK/first.aiff" "Chirp test one. The quick brown fox jumps over the lazy dog."
+ffmpeg -loglevel error -i "$WORK/first.aiff" -ar 16000 -ac 1 -c:a pcm_s16le "$WORK/first.wav"
+ffmpeg -loglevel error -f lavfi -i "anullsrc=r=16000:cl=mono" -t 2.5 -c:a pcm_s16le "$WORK/lead.wav"
+printf "file '%s'\nfile '%s'\n" lead.wav first.wav > "$WORK/first-late.txt"
+ffmpeg -loglevel error -f concat -safe 0 -i "$WORK/first-late.txt" -c:a pcm_s16le "$WORK/first-late.wav"
 # Long dictation: about 50 s of speech, a 1.5 s pause (the segment cut), then a closing sentence.
 LONG="Here is the plan for next quarter. We will start by reviewing the customer feedback from the spring survey and grouping it into themes. Then the design team will sketch three options for the onboarding flow, and we will test each option with five people from our pilot group. After that, engineering will estimate the work for the option that tests best, and we will agree on a schedule that leaves room for bug fixes. Marketing will prepare a short announcement, and support will update the help center articles so that nobody is surprised on launch day. We will also keep a running list of risks and review it every Monday morning. If a risk turns into a real problem, the owner writes a short note with what happened and what we will change, and we share it in the weekly meeting. By the end of the quarter we want the new onboarding flow in the hands of every new customer. That gives us a clear goal and a simple way to measure progress."
 say -o "$WORK/long.aiff" "$LONG [[slnc 1500]] Finally, send the summary to everyone before Friday afternoon."
@@ -69,6 +75,7 @@ xcrun simctl privacy "$device" grant microphone "${CHIRP_BUNDLE_ID:-dev.chirp.io
 status=0
 VOICES_DURATION=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WORK/voices.wav")
 TEST_RUNNER_CHIRP_LIVE_VOICES_AUDIO="$WORK/voices.wav" TEST_RUNNER_CHIRP_LIVE_VOICES_DURATION="$VOICES_DURATION" \
+TEST_RUNNER_CHIRP_LIVE_FIRST_AUDIO="$WORK/first.wav" TEST_RUNNER_CHIRP_LIVE_FIRST_LATE_AUDIO="$WORK/first-late.wav" \
 TEST_RUNNER_CHIRP_LIVE_LINK="$LINK" TEST_RUNNER_CHIRP_LIVE_AUDIO="$WORK/s.wav" TEST_RUNNER_CHIRP_LIVE_LONG_AUDIO="$WORK/long.wav" \
   TEST_RUNNER_CHIRP_LIVE_SPEAKERS_AUDIO="$WORK/two.wav" \
   ./scripts/simulator.sh ui "$device" "$@" || status=$?
