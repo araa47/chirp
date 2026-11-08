@@ -46,4 +46,4 @@ select = ["E", "F", "I", "UP", "B", "ASYNC"]
 
 [tool.uv]
 # This milestone explicitly measures the latest stable stack as of its implementation date.
-exclude-newer = "2026-10-17T23:59:59Z"
+exclude-newer = "2026-11-01T23:59:59Z"

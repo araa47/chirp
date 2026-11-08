@@ -23,8 +23,8 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.13"
           enable-cache: true
@@ -46,8 +46,8 @@ jobs:
     env:
       PYTHONUTF8: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.13"
           enable-cache: true
@@ -69,14 +69,14 @@ jobs:
       CHIRP_ONNX_MODEL_DIR: ${{ github.workspace }}\onnx-model\parakeet-onnx
       PYTHONUTF8: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.13"
           enable-cache: true
           cache-dependency-glob: server/uv.lock
       - run: uv sync --locked --extra onnx
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: model
         with:
           path: onnx-model
@@ -109,8 +109,8 @@ jobs:
     env:
       CHIRP_ONNX_MODEL_DIR: ${{ github.workspace }}/onnx-model/parakeet-onnx
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.13"
           enable-cache: true
@@ -121,7 +121,7 @@ jobs:
         run: |
           uv run python -c "import platform, importlib.util, onnxruntime; from chirp_server.config import Settings; assert platform.machine() == 'x86_64'; assert Settings().engine == 'onnx'; assert importlib.util.find_spec('mlx') is None; print(onnxruntime.__version__)"
           uv run pytest -q tests/test_platform_defaults.py
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: model
         with:
           path: onnx-model

@@ -23,10 +23,10 @@ jobs:
       run:
         working-directory: desktop
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
@@ -54,7 +54,7 @@ jobs:
       - name: Native Wayland insertion and clipboard fallback
         run: env CHIRP_PLATFORM_SMOKE=src-tauri/target/debug/examples/platform-smoke scripts/wayland-insertion-smoke.sh
       - run: npm run build -- --bundles deb
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: chirp-linux-amd64
           path: desktop/src-tauri/target/release/bundle/deb/*.deb
