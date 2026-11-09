@@ -299,6 +299,12 @@ struct SessionCoordinatorTests {
         try await eventually { !f.model.text.isEmpty }
         f.values.date = f.values.date.addingTimeInterval(301)
         f.model.reconcile()
+        // The dictation under way stops like Stop and lands (#381); then expiry ends the session and clears it all.
+        try await eventually { f.audio.finishCount == 1 }
+        #expect(f.model.armed && f.model.expiryDue)
+        f.transport.push(#"{"type":"final","text":"transient","raw":"transient"}"#)
+        try await eventually { f.model.phase == .finished }
+        f.model.reconcile()
         #expect(!f.model.armed && !f.audio.armed)
         #expect(f.model.text.isEmpty && f.model.raw.isEmpty && f.model.words.isEmpty)
         #expect(try f.stores.bridge.state() == nil)
@@ -465,10 +471,26 @@ extension SessionCoordinatorTests {
         #expect(!f.model.armed)                                          // then the session ends
     }
 
-    @Test func offTheSessionsTimeStillEndsADictation() async throws {
+    /// Off, the session's time stops the dictation like Stop: what was heard lands, then the session ends.
+    @Test func offTheSessionsTimeStopsADictationAndKeepsItsText() async throws {
         let f = try await fixture(); defer { f.clean() }
         try await f.model.begin(source: .keyboard)
         try await ready(f)
+        f.values.date = f.values.date.addingTimeInterval(SessionDuration.fiveMinutes.seconds! + 1)
+        f.model.reconcile()
+        #expect(f.model.armed && f.model.expiryDue && f.model.expiresAt == nil)
+        try await eventually { f.audio.finishCount == 1 }
+        try await eventually { f.transport.sent.contains { if case .string(let v) = $0 { v == ClientMessage.stop } else { false } } }
+        f.transport.push(#"{"type":"final","text":"Cut short."}"#)
+        try await eventually { f.model.phase == .finished }
+        #expect(f.model.text == "Cut short." && f.model.armed)
+        f.model.reconcile()
+        #expect(!f.model.armed)
+    }
+
+    @Test func theSessionsTimeEndsAnIdleSessionAtOnce() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        try await f.model.armSession()
         f.values.date = f.values.date.addingTimeInterval(SessionDuration.fiveMinutes.seconds! + 1)
         f.model.reconcile()
         #expect(!f.model.armed && !f.model.expiryDue)

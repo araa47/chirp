@@ -98,7 +98,7 @@ final class SessionCoordinator: ObservableObject {
     var limitsUtterance: Bool { utteranceLimit != nil }
     /// "Keep listening until I stop", read when each dictation starts.
     private(set) var keepListening = false
-    /// The session's time ran out during a dictation that keeps listening: it ends once that dictation does.
+    /// The session's time ran out during a dictation: the session ends once that dictation does.
     private(set) var expiryDue = false
     private var eventTask: Task<Void, Never>?
     private var rawExpiry: Task<Void, Never>?
@@ -547,12 +547,14 @@ final class SessionCoordinator: ObservableObject {
         do { try services?.bridge.endSession(); signal.post() } catch { notice = SessionFailure.storage.localizedDescription }
     }
 
-    /// The session's time is up. A dictation that keeps listening is not cut off: the countdown goes away and the
-    /// session ends once the dictation does (the heartbeat checks `expiryDue`).
+    /// The session's time is up. A dictation under way is never thrown away: it stops as if Stop were tapped and its
+    /// text lands, or with "Keep listening until I stop" it carries on until the user stops it. The countdown goes away
+    /// and the session ends once the dictation has finished (the heartbeat checks `expiryDue`).
     private func expire() {
         guard armed else { return }
-        guard keepListening, stream != nil else { endSession(code: .timeout); return }
+        guard stream != nil else { endSession(code: .timeout); return }
         expiryDue = true; expiresAt = nil; expiry?.cancel(); expiry = nil
+        if !keepListening { stopDictation() }
         publishState()
     }
 
