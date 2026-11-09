@@ -14,6 +14,9 @@ struct SessionCoordinatorTests {
         var activity = true
         var active = true
         var transports: [SyntheticTransport] = []
+        /// The session-length timer's waits so far; `timeUp` ends the current one.
+        var expiryWaits: [TimeInterval] = []
+        var timeUp = false
     }
     @MainActor struct Fixture {
         let model: SessionCoordinator
@@ -42,7 +45,12 @@ struct SessionCoordinatorTests {
             },
             requestPermission: { permission }, permissionGranted: { permission }, activityBegin: { _ in }, activityActive: { values.activity },
             activityUpdate: { _, _ in }, activityEnd: {}, copyText: { values.copied.append($0) },
-            appActive: { values.active }, now: { values.date }, production: false)
+            appActive: { values.active }, now: { values.date },
+            waitForExpiry: { seconds in
+                values.expiryWaits.append(seconds)
+                while !values.timeUp, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
+                values.timeUp = false
+            }, production: false)
         return Fixture(model: model, transport: transport, audio: audio, values: values, stores: stores, secrets: secrets, root: root)
     }
     func eventually(_ check: () -> Bool) async throws {
@@ -297,15 +305,15 @@ struct SessionCoordinatorTests {
         try await f.model.begin(); try await ready(f)
         f.transport.push(#"{"type":"partial","seq":1,"text":"transient","stable":""}"#)
         try await eventually { !f.model.text.isEmpty }
-        f.values.date = f.values.date.addingTimeInterval(301)
-        f.model.reconcile()
-        // The dictation under way stops like Stop and lands (#381); then expiry ends the session and clears it all.
+        // The session's time runs out: the dictation under way stops like Stop and lands (#381), then the session ends
+        // and clears it all.
+        f.values.timeUp = true
         try await eventually { f.audio.finishCount == 1 }
         #expect(f.model.armed && f.model.expiryDue)
         f.transport.push(#"{"type":"final","text":"transient","raw":"transient"}"#)
         try await eventually { f.model.phase == .finished }
         f.model.reconcile()
-        #expect(!f.model.armed && !f.audio.armed)
+        #expect(!f.model.armed && !f.audio.armed && f.model.notice == "Session ended.")
         #expect(f.model.text.isEmpty && f.model.raw.isEmpty && f.model.words.isEmpty)
         #expect(try f.stores.bridge.state() == nil)
     }
@@ -453,22 +461,31 @@ extension SessionCoordinatorTests {
         #expect(try keyboardView(f).state()?.utteranceID == id)
     }
 
+    /// Keep listening on: the session's time takes the countdown away, but the dictation carries on until Stop.
     @Test func theSessionsTimeWaitsForADictationThatKeepsListening() async throws {
         let f = try await fixture(); defer { f.clean() }
         f.model.preferences.continuousListening = true; f.model.savePreferences()
         try await f.model.begin(source: .keyboard)
         try await ready(f)
-        #expect(f.model.expiresAt != nil)
-        f.values.date = f.values.date.addingTimeInterval(SessionDuration.fiveMinutes.seconds! + 1)
+        let countdown = try keyboardView(f).state()?.sessionExpiresAt
+        #expect(f.model.expiresAt != nil && countdown != nil)
+        f.values.timeUp = true
+        try await eventually { f.model.expiryDue }
+        // Told early, before the countdown the keyboard reads runs out (the bridge would retire the session with it).
+        #expect(f.values.expiryWaits == [SessionDuration.fiveMinutes.seconds! - SessionCoordinator.expiryLead])
+        #expect(f.model.armed && f.model.phase == .listening && f.model.expiresAt == nil && f.audio.finishCount == 0)
+        let state = try #require(try keyboardView(f).state())
+        #expect(state.sessionExpiresAt == nil && state.phase == .listening)   // no countdown the keyboard would read as over
+        f.transport.push(#"{"type":"partial","seq":1,"text":"A long","stable":""}"#)
+        try await eventually { f.model.text == "A long" }
         f.model.reconcile()
-        #expect(f.model.armed && f.model.phase == .listening && f.model.expiryDue && f.model.expiresAt == nil)
-        #expect(try keyboardView(f).state()?.sessionExpiresAt == nil)   // no countdown the keyboard would read as over
+        #expect(f.model.armed && f.model.phase == .listening && f.audio.finishCount == 0)
         f.model.stopDictation()
         f.transport.push(#"{"type":"final","text":"A long one."}"#)
         try await eventually { f.model.phase == .finished }
         #expect(f.model.text == "A long one." && f.model.armed)
         f.model.reconcile()
-        #expect(!f.model.armed)                                          // then the session ends
+        #expect(!f.model.armed && f.model.notice == "Session ended.")   // then the session ends
     }
 
     /// Off, the session's time stops the dictation like Stop: what was heard lands, then the session ends.
@@ -476,16 +493,62 @@ extension SessionCoordinatorTests {
         let f = try await fixture(); defer { f.clean() }
         try await f.model.begin(source: .keyboard)
         try await ready(f)
-        f.values.date = f.values.date.addingTimeInterval(SessionDuration.fiveMinutes.seconds! + 1)
-        f.model.reconcile()
-        #expect(f.model.armed && f.model.expiryDue && f.model.expiresAt == nil)
-        try await eventually { f.audio.finishCount == 1 }
+        f.values.timeUp = true
+        try await eventually { f.model.expiryDue }
+        #expect(f.values.expiryWaits == [SessionDuration.fiveMinutes.seconds! - SessionCoordinator.expiryLead])
+        #expect(f.model.armed && f.model.expiresAt == nil && f.audio.finishCount == 1)
         try await eventually { f.transport.sent.contains { if case .string(let v) = $0 { v == ClientMessage.stop } else { false } } }
         f.transport.push(#"{"type":"final","text":"Cut short."}"#)
         try await eventually { f.model.phase == .finished }
         #expect(f.model.text == "Cut short." && f.model.armed)
         f.model.reconcile()
-        #expect(!f.model.armed)
+        #expect(!f.model.armed && f.model.notice == "Session ended.")
+    }
+
+    /// An idle session ends when its time is up, not early.
+    @Test func theSessionTimerEndsAnIdleSessionOnTime() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        try await f.model.armSession()
+        f.values.timeUp = true
+        try await eventually { f.values.expiryWaits.count == 2 }
+        #expect(f.model.armed && f.values.expiryWaits == [SessionDuration.fiveMinutes.seconds! - SessionCoordinator.expiryLead,
+                                                          SessionCoordinator.expiryLead])
+        f.values.timeUp = true
+        try await eventually { !f.model.armed }
+        #expect(!f.model.expiryDue && f.model.notice == "Session ended.")
+    }
+
+    /// A tap in the session's last seconds is not lost: in the app it starts a fresh session and the dictation.
+    @Test func aStartInTheSessionsLastSecondsBeginsAFreshSession() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        try await f.model.armSession()
+        let old = try #require(try keyboardView(f).state()?.generation)
+        f.values.timeUp = true
+        try await eventually { f.model.inLastSeconds }
+        try await f.model.begin()
+        let state = try #require(try keyboardView(f).state())
+        #expect(f.model.armed && !f.model.inLastSeconds && f.model.expiresAt != nil && f.model.notice.isEmpty)
+        #expect(state.generation != old && state.utteranceID != nil && f.audio.autoStops.count == 1)
+        try await ready(f)
+        try await eventually { f.values.expiryWaits.count == 3 }      // the fresh session has its own full length
+        #expect(f.values.expiryWaits.last == SessionDuration.fiveMinutes.seconds! - SessionCoordinator.expiryLead)
+    }
+
+    /// From the keyboard (the app is in the background and cannot start the microphone again) the session ends now,
+    /// and the keyboard offers Open Chirp as at any session's end.
+    @Test func aKeyboardStartInTheSessionsLastSecondsEndsTheSession() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        try await f.model.armSession()
+        f.values.timeUp = true
+        try await eventually { f.model.inLastSeconds }
+        let keyboard = try keyboardView(f)
+        let state = try #require(try keyboard.state())
+        try keyboard.send(BridgeCommand(generation: state.generation, utteranceID: UUID(), action: .start,
+                                        createdAt: Date(), expiresAt: Date().addingTimeInterval(10)))
+        f.model.reconcile()
+        try await eventually { !f.model.armed }
+        #expect(f.audio.autoStops.isEmpty && f.model.notice == "Session ended.")
+        #expect(try keyboardView(f).state() == nil)
     }
 
     @Test func theSessionsTimeEndsAnIdleSessionAtOnce() async throws {
@@ -493,6 +556,6 @@ extension SessionCoordinatorTests {
         try await f.model.armSession()
         f.values.date = f.values.date.addingTimeInterval(SessionDuration.fiveMinutes.seconds! + 1)
         f.model.reconcile()
-        #expect(!f.model.armed && !f.model.expiryDue)
+        #expect(!f.model.armed && !f.model.expiryDue && f.model.notice == "Session ended.")
     }
 }

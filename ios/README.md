@@ -283,6 +283,9 @@ Interruptions (calls, Siri, route changes) and expiry end the session safely.
 If the session length runs out during a dictation, the dictation is not thrown
 away: it stops as if you tapped Stop and its text lands (with Keep listening
 until I stop it carries on until you stop it), then the session ends.
+Starting a dictation in the app in the session's last five seconds starts a
+fresh session with it; from Chirp Keyboard the session ends and the keyboard
+offers Open Chirp.
 When dictation fails partway — the connection drops, the computer answers with an
 error, or it doesn't finish in time — Chirp **keeps what was heard**. The last
 live text lands as plain text, with no clean-up, and the notice says why

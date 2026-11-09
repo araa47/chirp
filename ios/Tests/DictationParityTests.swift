@@ -83,11 +83,13 @@ struct DictationParityTests {
     }
 
     @Test func keepListeningHasNoPauseAndNoTenMinuteTimer() async throws {
+        let off = try await fixture(); defer { off.clean() }
+        off.model.preferences.stopOnPause = true; off.model.preferences.pauseSeconds = 1.5; off.model.savePreferences()
+        try await off.model.begin()
+        #expect(off.audio.autoStops.last?.silence == 1.5 && off.model.limitsUtterance && !off.model.keepListening)
+        // A second fixture: a fixture's streams share one synthetic transport, so a second dictation would miss its `ready`.
         let f = try await fixture(); defer { f.clean() }
-        f.model.preferences.stopOnPause = true; f.model.preferences.pauseSeconds = 1.5; f.model.savePreferences()
-        try await f.model.begin()
-        #expect(f.audio.autoStops.last?.silence == 1.5 && f.model.limitsUtterance && !f.model.keepListening)
-        f.model.cancelDictation()
+        f.model.preferences.stopOnPause = true; f.model.preferences.pauseSeconds = 1.5
         f.model.preferences.continuousListening = true; f.model.savePreferences()
         try await f.model.begin()
         #expect(f.audio.autoStops.last?.silence == nil && !f.model.limitsUtterance && f.model.keepListening)
