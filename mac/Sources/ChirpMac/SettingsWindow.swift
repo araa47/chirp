@@ -90,6 +90,7 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
         s.activationMode = settings.activationMode
         s.autoEnter = settings.autoEnter
         s.autoStopSilence = settings.autoStopSilence
+        s.continuousListening = settings.continuousListening
         s.serverURL = settings.serverURL
         s.tokenPresent = ServerConfig.readToken() != nil
         s.launch = LaunchAtLogin.state
@@ -399,6 +400,8 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
         form.mode.action = #selector(modeChanged(_:))
         form.silence.target = self
         form.silence.action = #selector(silenceChanged(_:))
+        form.keepListening.target = self
+        form.keepListening.action = #selector(toggleKeepListening(_:))
         form.sounds.target = self
         form.sounds.action = #selector(toggleSounds(_:))
         form.soundPack.target = self
@@ -756,8 +759,13 @@ final class SettingsWindowController: NSObject, NSTextFieldDelegate {
 
     @objc private func modeChanged(_ sender: NSPopUpButton) {
         settings.activationMode = (sender.selectedItem?.representedObject as? String).flatMap(ActivationMode.init(rawValue:)) ?? .autoStop
-        form?.showMode(settings.activationMode, silence: settings.autoStopSilence)
+        form?.showMode(settings.activationMode, silence: settings.autoStopSilence, continuous: settings.continuousListening)
         onHotkeyChange?()
+    }
+
+    @objc private func toggleKeepListening(_ sender: NSButton) {
+        settings.continuousListening = sender.state == .on
+        form?.showMode(settings.activationMode, silence: settings.autoStopSilence, continuous: settings.continuousListening)
     }
 
     @objc private func silenceChanged(_ sender: NSPopUpButton) {

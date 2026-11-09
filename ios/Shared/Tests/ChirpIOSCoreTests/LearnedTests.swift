@@ -153,4 +153,24 @@ struct StopOnPausePreferenceTests {
         let old = try JSONDecoder().decode(IOSPreferences.self, from: JSONEncoder().encode(IOSPreferences()))
         #expect(old.stopOnPause == nil && old.learnFromEdits == nil)
     }
+
+    @Test func keepListeningIsOffByDefaultRoundTripsAndOverridesThePause() throws {
+        var prefs = IOSPreferences()
+        #expect(!prefs.continuousListening)
+        // A file from before the setting decodes with it off.
+        let older = try JSONDecoder().decode(IOSPreferences.self, from: Data(#"{"stopOnPause":true}"#.utf8))
+        #expect(!older.continuousListening && older.autoStopSilence == AutoStopDetector.defaultSilence)
+        prefs.stopOnPause = true; prefs.pauseSeconds = 3
+        prefs.continuousListening = true
+        #expect(prefs.autoStopSilence == nil)
+        let data = try JSONEncoder().encode(prefs)
+        #expect(String(decoding: data, as: UTF8.self).contains(#""continuousListening":true"#))
+        let back = try JSONDecoder().decode(IOSPreferences.self, from: data)
+        #expect(back == prefs && back.continuousListening && back.autoStopSilence == nil && back.pauseLength == 3)
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try PreferenceStore(root: root)
+        try store.save(prefs)
+        #expect(try PreferenceStore(root: root).load().continuousListening)
+    }
 }

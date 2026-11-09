@@ -90,6 +90,8 @@ final class DictationController {
     private var startOptions = StartOptions()
     /// The hotkey's presses for the current mode and shortcut; rebuilt whenever the hotkey is registered.
     private var gesture = HotkeyGesture()
+    /// "Keep listening until I stop", read when each dictation starts.
+    private var continuous = false
 
     /// Legacy-server fallback; current servers advertise their effective budget.
     static let correctionTimeout: TimeInterval = 12
@@ -331,7 +333,9 @@ final class DictationController {
         capturedSeconds = 0
         privateDictation = privateSession.isActive
         hud.model.privateSession = privateDictation
-        hud.model.duration = "0:00 / 10:00"
+        continuous = settings.continuousListening
+        machine.continuous = continuous
+        hud.model.duration = DictationCaptureSink.durationLabel(0, continuous: continuous)
         lastHistoryID = nil
         // A new dictation ends the last one's edit window (what the user changed so far is learned).
         if privateDictation { learning?.watcher.cancel() } else { learning?.watcher.finish() }
@@ -367,18 +371,18 @@ final class DictationController {
     }
 
     private func startStreaming(epoch myEpoch: Int) {
-        let config = settings.serverConfig(), options = startOptions
+        let config = settings.serverConfig(), options = startOptions, continuous = self.continuous
         let session = RollingDictationSession(
             correctionTimeout: health?.operationTimeout(.dictation, fallback: Self.correctionTimeout) ?? Self.correctionTimeout,
-            commands: settings.spokenCommands,
+            commands: settings.spokenCommands, maxTotal: continuous ? nil : RollingDictationSegmenter.maxTotal,
             makeStream: { StreamSession(config: config, options: options) })
         self.session = session
-        let autoStop = machine.mode == .autoStop ? AutoStopDetector(silence: settings.autoStopSilence) : nil
-        let sink = CaptureSink(session: session, autoStop: autoStop) { [weak self] level, elapsed in
+        let sink = DictationCaptureSink(mode: machine.mode, continuous: continuous, autoStopSilence: settings.autoStopSilence,
+                                        send: { session.sendAudio($0) }) { [weak self] level, elapsed in
             Task { @MainActor in
                 guard let self, self.epoch == myEpoch else { return }
                 self.hud.model.pushLevel(level.rms)
-                self.hud.model.duration = Self.durationLabel(elapsed)
+                self.hud.model.duration = DictationCaptureSink.durationLabel(elapsed, continuous: continuous)
             }
         } onSilence: { [weak self] in
             Task { @MainActor in
@@ -394,7 +398,7 @@ final class DictationController {
             // The whole dictation, across ordered rolling sockets, is limited to ten minutes.
             Task { @MainActor in
                 guard let self, self.epoch == myEpoch, self.machine.state == .listening else { return }
-                chirpLog.info("dictation limit reached seconds=\(Int(CaptureSink.limitSeconds), privacy: .public)")
+                chirpLog.info("dictation limit reached seconds=\(Int(DictationCaptureSink.limitSeconds), privacy: .public)")
                 self.send(.toggle)
             }
         }
@@ -483,11 +487,6 @@ final class DictationController {
 
     /// A server that rejected one rolling segment.
     static let tooLong = "This dictation segment was too long — try again"
-
-    private static func durationLabel(_ seconds: TimeInterval) -> String {
-        let total = min(Int(seconds), Int(RollingDictationSegmenter.maxTotal))
-        return String(format: "%d:%02d / 10:00", total / 60, total % 60)
-    }
 
     private static func friendly(code: String, message: String) -> String {
         switch code {
@@ -879,51 +878,5 @@ extension DictationController {
         }
         chirpLog.info("dictation paste_last")
         insert(text)
-    }
-}
-
-/// Runs on the audio thread: forwards frames to the socket in order and measures levels.
-final class CaptureSink: @unchecked Sendable {
-    private let session: RollingDictationSession
-    private let onLevel: @Sendable (Level, TimeInterval) -> Void
-    private let onSilence: @Sendable () -> Void
-    private let lock = NSLock()
-    private let onAutoStop: @Sendable () -> Void
-    private let onLimit: @Sendable () -> Void
-    private var limitSent = false
-    private var guardState = SilenceGuard()
-    private var autoStop: AutoStopDetector?
-    private var clock: TimeInterval = 0
-
-    init(session: RollingDictationSession, autoStop: AutoStopDetector? = nil, onLevel: @escaping @Sendable (Level, TimeInterval) -> Void,
-         onSilence: @escaping @Sendable () -> Void, onAutoStop: @escaping @Sendable () -> Void = {},
-         onLimit: @escaping @Sendable () -> Void = {}) {
-        self.session = session
-        self.autoStop = autoStop
-        self.onLevel = onLevel
-        self.onSilence = onSilence
-        self.onAutoStop = onAutoStop
-        self.onLimit = onLimit
-    }
-
-    /// Total capture ceiling; the socket wrapper rolls individual segments below the protocol limit.
-    static let limitSeconds = RollingDictationSegmenter.maxTotal
-
-    /// `muted`: the frame was zeroed for the start cue. It is sent and counted, but the silence and auto-stop
-    /// detectors do not hear it (as before, when the microphone opened after the cue).
-    func handle(_ frame: Data, muted: Bool = false) {
-        session.sendAudio(frame)
-        let level = muted ? .zero : Level(pcm16: frame)
-        let (silent, paused, limit, elapsed) = lock.withLock { () -> (Bool, Bool, Bool, TimeInterval) in
-            clock += Double(frame.count / 2) / PCMConverter.sampleRate
-            let limit = !limitSent && clock >= Self.limitSeconds
-            if limit { limitSent = true }
-            guard !muted else { return (false, false, limit, clock) }
-            return (guardState.feed(level, at: clock), autoStop?.feed(level, at: clock) ?? false, limit, clock)
-        }
-        onLevel(level, elapsed)
-        if silent { onSilence() }
-        if paused { onAutoStop() }
-        if limit { onLimit() }
     }
 }

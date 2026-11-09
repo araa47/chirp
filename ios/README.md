@@ -353,6 +353,14 @@ land in order with a space between them. Undo and Use raw apply to the last
 part, and a part that fails keeps what it heard. A dictation stops just under
 10 minutes.
 
+**Keep listening until I stop** (Settings → Dictation → Stop dictation, off by
+default) ends a dictation only on Stop, Cancel, or leaving the keyboard or the
+app, in the app and in Chirp Keyboard. It hides When I tap / When I pause, and
+there is no 10-minute limit: parts keep rolling under the server's 120-second
+cap, and a silent stretch in the middle is not an error. If the session length
+runs out mid-dictation, the session waits for the
+dictation to finish and then ends.
+
 If the server runs with `--debug-retain`, a persistent red banner "DEBUG RETENTION IS ON" stays on screen in the app, keyboard and Live Activity.
 
 ![Dictate listening, light](../docs/screenshots/ios/iphone-dictate-listening.png)

@@ -107,6 +107,13 @@ public final class Preferences: @unchecked Sendable {
         }
         set { defaults.set(newValue.isFinite ? min(max(newValue, 0.5), 10) : AutoStopDetector.defaultSilence, forKey: "autoStopSilence") }
     }
+    /// "Keep listening until I stop": a dictation ends only when the user ends it (the shortcut again, letting go in
+    /// hold to talk, Esc). Pauses, the no-speech timeout, the ten-minute ceiling and a silent microphone after it has
+    /// heard something never do. Off by default; it overrides auto-stop's pause.
+    public var continuousListening: Bool {
+        get { defaults.bool(forKey: "continuousListening") }
+        set { defaults.set(newValue, forKey: "continuousListening") }
+    }
     /// Press Return after a successful insertion: off (the default), always, or only in apps with a Chat style rule.
     public var autoEnter: AutoEnter {
         get { defaults.string(forKey: "autoEnter").flatMap(AutoEnter.init(rawValue:)) ?? .off }

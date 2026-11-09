@@ -426,3 +426,51 @@ final class FlakyHTTP: URLProtocol, @unchecked Sendable {
     }
     override func stopLoading() {}
 }
+
+/// "Keep listening until I stop" (#381) from Chirp Keyboard, and the session's own time running out mid-dictation.
+@MainActor
+extension SessionCoordinatorTests {
+    @Test func theKeyboardsDictationReadsKeepListening() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        f.model.preferences.stopOnPause = true; f.model.preferences.continuousListening = true; f.model.savePreferences()
+        // The shared preferences file the keyboard's session uses has it.
+        #expect(try f.stores.preferences.load().continuousListening)
+        try await f.model.armSession()
+        let keyboard = try keyboardView(f)
+        let state = try #require(try keyboard.state())
+        let id = UUID()
+        try keyboard.send(BridgeCommand(generation: state.generation, utteranceID: id, action: .start,
+                                        createdAt: Date(), expiresAt: Date().addingTimeInterval(10)))
+        f.model.reconcile()
+        try await eventually { f.audio.autoStops.count == 1 }
+        #expect(f.audio.autoStops.last?.silence == nil && !f.model.limitsUtterance && f.model.keepListening)
+        #expect(try keyboardView(f).state()?.utteranceID == id)
+    }
+
+    @Test func theSessionsTimeWaitsForADictationThatKeepsListening() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        f.model.preferences.continuousListening = true; f.model.savePreferences()
+        try await f.model.begin(source: .keyboard)
+        try await ready(f)
+        #expect(f.model.expiresAt != nil)
+        f.values.date = f.values.date.addingTimeInterval(SessionDuration.fiveMinutes.seconds! + 1)
+        f.model.reconcile()
+        #expect(f.model.armed && f.model.phase == .listening && f.model.expiryDue && f.model.expiresAt == nil)
+        #expect(try keyboardView(f).state()?.sessionExpiresAt == nil)   // no countdown the keyboard would read as over
+        f.model.stopDictation()
+        f.transport.push(#"{"type":"final","text":"A long one."}"#)
+        try await eventually { f.model.phase == .finished }
+        #expect(f.model.text == "A long one." && f.model.armed)
+        f.model.reconcile()
+        #expect(!f.model.armed)                                          // then the session ends
+    }
+
+    @Test func offTheSessionsTimeStillEndsADictation() async throws {
+        let f = try await fixture(); defer { f.clean() }
+        try await f.model.begin(source: .keyboard)
+        try await ready(f)
+        f.values.date = f.values.date.addingTimeInterval(SessionDuration.fiveMinutes.seconds! + 1)
+        f.model.reconcile()
+        #expect(!f.model.armed && !f.model.expiryDue)
+    }
+}
