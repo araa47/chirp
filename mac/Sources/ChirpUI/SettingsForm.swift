@@ -18,6 +18,8 @@ public struct SettingsState: Sendable {
     public var autoEnter: AutoEnter = .off
     /// Auto-stop: seconds of quiet that end a dictation.
     public var autoStopSilence = AutoStopDetector.defaultSilence
+    /// Dictation: "Keep listening until I stop" (off by default).
+    public var continuousListening = false
     public var serverURL = ServerConfig.defaultURL.absoluteString
     public var tokenPresent = true
     public var launch: LaunchState = .off
@@ -158,7 +160,8 @@ public enum SettingsTab: String, CaseIterable, Sendable {
     public var keywords: [String] {
         switch self {
         case .general: ["startup", "launch at login", "dock", "permissions", "microphone", "accessibility", "setup"]
-        case .dictation: ["shortcuts", "hotkey", "hold to talk", "auto-stop", "stop", "silence", "return", "word waveform",
+        case .dictation: ["shortcuts", "hotkey", "hold to talk", "auto-stop", "stop", "silence", "keep listening", "continuous",
+                          "pause", "return", "word waveform",
                           "sounds", "volume", "input device", "use raw", "new note", "spoken commands", "new line", "new paragraph"]
         case .privacy: ["history", "dictation history", "recent dictations", "retention", "clear", "privacy", "learn",
                         "learned", "edits", "vocabulary", "terms", "private session", "never keep", "excluded"]
@@ -223,6 +226,8 @@ public final class SettingsForm {
     /// Auto-stop or hold to talk, and (auto-stop only) how long a pause ends the dictation.
     public let mode = NSPopUpButton(frame: .zero, pullsDown: false)
     public let silence = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// "Keep listening until I stop": overrides auto-stop's pause (the Stop after menu is disabled while it is on).
+    public let keepListening = NSButton(checkboxWithTitle: "Keep listening until I stop", target: nil, action: nil)
     /// Press Return after inserting: Off, Always, or in chat apps only.
     public let autoEnter = NSPopUpButton(frame: .zero, pullsDown: false)
     private let modeHelp = SettingsForm.help("")
@@ -467,6 +472,7 @@ public final class SettingsForm {
             SettingsSection("Dictating", [
                 row("Mode", mode, help: modeHelp),
                 row("Stop after", silence),
+                row(nil, keepListening, help: Self.help("Chirp keeps the microphone on through pauses and long dictations. It stops only when you press the shortcut again.")),
                 row("Microphone", microphone, help: Self.help("Follows the system default unless you pick one. Applies from the next dictation.")),
                 row(nil, wordWaveform, help: Self.help("Draws each word's audio above it as you speak, so you can see what was heard.")),
                 notchRow,
@@ -696,7 +702,7 @@ public final class SettingsForm {
             fillHotkeyMenu(selecting: s.hotkey, taken: ChirpShortcut.dictation.taken(s.combo(for:)))
             showShortcuts(s)
             alwaysInDock.state = s.alwaysShowInDock ? .on : .off
-            showMode(s.activationMode, silence: s.autoStopSilence)
+            showMode(s.activationMode, silence: s.autoStopSilence, continuous: s.continuousListening)
             autoEnter.selectItem(at: AutoEnter.allCases.firstIndex(of: s.autoEnter) ?? 0)
             sounds.state = s.soundsEnabled ? .on : .off
             showPack(s.soundPack)
@@ -962,18 +968,20 @@ public final class SettingsForm {
         styleHelp.stringValue = text
     }
 
-    /// Selects `mode` and the auto-stop pause (the nearest offered one), which only matters in auto-stop.
-    public func showMode(_ m: ActivationMode, silence seconds: TimeInterval) {
+    /// Selects `mode`, the auto-stop pause (the nearest offered one) and "Keep listening until I stop". The pause
+    /// only matters in auto-stop with keep listening off.
+    public func showMode(_ m: ActivationMode, silence seconds: TimeInterval, continuous: Bool) {
         if let i = mode.itemArray.firstIndex(where: { $0.representedObject as? String == m.rawValue }) { mode.selectItem(at: i) }
-        modeHelp.stringValue = m.help(singleModifierKey: shownHotkey.isSingleModifierKey)
+        keepListening.state = continuous ? .on : .off
+        modeHelp.stringValue = m.help(singleModifierKey: shownHotkey.isSingleModifierKey, continuous: continuous)
         let nearest = AutoStopDetector.silenceChoices.enumerated().min { abs($0.element - seconds) < abs($1.element - seconds) }
         if let nearest { silence.selectItem(at: nearest.offset) }
-        silence.isEnabled = m == .autoStop
+        silence.isEnabled = m == .autoStop && !continuous
     }
 
     private func refreshHotkeyHelp() {
         if let raw = mode.selectedItem?.representedObject as? String, let m = ActivationMode(rawValue: raw) {
-            modeHelp.stringValue = m.help(singleModifierKey: shownHotkey.isSingleModifierKey)
+            modeHelp.stringValue = m.help(singleModifierKey: shownHotkey.isSingleModifierKey, continuous: keepListening.state == .on)
         }
         fnKeySetupRow?.isHidden = !(shownHotkey.isModifierOnly && shownHotkey.modifiers == ModifierKeys.fn)
         hotkeyHelp.textColor = .secondaryLabelColor

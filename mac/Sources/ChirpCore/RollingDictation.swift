@@ -42,6 +42,8 @@ public final class RollingDictationSession: @unchecked Sendable {
     private let makeStream: @Sendable () -> StreamSession
     private let correctionTimeout: TimeInterval
     private let commands: Bool
+    /// The whole dictation's ceiling in seconds of audio; nil ("Keep listening until I stop") rolls segments forever.
+    private let maxTotal: TimeInterval?
     private var segments: [Segment] = []
     private var segmenter = RollingDictationSegmenter()
     private var totalBytes = 0
@@ -69,9 +71,11 @@ public final class RollingDictationSession: @unchecked Sendable {
     }
 
     public init(correctionTimeout: TimeInterval, commands: Bool = false,
+                maxTotal: TimeInterval? = RollingDictationSegmenter.maxTotal,
                 makeStream: @escaping @Sendable () -> StreamSession) {
         self.correctionTimeout = correctionTimeout
         self.commands = commands
+        self.maxTotal = maxTotal
         self.makeStream = makeStream
         (events, output) = AsyncStream.makeStream(of: StreamEvent.self)
     }
@@ -88,7 +92,7 @@ public final class RollingDictationSession: @unchecked Sendable {
         lock.withLock {
             guard !closed, !stopped else { return }
             if segments.isEmpty { appendSegment() }
-            let ceiling = Int(RollingDictationSegmenter.maxTotal * PCMConverter.sampleRate) * 2
+            let ceiling = maxTotal.map { Int($0 * PCMConverter.sampleRate) * 2 } ?? .max
             // Normal capture frames are 50 ms. Limit chunks here too so a delayed callback cannot overshoot a cap.
             var offset = 0
             while offset + 1 < data.count, totalBytes < ceiling {

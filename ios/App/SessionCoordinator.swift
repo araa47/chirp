@@ -94,6 +94,14 @@ final class SessionCoordinator: ObservableObject {
     private var expiry: Task<Void, Never>?
     private var deadline: Task<Void, Never>?
     private var utteranceLimit: Task<Void, Never>?
+    /// The 10-minute ceiling is armed for the live dictation (never with "Keep listening until I stop").
+    var limitsUtterance: Bool { utteranceLimit != nil }
+    /// "Keep listening until I stop", read when each dictation starts.
+    private(set) var keepListening = false
+    /// The session's time ran out during a dictation: the session ends once that dictation does.
+    private(set) var expiryDue = false
+    /// The session is in its last `expiryLead` seconds (the timer is waiting them out): a start begins a fresh session.
+    private(set) var inLastSeconds = false
     private var eventTask: Task<Void, Never>?
     private var rawExpiry: Task<Void, Never>?
     /// When Use raw stops being offered after a final (five seconds on), for its countdown label.
@@ -114,6 +122,8 @@ final class SessionCoordinator: ObservableObject {
     private var liveFinal: (result: FinalResult, kept: Bool)?
     private var timer: SessionTimer?
     private let network: () -> SessionTiming.Network
+    /// The session-length timer's wait (tests stand in for the minutes).
+    private let waitForExpiry: (TimeInterval) async -> Void
     private var startingUtterance = false
     private let signal = DarwinSignal(name: DarwinSignal.bridgeChanged)
 
@@ -130,6 +140,7 @@ final class SessionCoordinator: ObservableObject {
          appActive: @escaping () -> Bool = { UIApplication.shared.applicationState == .active },
          now: @escaping () -> Date = Date.init,
          network: @escaping () -> SessionTiming.Network = { NetworkKind.shared.current },
+         waitForExpiry: @escaping (TimeInterval) async -> Void = { try? await Task.sleep(for: .seconds($0)) },
          production: Bool = true) {
         #if DEBUG
         self.audio = audio ?? SimulatorFileAudio.fromArguments() ?? MicrophoneCapture()
@@ -139,6 +150,7 @@ final class SessionCoordinator: ObservableObject {
         self.http = http; self.makeStream = makeStream; self.requestPermission = requestPermission; self.permissionGranted = permissionGranted
         self.activityBegin = activityBegin; self.activityActive = activityActive
         self.activityUpdate = activityUpdate; self.activityEnd = activityEnd; self.copyText = copyText; self.appActive = appActive; self.now = now; self.network = network
+        self.waitForExpiry = waitForExpiry
         do {
             let stores = try services ?? (production ? AppServices.production() : nil)
             self.services = stores
@@ -332,14 +344,21 @@ final class SessionCoordinator: ObservableObject {
                     guard !Task.isCancelled, self.armed else { return }
                     self.publishState(); self.processCommands()
                 }
-                catch { self.endSession(code: .interrupted); return }
+                catch { if self.armed { self.endSession(code: .interrupted) }; return }
             }
         }
         if let seconds = preferences.sessionDuration.seconds {
+            let wait = waitForExpiry
             expiry = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(seconds))
-                guard !Task.isCancelled else { return }
-                self?.endSession(code: .timeout)
+                // A dictation hears that the time is up `expiryLead` early; an idle session ends on time.
+                await wait(seconds - Self.expiryLead)
+                guard !Task.isCancelled, let self else { return }
+                if self.stream == nil {
+                    self.inLastSeconds = true
+                    await wait(Self.expiryLead)
+                    guard !Task.isCancelled else { return }
+                }
+                self.expire()
             }
         }
     }
@@ -359,10 +378,20 @@ final class SessionCoordinator: ObservableObject {
             reached(checked)
         }
         try reconcileOrThrow()
+        // In the session's last seconds a dictation would only be cut off. In the app a fresh session starts with it;
+        // from the keyboard or in the background, where the microphone cannot start again, the session ends now and the
+        // keyboard offers Open Chirp, as at any session's end.
+        if inLastSeconds || expiresAt.map({ now() >= $0 - Self.expiryLead }) == true {
+            endSession(code: .timeout)
+            guard source != .keyboard, appActive() else { throw SessionFailure.expired }
+            notice = ""; startingUtterance = false
+            return try await begin(source: source, id: id, autoStop: autoStop)
+        }
         guard stream == nil, let config else { throw SessionFailure.setup }
         clearUtterance()
         lastError = nil
         utterance = id; companion = source == .companion ? id : nil; utteranceSource = source
+        keepListening = preferences.continuousListening
         timer = SessionTimer(now: now())
         privateUtterance = preferences.privacyMode
         var options = StartOptions(client: "ios", correction: health.map { preferences.permitsCorrection(health: $0) } ?? false,
@@ -386,7 +415,7 @@ final class SessionCoordinator: ObservableObject {
             } }, onCut: { [weak self] in Task { @MainActor in
                 guard let self, self.armed, self.lifecycle == ticket, self.utterance == id else { return }
                 self.rollOver()
-            } }, autoStop: autoStop ? preferences.autoStopSilence : nil, onAutoStop: { [weak self] in Task { @MainActor in
+            } }, autoStop: autoStop && !keepListening ? preferences.autoStopSilence : nil, onAutoStop: { [weak self] in Task { @MainActor in
                 // Stop dictation "When I pause": the same path as tapping Stop.
                 guard let self, self.armed, self.lifecycle == ticket, self.utterance == id else { return }
                 self.stopDictation()
@@ -395,6 +424,8 @@ final class SessionCoordinator: ObservableObject {
         setPhase(.connecting)
         guard armed, utterance == id else { throw SessionFailure.storage }
         eventTask = listen(to: session, id: id)
+        // "Keep listening until I stop": no ceiling; segments keep rolling under the 120 s cap until the user stops.
+        guard !keepListening else { return }
         utteranceLimit = Task { [weak self] in
             // Each segment stays under the protocol's 120 s cap; the whole dictation stops just under 10 minutes.
             try? await Task.sleep(for: .seconds(RollingDictation.maxTotal - 1))
@@ -529,7 +560,7 @@ final class SessionCoordinator: ObservableObject {
         audio.disarm()
         let previous = stream
         clearUtterance(error: SessionFailure.expired)
-        heartbeat?.cancel(); heartbeat = nil; expiry?.cancel(); expiry = nil; expiresAt = nil
+        heartbeat?.cancel(); heartbeat = nil; expiry?.cancel(); expiry = nil; expiresAt = nil; expiryDue = false; inLastSeconds = false
         generation = UUID(); phase = .idle; lastError = nil
         if let code { record(code); notice = code == .timeout ? "Session ended." : "Session interrupted. Open Chirp to start again." }
         else { notice = "Session ended. Microphone off." }
@@ -538,12 +569,33 @@ final class SessionCoordinator: ObservableObject {
         do { try services?.bridge.endSession(); signal.post() } catch { notice = SessionFailure.storage.localizedDescription }
     }
 
+    /// A dictation hears that the session's time is up this long before the end. The shared bridge drops a state, and
+    /// retires its session, once its `sessionExpiresAt` has passed, so a countdown taken away later than that (by a
+    /// timer that wakes late, or the 2 s heartbeat) would end the session with the dictation in it.
+    static let expiryLead: TimeInterval = 5
+
+    /// The session's time is up. A dictation under way is never thrown away: it stops as if Stop were tapped and its
+    /// text lands, or with "Keep listening until I stop" it carries on until the user stops it. The countdown goes away
+    /// and the session ends once the dictation has finished (the heartbeat checks `expiryDue`).
+    private func expire() {
+        guard armed else { return }
+        guard stream != nil else { endSession(code: .timeout); return }
+        expiryDue = true; expiresAt = nil; expiry?.cancel(); expiry = nil
+        if !keepListening { stopDictation() }
+        publishState()
+    }
+
     func refreshSetup() { keyboardReady = (try? services?.keyboardSetup.fullAccessSeenAt()) != nil }
 
-    func reconcile() { if armed { do { try reconcileOrThrow(); processCommands() } catch { endSession(code: .interrupted) } } }
+    /// A throw after the session already ended (its time ran out) leaves that ending and its notice as they are.
+    func reconcile() { if armed { do { try reconcileOrThrow(); processCommands() } catch { if armed { endSession(code: .interrupted) } } } }
     private func reconcileOrThrow() throws {
         guard armed else { throw SessionFailure.expired }
-        if let expiresAt, now() >= expiresAt { endSession(code: .timeout); throw SessionFailure.expired }
+        if expiryDue, stream == nil { endSession(code: .timeout); throw SessionFailure.expired }
+        if let expiresAt, now() >= expiresAt - (stream == nil ? 0 : Self.expiryLead) {
+            expire()
+            guard armed else { throw SessionFailure.expired }
+        }
         guard activityActive() else { throw SessionFailure.audio }
         guard permissionGranted() else { throw SessionFailure.permission }
     }
@@ -807,7 +859,7 @@ final class SessionCoordinator: ObservableObject {
                     Task {
                         guard armed, expected == generation else { return }
                         do { try await begin(source: .keyboard, id: id) }
-                        catch { notice = "Dictation unavailable. Finish the current utterance first." }
+                        catch { if armed { notice = "Dictation unavailable. Finish the current utterance first." } }
                     }
                 case .stop: if command.utteranceID == utterance { stopDictation() }
                 case .cancel: if command.utteranceID == utterance { cancelDictation() }
@@ -820,7 +872,7 @@ final class SessionCoordinator: ObservableObject {
                     if let id = command.utteranceID, id == utterance, companion == id { typedByKeyboard = id; publishState() }
                 }
             }
-        } catch { endSession(code: .storage) }
+        } catch { if armed { endSession(code: .storage) } }
     }
     /// One content-free timing entry per dictation; later calls for the same dictation do nothing.
     private func finishTiming(_ outcome: SessionTiming.Outcome, error: DiagnosticCode? = nil) {

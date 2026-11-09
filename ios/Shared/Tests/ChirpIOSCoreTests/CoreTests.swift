@@ -312,6 +312,27 @@ struct BridgeTests {
         #expect(throws: CoreError.staleGeneration) { try keyboard.send(BridgeCommand(generation: generation, action: .end, createdAt: clock.now(), expiresAt: clock.now() + 5)) }
         #expect(try keyboard.state()?.generation == next)
     }
+    /// Why the app tells a dictation early that the session's time is up (#381): once `sessionExpiresAt` has passed,
+    /// the next bridge operation (a partial, the keyboard looking) retires the session, so it can no longer carry on.
+    @Test func aSessionCarriesOnPastItsTimeOnlyIfTheCountdownGoesFirst() throws {
+        let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let clock = TestClock(), secrets = MemorySecretStore(), utterance = UUID()
+        let app = try SharedBridge(root: root, secrets: secrets, role: .app, now: clock.now)
+        let keyboard = try SharedBridge(root: root, secrets: secrets, role: .keyboard, now: clock.now)
+        func state(_ generation: UUID, ends: Date?) -> BridgeState {
+            BridgeState(generation: generation, phase: .listening, utteranceID: utterance, leaseUntil: clock.now() + 8, sessionExpiresAt: ends)
+        }
+        let early = UUID()
+        try app.publish(state(early, ends: clock.now() + 5))
+        clock.advance(2); try app.publish(state(early, ends: nil))              // the countdown goes before it runs out
+        clock.advance(4); try app.publish(state(early, ends: nil))              // past the old time, still the same session
+        #expect(try keyboard.state()?.generation == early)
+        let late = UUID()
+        try app.publish(state(late, ends: clock.now() + 5))
+        clock.advance(6)
+        #expect(try keyboard.state() == nil)                                    // ran out first: retired
+        #expect(throws: CoreError.staleGeneration) { try app.publish(state(late, ends: nil)) }
+    }
     @Test func queueBoundAndConcurrentWriters() async throws {
         let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let clock = TestClock(), secrets = MemorySecretStore(), generation = UUID()

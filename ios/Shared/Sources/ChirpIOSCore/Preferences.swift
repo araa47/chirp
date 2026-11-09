@@ -30,9 +30,13 @@ public struct IOSPreferences: Codable, Sendable, Equatable {
     public var stopOnPause: Bool?
     /// The pause that stops it, one of `AutoStopDetector.silenceChoices`; nil is the default (2 s).
     public var pauseSeconds: Double?
+    /// "Keep listening until I stop" (#381): only Stop, Cancel or leaving the keyboard or app ends a dictation. It
+    /// overrides "When I pause" and lifts the 10-minute ceiling. Off by default, and when absent from an older file.
+    public var continuousListening = false
     public init() {}
     private enum CodingKeys: String, CodingKey {
         case correction, styleID, prompts, sessionDuration, privacyMode, consentHost, spokenCommands, autoEnter, hardwareShortcut, learnFromEdits, stopOnPause, pauseSeconds
+        case continuousListening
     }
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -48,6 +52,7 @@ public struct IOSPreferences: Codable, Sendable, Equatable {
         learnFromEdits = try values.decodeIfPresent(Bool.self, forKey: .learnFromEdits)
         stopOnPause = try values.decodeIfPresent(Bool.self, forKey: .stopOnPause)
         pauseSeconds = try values.decodeIfPresent(Double.self, forKey: .pauseSeconds)
+        continuousListening = try values.decodeIfPresent(Bool.self, forKey: .continuousListening) ?? false
     }
     public var learning: Bool { learnFromEdits != false }
     /// The pause length offered nearest to the stored one.
@@ -55,8 +60,8 @@ public struct IOSPreferences: Codable, Sendable, Equatable {
         guard let pauseSeconds, pauseSeconds.isFinite else { return AutoStopDetector.defaultSilence }
         return AutoStopDetector.silenceChoices.min { abs($0 - pauseSeconds) < abs($1 - pauseSeconds) } ?? AutoStopDetector.defaultSilence
     }
-    /// The silence that ends a dictation, nil when only Stop does.
-    public var autoStopSilence: TimeInterval? { stopOnPause == true ? pauseLength : nil }
+    /// The silence that ends a dictation, nil when only Stop does (always with "Keep listening until I stop").
+    public var autoStopSilence: TimeInterval? { stopOnPause == true && !continuousListening ? pauseLength : nil }
     public func permitsCorrection(health: Health) -> Bool {
         guard correction, health.correctionAvailable else { return false }
         if health.correctionLeavesMachine == false { return true }

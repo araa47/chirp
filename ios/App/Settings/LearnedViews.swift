@@ -53,31 +53,43 @@ enum StopText {
     static let tap = "When I tap"
     static let pause = "When I pause"
     static let length = "Pause length"
+    static let keepListening = "Keep listening until I stop"
+    static let keepListeningHelp = "Chirp keeps the microphone on through pauses and long dictations. It stops only when you tap Stop."
     static func seconds(_ value: TimeInterval) -> String {
         (value.rounded() == value ? String(Int(value)) : String(value)) + " s"
     }
-    static func info(onPause: Bool) -> String {
-        onPause
-            ? "Chirp stops after you pause, judged against the room’s background noise. It never stops before you speak, and gives up after 10 seconds of silence. Stop always works, and a hardware key held to talk ignores pauses. Either way, dictation ends at 10 minutes."
-            : "Tap Stop to finish. Either way, dictation ends at 10 minutes."
+    static func info(onPause: Bool, keepListening: Bool = false) -> String {
+        if keepListening {
+            return keepListeningHelp + " Pauses, silence and long dictations never end it, and there is no 10-minute limit. Cancel, or leaving the keyboard or Chirp, also ends it."
+        }
+        return onPause
+            ? "Chirp stops after you pause, judged against the room’s background noise. It never stops before you speak, and gives up after 10 seconds of silence. Stop always works, and a hardware key held to talk ignores pauses. Either way, dictation ends at 10 minutes, unless Keep listening until I stop is on."
+            : "Tap Stop to finish. Either way, dictation ends at 10 minutes, unless Keep listening until I stop is on."
     }
 }
 
 // MARK: - Settings → Dictation
 
-/// "When I tap" (default) or "When I pause" with the pause length, read at each dictation's start.
+/// "When I tap" (default) or "When I pause" with the pause length, and "Keep listening until I stop", which hides
+/// both choices (only Stop ends it). Read at each dictation's start.
 struct StopDictationGroup: View {
     @ObservedObject var model: SessionCoordinator
     var body: some View {
         let onPause = model.preferences.stopOnPause == true
+        let keep = model.preferences.continuousListening
         SettingsGroup(title: StopText.title) {
+            SwitchRow(title: StopText.keepListening, isOn: keep, summary: StopText.keepListeningHelp,
+                      identifier: "chirp.settings.keepListening",
+                      set: { model.preferences.continuousListening = $0; model.savePreferences() })
             SettingsItem {
-                ChoiceChips(options: [false, true],
-                            selection: Binding(get: { onPause },
-                                               set: { model.preferences.stopOnPause = $0 ? true : nil; model.savePreferences() }),
-                            label: { $0 ? StopText.pause : StopText.tap })
-                    .accessibilityIdentifier("chirp.settings.stopDictation")
-                if onPause {
+                if !keep {
+                    ChoiceChips(options: [false, true],
+                                selection: Binding(get: { onPause },
+                                                   set: { model.preferences.stopOnPause = $0 ? true : nil; model.savePreferences() }),
+                                label: { $0 ? StopText.pause : StopText.tap })
+                        .accessibilityIdentifier("chirp.settings.stopDictation")
+                }
+                if onPause, !keep {
                     Text(StopText.length).font(.subheadline).foregroundStyle(Color.chirp.inkMuted)
                     ChoiceChips(options: AutoStopDetector.silenceChoices,
                                 selection: Binding(get: { model.preferences.pauseLength },
@@ -85,7 +97,7 @@ struct StopDictationGroup: View {
                                 label: StopText.seconds)
                         .accessibilityIdentifier("chirp.settings.pauseLength")
                 }
-                LearnMore(title: StopText.title, label: "About Stop dictation") { Text(StopText.info(onPause: onPause)) }
+                LearnMore(title: StopText.title, label: "About Stop dictation") { Text(StopText.info(onPause: onPause, keepListening: keep)) }
             }
         }
     }

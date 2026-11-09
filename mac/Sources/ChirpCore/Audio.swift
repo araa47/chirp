@@ -101,14 +101,22 @@ public struct Level: Sendable, Equatable {
 /// which is what a muted device or a denied microphone permission produces.
 public struct SilenceGuard: Sendable {
     public let window: TimeInterval
+    /// "Keep listening until I stop": once the input has carried any signal it is a working microphone, so later
+    /// digital silence (muted, or gated to zero during a pause) is a pause and never fires.
+    public let onlyBeforeSignal: Bool
     private var silentSince: TimeInterval?
+    private var heardSignal = false
     private var fired = false
 
-    public init(window: TimeInterval = 1.5) { self.window = window }
+    public init(window: TimeInterval = 1.5, onlyBeforeSignal: Bool = false) {
+        self.window = window
+        self.onlyBeforeSignal = onlyBeforeSignal
+    }
 
     public mutating func feed(_ level: Level, at time: TimeInterval) -> Bool {
         guard !fired else { return false }
-        if level.peak > 0 { silentSince = nil; return false }
+        if level.peak > 0 { silentSince = nil; heardSignal = true; return false }
+        if onlyBeforeSignal, heardSignal { return false }
         let since = silentSince ?? time
         silentSince = since
         if time - since >= window { fired = true; return true }

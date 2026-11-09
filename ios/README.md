@@ -280,6 +280,12 @@ minutes, 1 hour,
 Never**. Never lasts until ended, interrupted, terminated or revoked — iOS may
 still suspend the app; indefinite background execution is not guaranteed.
 Interruptions (calls, Siri, route changes) and expiry end the session safely.
+If the session length runs out during a dictation, the dictation is not thrown
+away: it stops as if you tapped Stop and its text lands (with Keep listening
+until I stop it carries on until you stop it), then the session ends.
+Starting a dictation in the app in the session's last five seconds starts a
+fresh session with it; from Chirp Keyboard the session ends and the keyboard
+offers Open Chirp.
 When dictation fails partway — the connection drops, the computer answers with an
 error, or it doesn't finish in time — Chirp **keeps what was heard**. The last
 live text lands as plain text, with no clean-up, and the notice says why
@@ -352,6 +358,13 @@ utterance without dropping audio, while the earlier one finishes. The parts
 land in order with a space between them. Undo and Use raw apply to the last
 part, and a part that fails keeps what it heard. A dictation stops just under
 10 minutes.
+
+**Keep listening until I stop** (Settings → Dictation → Stop dictation, off by
+default) ends a dictation only on Stop, Cancel, or leaving the keyboard or the
+app, in the app and in Chirp Keyboard. It hides When I tap / When I pause, and
+there is no 10-minute limit: parts keep rolling under the server's 120-second
+cap, and a silent stretch in the middle is not an error. If the session length
+runs out mid-dictation, the session waits for you to stop and then ends.
 
 If the server runs with `--debug-retain`, a persistent red banner "DEBUG RETENTION IS ON" stays on screen in the app, keyboard and Live Activity.
 

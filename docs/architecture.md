@@ -563,7 +563,7 @@ Version additions preserve existing fields. A breaking change becomes `/v2`.
 
 ## 6. Interaction model (Koi parity)
 
-- **Auto-stop or hold to talk (Mac).** Auto-stop: a press starts, a pause (or the next press) stops. Hold to talk: talk while held, release finishes; a press shorter than 300 ms is dropped. Right ⌥ (the default) does both in auto-stop: a tap toggles, a hold talks until let go. Esc on Mac, or ✕ on Android, cancels and inserts nothing.
+- **Auto-stop or hold to talk (Mac).** Auto-stop: a press starts, a pause (or the next press) stops. Hold to talk: talk while held, release finishes; a press shorter than 300 ms is dropped. Right ⌥ (the default) does both in auto-stop: a tap toggles, a hold talks until let go. Esc on Mac, or ✕ on Android, cancels and inserts nothing. **Keep listening until I stop** (#381, every platform, off by default) overrides the pause, the no-speech timeout, the 10-minute ceiling and digital silence after the microphone has carried sound: only an explicit stop ends it.
 - **Live text while speaking:**
   - Mac: a non-activating floating HUD at the bottom centre of the screen shows the partial text and a level meter.
   - Android: partials are shown as **composing text** (underlined) in the target field, via `setComposingText`. The final replaces them with `commitText`.
