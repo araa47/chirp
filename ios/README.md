@@ -650,9 +650,9 @@ Two iPadOS limits shape this: iPadOS hides on-screen keyboards, including Chirp
 Keyboard, while a hardware keyboard is attached; and keyboard extensions never
 receive hardware key presses. So there are two ways to dictate into another app:
 
-- **Show Chirp Keyboard.** Press the globe key (or Control-Space) until Chirp is
-  chosen, then use the small keyboard bar at the bottom of the screen to show
-  it, and tap Start/Stop dictation. Text goes in at the cursor as usual.
+- **The floating mic.** Dictate → Floating mic: a small pill over every app.
+  With Settings → Dictation → Floating mic → Record button on, tap it to
+  record and stop; the text is copied for ⌘V.
 - **Toggle from anywhere.** From any app press ⌘Space, type *Toggle
   dictation* and press Return; do it again to stop. Chirp copies the final
   text, so press ⌘V to paste.
@@ -707,8 +707,7 @@ dictation key starts dictating, the keyboard takes that dictation: the words
 appear in the field as you speak and the polished final replaces them, as with
 the keyboard's own mic. Nothing is copied, and Toggle says "Typed into the
 field." Without Chirp Keyboard on screen (with a hardware keyboard attached,
-iPadOS hides it until you show it from the keyboard bar), the text is copied
-for ⌘V as before. The keyboard never takes one into a secure field, or while it
+iPadOS hides it), the text is copied for ⌘V as before. The keyboard never takes one into a secure field, or while it
 has a dictation of its own, or right after you typed. Under the hood the app
 offers the dictation in the shared mailbox (`adoptable`) and the keyboard
 answers `adopt`, which the mailbox accepts only for the offered dictation.
@@ -870,7 +869,7 @@ when it matters; surrounding editor text is never collected.
 |---|---|
 | "Dictation needs Full Access" | Enable Full Access for Chirp Keyboard in Settings → General → Keyboard → Keyboards. |
 | Setup step 2 never shows done | Open Chirp Keyboard once in any app with Full Access on. The step needs the keyboard to reach the App Group, which only works with Full Access. |
-| Chirp Keyboard doesn't appear on iPad | A hardware keyboard is attached. Show it from the keyboard bar at the bottom of the screen, or use the Toggle dictation shortcut key. |
+| No on-screen keyboard (or keyboard bar) at all on iPad | A hardware keyboard is attached and Chirp Keyboard is the selected keyboard: iPadOS then may show nothing at the bottom of the screen. Press 🌐 (or Control-Space) on the hardware keyboard until Apple's keyboard bar appears; its keyboard button shows the full on-screen keyboard. With a hardware keyboard, dictate with the floating mic or a dictation key. |
 | "Start a session in Chirp" in the keyboard | No armed session (or the lease expired). Open Chirp, tap Start keyboard session, return to your editor. |
 | "iOS could not open Chirp from this keyboard" | Expected fallback; open Chirp manually and return via app switcher. |
 | "Text kept in place" | The editor's context changed or is unreliable; recover the dictation in the app. Your text is never auto-deleted. |

@@ -289,7 +289,7 @@ struct OtherAppsGuide: View {
         VStack(alignment: .leading, spacing: 14) {
             Label("On screen: tap a text field in any app, touch and hold the globe key and choose Chirp. Tap Start dictation, then Stop dictation. The text appears where you were typing. Tap the globe key to go back to your usual keyboard.",
                   systemImage: "hand.tap")
-            Label("With a hardware keyboard: iPadOS hides on-screen keyboards. Press the globe key (or Control-Space) until Chirp is chosen, then use the small keyboard bar at the bottom of the screen to show it. Chirp Keyboard doesn't receive hardware keys, so it has no hold-to-talk key.",
+            Label("With a hardware keyboard: iPadOS hides on-screen keyboards, Chirp Keyboard included (with it selected, nothing may show at the bottom of the screen). Use a dictation key instead, or the floating mic with its Record button on (Settings → Dictation → Floating mic). To get Apple's keyboard bar back, press 🌐 (or Control-Space) on the hardware keyboard.",
                   systemImage: "keyboard")
             Label("From any app with a hardware keyboard: press ⌘Space, type Toggle dictation and press Return. Do it again to stop. The text is copied, so press ⌘V to paste. If no session is running, Toggle starts one.",
                   systemImage: "magnifyingglass")

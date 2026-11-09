@@ -81,7 +81,6 @@ final class ChirpSettingsUITests: XCTestCase {
         screenshot("dictation-keyboard-shortcuts-\(appearance)", app)
     }
 
-    /// All seven categories are there with a live summary, each opens its page, and iPhone pushes back.
     /// Settings → Dictation → Floating mic → Record button: off by default (indicator only), and it toggles.
     @MainActor func testFloatingMicRecordButtonToggles() {
         let app = launch()
@@ -96,6 +95,23 @@ final class ChirpSettingsUITests: XCTestCase {
         XCTAssertTrue(waitFor(row, "value == '\(initial ?? "")'"), "The switch did not toggle back")
     }
 
+    /// Settings → Keyboard → With a hardware keyboard: with Chirp Keyboard selected and a hardware keyboard attached,
+    /// iPadOS may show no keyboard at all (seen on an iPad, 2026-11-08), so the sheet gives the way back (🌐 /
+    /// Control-Space) and the floating mic, instead of a keyboard bar that doesn't appear.
+    @MainActor func testHardwareKeyboardWayGivesTheWayBack() {
+        let app = launch()
+        app.openSettingsPage("chirp.settings.keyboard")
+        let way = app.buttons["chirp.keyboard.way.hardware"]
+        XCTAssertTrue(way.waitForExistence(timeout: 5))
+        way.tap()
+        let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Control-Space'")).firstMatch
+        XCTAssertTrue(text.waitForExistence(timeout: 5), "The sheet must say how to get Apple's keyboard back")
+        XCTAssertTrue(text.label.contains("floating mic"))
+        XCTAssertFalse(text.label.contains("to show it"), "No more 'use the keyboard bar to show it'")
+        app.buttons["Close"].tap()
+    }
+
+    /// All seven categories are there with a live summary, each opens its page, and iPhone pushes back.
     @MainActor func testSevenCategoriesOpenTheirPages() {
         let app = pairedApp()
         app.selectChirpTab("Settings")
