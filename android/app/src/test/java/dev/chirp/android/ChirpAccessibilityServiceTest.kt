@@ -109,7 +109,25 @@ class ChirpAccessibilityServiceTest {
         }
         focus()
     }
-    @After fun cleanup() { service.onDestroy() }
+    @After fun cleanup() { service.onDestroy(); SettingsStore(app).continuousListening = false }
+
+    @Test fun `keep listening rolls the floating mic past the cap and inserts the joined text once on Stop (381)`() {
+        SettingsStore(app).continuousListening = true
+        start(); val capture = service.captures.last()
+        assertEquals(CaptureLimit.UNLIMITED, capture.limitSeconds)
+        service.streams[0].partial(1, "one"); advance()
+        repeat(((DictationSegmenter.MIN_SEGMENT + DictationSegmenter.PAUSE_CUT) * 25).toInt()) { i ->
+            capture.frame(ByteArray(1280) { if (i < DictationSegmenter.MIN_SEGMENT * 25 && it % 2 == 0) 0x40 else 0 })
+        }
+        advance()
+        assertEquals(2, service.streams.size); service.streams[1].ready()
+        service.streams[0].event(ServerEvent.Final("One.", "one", false)); advance()
+        service.streams[1].partial(1, "two"); advance()
+        assertEquals("One. two", ReflectionHelpers.getField<String>(service, "partial")); assertEquals(0, writes)
+        button("Stop").performClick(); advance()
+        service.streams[1].event(ServerEvent.Final("Two.", "two", false)); advance()
+        assertEquals(1, writes); assertTrue(node.text.toString(), node.text.contains("One. Two."))
+    }
 
     @Test fun `floating corrections activate after two windows and respect real editor privacy flags`() {
         val original = "Try Acme Cloud today."

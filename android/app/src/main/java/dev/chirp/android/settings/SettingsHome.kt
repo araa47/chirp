@@ -57,7 +57,11 @@ internal fun SettingsList(state: SetupState, actions: SettingsActions, history: 
 internal fun dictationSummary(context: android.content.Context, state: SetupState): String {
     val store = remember(context) { SettingsStore(context) }
     val cleanup = state.health.cleanupAvailable()
-    val stop = stringResource(if (store.stopOnPause) R.string.settings_summary_stops_on_pause else R.string.settings_summary_stops_on_tap)
+    val stop = stringResource(when {
+        store.continuousListening -> R.string.settings_summary_keeps_listening
+        store.stopOnPause -> R.string.settings_summary_stops_on_pause
+        else -> R.string.settings_summary_stops_on_tap
+    })
     return when {
         !state.paired -> stop
         cleanup && store.correction -> stringResource(R.string.settings_summary_cleanup_on, stop)

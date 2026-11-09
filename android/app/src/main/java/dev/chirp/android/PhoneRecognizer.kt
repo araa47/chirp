@@ -8,6 +8,7 @@ import android.content.res.Resources
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -39,6 +40,7 @@ internal interface PhoneRecognizer {
         fun level(value: Double)
         fun error(code: Int)
     }
+    /** [pauseMs] null: the recogniser should not end the utterance at a pause; [PhoneDictation] restarts it if it does. */
     fun start(listener: Listener, pauseMs: Long?)
     fun stop()
     /** Releases the microphone and the service binding; no callback follows. */
@@ -66,18 +68,27 @@ internal class AndroidPhoneRecognizer(private val context: Context) : PhoneRecog
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            .apply { pauseMs?.let { putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, it) } })
+            .apply {
+                // Without a pause to stop on, ask for the longest quiet the service allows; many ignore it, hence the restarts.
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, pauseMs ?: KEEP_LISTENING_MS)
+                if (pauseMs == null) putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, KEEP_LISTENING_MS)
+            })
     }
     override fun stop() { recognizer?.stopListening() }
     override fun cancel() { recognizer?.cancel(); release() }
     private fun release() { val old = recognizer; recognizer = null; old?.destroy() }
     private fun best(results: Bundle?) = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
     companion object {
+        const val KEEP_LISTENING_MS = 10_000L
         fun available(context: Context) = try { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) } catch (_: Exception) { false }
     }
 }
 
-/** One phone-recognised utterance: raw text only, no clean-up, and what was heard survives a failure. */
+/**
+ * One phone-recognised dictation: raw text only, no clean-up, and what was heard survives a failure. Without a pause to
+ * stop on ("When I tap", or "Keep listening until I stop") the recogniser's own end of speech is not the user's: it
+ * restarts and keeps the words, until Stop (#381).
+ */
 internal class PhoneDictation(
     private val recognizer: PhoneRecognizer,
     private val changed: (DictationStatus, ServerEvent.Partial?) -> Unit,
@@ -88,49 +99,79 @@ internal class PhoneDictation(
     private val handler: Handler = Handler(Looper.getMainLooper()),
 ) : Utterance {
     private var live = false
+    private var restarts = false
     private var sequence = 0L
     private var heard: String? = null
+    // Words from earlier rounds of a restarted recogniser.
+    private var landed = ""
+    private var listeningNow = false
+    private var roundAt = 0L
     private var listening: DictationStatus = StatusLine.PHONE_LISTENING
     override var stopping = false
         private set
     override val polishing get() = false
     private val timeout = Runnable { fail(SpeechRecognizer.ERROR_CLIENT) }
+    private val restart = Runnable { if (live && !stopping) listen() }
+    private var pauseMs: Long? = null
+    private val listener = object : PhoneRecognizer.Listener {
+        override fun partial(text: String) {
+            if (live && listeningNow && text.isNotBlank() && text != heard) { heard = text; show(if (stopping) StatusLine.PHONE_FINISHING else listening, text) }
+        }
+        override fun final(text: String) {
+            if (!live || !listeningNow) return
+            listeningNow = false
+            if (restarts && !stopping) { landed = join(landed, text); heard = null; if (text.isNotBlank()) show(listening, ""); again(0); return }
+            finish(join(landed, text))
+        }
+        override fun level(value: Double) { if (live && !stopping) this@PhoneDictation.level(value) }
+        override fun error(code: Int) {
+            if (!live || !listeningNow) return
+            listeningNow = false
+            val quiet = code == SpeechRecognizer.ERROR_NO_MATCH || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+            // A quiet stretch: keep listening, or finish with what earlier rounds heard once Stop was asked for.
+            if (quiet && restarts && !stopping) { heard = null; again(if (SystemClock.uptimeMillis() - roundAt < 1000) RESTART_MS else 0); return }
+            if (quiet && stopping && heard.isNullOrBlank() && landed.isNotBlank()) { finish(landed); return }
+            fail(code)
+        }
+    }
 
     fun start(status: DictationStatus, pauseSeconds: Double?) {
         check(!live)
-        live = true; listening = status
+        live = true; listening = status; restarts = pauseSeconds == null; pauseMs = pauseSeconds?.let { (it * 1000).toLong() }
         changed(status, null)
-        recognizer.start(object : PhoneRecognizer.Listener {
-            override fun partial(text: String) {
-                if (live && text.isNotBlank() && text != heard) { heard = text; changed(if (stopping) StatusLine.PHONE_FINISHING else listening, ServerEvent.Partial(++sequence, text, "")) }
-            }
-            override fun final(text: String) {
-                if (!live) return
-                close(false)
-                try { if (text.isBlank()) changed(StatusLine.NO_SPEECH, null) else this@PhoneDictation.final(ServerEvent.Final(text, text, false)) } finally { ended() }
-            }
-            override fun level(value: Double) { if (live && !stopping) this@PhoneDictation.level(value) }
-            override fun error(code: Int) = fail(code)
-        }, pauseSeconds?.let { (it * 1000).toLong() })
+        listen()
     }
+    private fun listen() { listeningNow = true; roundAt = SystemClock.uptimeMillis(); recognizer.start(listener, pauseMs) }
+    private fun again(delay: Long) { handler.removeCallbacks(restart); handler.postDelayed(restart, delay) }
+    private fun show(status: DictationStatus, current: String) = changed(status, ServerEvent.Partial(++sequence, join(landed, current), ""))
     override fun stop() {
         if (!live || stopping) return
         stopping = true; changed(StatusLine.PHONE_FINISHING, null)
+        // Between rounds nothing is listening: what earlier rounds heard is the result.
+        if (!listeningNow) { handler.removeCallbacks(restart); finish(landed); return }
         recognizer.stop(); handler.postDelayed(timeout, FINISH_MS)
     }
     override fun cancel() { if (live) { close(true); ended() } }
+    private fun finish(text: String) {
+        close(false)
+        try { if (text.isBlank()) changed(StatusLine.NO_SPEECH, null) else final(ServerEvent.Final(text, text, false)) } finally { ended() }
+    }
     private fun fail(code: Int) {
         if (!live) return
-        val partial = heard?.takeIf { it.isNotBlank() }
+        val partial = join(landed, heard.orEmpty()).takeIf { it.isNotBlank() }
         close(true)
         try { if (partial != null) kept(partial, reason(code)) else changed(reason(code), null) } finally { ended() }
     }
     private fun close(cancel: Boolean) {
-        live = false; heard = null; handler.removeCallbacks(timeout)
+        live = false; listeningNow = false; heard = null; landed = ""
+        handler.removeCallbacks(timeout); handler.removeCallbacks(restart)
         if (cancel) recognizer.cancel()
     }
     companion object {
         const val FINISH_MS = 5000L
+        /** A recogniser that gives up within a second of starting is restarted after this pause, never in a tight loop. */
+        const val RESTART_MS = 250L
+        private fun join(first: String, second: String) = listOf(first, second).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
         fun reason(code: Int) = when (code) {
             SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> StatusLine.NO_SPEECH
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> StatusLine.ALLOW_MICROPHONE

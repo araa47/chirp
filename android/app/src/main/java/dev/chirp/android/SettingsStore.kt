@@ -105,8 +105,12 @@ class SettingsStore(context: Context) {
     var pauseSeconds: Double
         get() = AutoStopDetector.nearest(prefs.getFloat("pause_seconds", AutoStopDetector.DEFAULT_SILENCE.toFloat()).toDouble())
         set(value) { prefs.edit { putFloat("pause_seconds", AutoStopDetector.nearest(value).toFloat()) } }
-    /** The pause that ends a dictation on its own, or null when it stops only on tap. */
-    val autoStopSeconds: Double? get() = pauseSeconds.takeIf { stopOnPause }
+    /** "Keep listening until I stop": every dictation ends only on Stop or Cancel, with no pause, silence or length limit. */
+    var continuousListening: Boolean
+        get() = prefs.getBoolean("continuous_listening", false)
+        set(value) { prefs.edit { putBoolean("continuous_listening", value) } }
+    /** The pause that ends a dictation on its own, or null when it stops only on tap (or keeps listening). */
+    val autoStopSeconds: Double? get() = pauseSeconds.takeIf { stopOnPause && !continuousListening }
     var hardwareShortcut: Boolean
         get() = prefs.getBoolean("hardware_shortcut", true)
         set(value) { prefs.edit { putBoolean("hardware_shortcut", value) } }

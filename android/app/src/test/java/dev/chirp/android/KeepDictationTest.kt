@@ -57,7 +57,8 @@ class KeepDictationTest {
     private fun start(value: String, at: Int = value.length, end: Int = at) {
         editor.reset(value, at, end)
         host.info.initialSelStart = at; host.info.initialSelEnd = end
-        voice.input(host.info, false); tap(); stream.ready()
+        // toggle, not a touch: this harness's clock passes MicGesture's 300 ms hold during start, and a hold's release stops.
+        voice.input(host.info, false); voice.toggle(); stream.ready()
     }
     private fun partial(text: String = "synthetic", seq: Long = 1) { stream.partial(seq, text); advance(16) }
     /** The user taps somewhere else in the field, as reported through onUpdateSelection. */
@@ -119,7 +120,7 @@ class KeepDictationTest {
     @Test fun `moving the caret stops and the final lands where it was spoken`() {
         start("Start. End", 6)
         partial(); assertEquals("Start. synthetic End", editor.text)
-        moveCaret(0)
+        assertEquals(0, stream.stops); moveCaret(0)
         assertEquals(1, stream.stops); assertTrue(voice.active)
         partial("synthetic words", 2) // Late partials no longer touch the editor or the caret.
         assertEquals("Start. synthetic End", editor.text); assertEquals(0, editor.caret)
@@ -177,6 +178,47 @@ class KeepDictationTest {
         voice.selection(10, 10, 0, 0, -1, -1)
         assertEquals(View.GONE, strip.raw.visibility); assertEquals(View.GONE, strip.revert.visibility)
         assertEquals("Synthetic.", editor.text)
+    }
+    /** The editor reports our own edit back later, as onUpdateSelection does; [region] false models editors that report no composing span. */
+    private fun echo(old: Int, region: Boolean = true) {
+        val caret = editor.caret
+        voice.selection(old, old, caret, caret, if (region) BaseInputConnection.getComposingSpanStart(editor.buffer) else -1,
+            if (region) BaseInputConnection.getComposingSpanEnd(editor.buffer) else -1)
+        advance(0)
+    }
+    @Test fun `an editor that reports no composing region does not stop dictation at the first partial (381)`() {
+        start("Hello.")
+        partial("one"); echo(6, region = false)
+        assertTrue(voice.active); assertEquals(0, stream.stops)
+        partial("one two", 2); echo(10, region = false)
+        assertTrue(voice.active); assertEquals(0, stream.stops)
+        tap(); advance(0); stream.final()
+        assertEquals("Hello. Synthetic.", editor.text)
+    }
+    @Test fun `a late echo of an earlier partial is not a caret move (381)`() {
+        start("Hello.")
+        partial("one"); partial("one two three", 2)
+        // The report for "one" arrives after "one two three" is already in: the caret it names is inside our text.
+        voice.selection(6, 6, 10, 10, -1, -1); advance(0)
+        assertTrue(voice.active); assertEquals(0, stream.stops)
+        // ...and so is one for a longer partial the server then revised to something shorter.
+        partial("one two three four", 3); partial("one two", 4)
+        voice.selection(20, 20, 25, 25, -1, -1); advance(0)
+        assertTrue(voice.active); assertEquals(0, stream.stops)
+    }
+    @Test fun `a fully stable partial leaves no composing region and is not a caret move (381)`() {
+        start("Hello.")
+        stream.event(ServerEvent.Partial(1, "one", "one")); advance(16)
+        assertEquals("Hello. one", editor.text); assertEquals(-1, BaseInputConnection.getComposingSpanStart(editor.buffer))
+        echo(6)
+        assertTrue(voice.active); assertEquals(0, stream.stops)
+    }
+    @Test fun `selecting text or moving past the utterance still stops (381)`() {
+        start("Start. End", 6)
+        partial(); val caret = editor.caret; assertEquals(0, stream.stops)
+        Selection.setSelection(editor.buffer, 7, 10)
+        voice.selection(caret, caret, 7, 10, -1, -1); advance(0)
+        assertEquals(1, stream.stops)
     }
     @Test fun `undo expires after five seconds`() {
         start("")

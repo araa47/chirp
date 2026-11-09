@@ -223,6 +223,7 @@
     <string name="settings_summary_version">Chirp %1$s</string>
     <string name="settings_summary_stops_on_pause">stops on pause</string>
     <string name="settings_summary_stops_on_tap">stops on tap</string>
+    <string name="settings_summary_keeps_listening">keeps listening</string>
     <!-- %1$s: settings_summary_stops_on_pause or settings_summary_stops_on_tap. -->
     <string name="settings_summary_cleanup_on">Clean-up on · %1$s</string>
     <string name="settings_summary_cleanup_off">Clean-up off · %1$s</string>
@@ -387,6 +388,8 @@
     <string name="stop_when_tap">When I tap</string>
     <string name="stop_pause_length">Pause length</string>
     <string name="stop_info_pause">Chirp stops after you pause, judged against the room\'s background noise. It never stops before you speak, and gives up after 10 seconds of silence. Either way, dictation ends at 10 minutes.</string>
+    <string name="stop_keep_listening">Keep listening until I stop</string>
+    <string name="stop_keep_listening_info">Chirp keeps the microphone on through pauses and long dictations. It stops only when you tap Stop.</string>
     <string name="stop_info_tap">Tap the stop button to finish. Either way, a countdown starts 15 seconds before the limit and dictation ends at 10 minutes.</string>
 
     <!-- Press Send after dictating (AutoEnterSettings.kt) -->

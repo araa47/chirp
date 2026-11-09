@@ -83,7 +83,7 @@ internal class ScratchpadModel(
     private val app = context.applicationContext as android.app.Application
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var client: OkHttpClient? = null
-    private var session: DictationStream? = null
+    private var session: Dictation? = null
     private var privateUtterance = false
     private var refreshing = 0
     /** The notes library for "Save as note"; built lazily so merely opening the Scratchpad touches no storage. */
@@ -181,7 +181,7 @@ internal class ScratchpadModel(
         privateUtterance = PrivateSession.enabled
         val chosen = style
         partial = ""; level = 0.0
-        val stream = DictationStream(
+        val stream = dictation(store.continuousListening,
             deadlines = store.health?.operationDeadlines ?: OperationDeadlines(),
             transportFactory = { event, failed -> transportFactory(http(), paired, event, failed) },
             captureFactory = { frame, lvl, done -> captureFactory(app, frame, lvl, done) },

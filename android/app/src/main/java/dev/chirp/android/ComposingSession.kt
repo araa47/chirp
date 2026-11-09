@@ -36,6 +36,13 @@ class ComposingSession(private val connection: InputConnection, private val anch
         private set
     val committedText get() = finalText
     val rawAvailable get() = rawText != null
+    // Where this utterance's recent partials left the caret: their selection reports may arrive after newer edits.
+    private val carets = ArrayDeque<Int>()
+    /** Where the composed text ends, or -1 without a known anchor. */
+    val end get() = if (anchor >= 0) anchor + rendered.length else -1
+
+    /** True when an editor's caret report at [caret] is one of our own edits coming back: at a place a recent partial left it. */
+    fun echo(caret: Int) = anchor >= 0 && caret in carets
 
     /** Opt this utterance's final into mid-sentence casing (and spoken commands). Call before the first partial. */
     fun shapeFinal(spokenCommands: Boolean) {
@@ -72,7 +79,10 @@ class ComposingSession(private val connection: InputConnection, private val anch
                 inserted
             } finally { connection.endBatchEdit() }
         }
-        if (accepted) { composing = true; rendered = next }
+        if (accepted) {
+            composing = true; rendered = next
+            if (anchor >= 0) { carets.addLast(anchor + next.length); if (carets.size > ECHOES) carets.removeFirst() }
+        }
         return accepted
     }
     private fun wholeRegion() {
@@ -145,6 +155,7 @@ class ComposingSession(private val connection: InputConnection, private val anch
     private fun <T> editor(fallback: T, action: () -> T): T = try { action() } catch (_: RuntimeException) { fallback }
 
     fun forgetUndo() { finalText = null; rawText = null; restore = "" }
+    private companion object { const val ECHOES = 8 }
     /** Removes exactly the committed text (separator included) and restores any selection it replaced. */
     fun undo(selStart: Int, selEnd: Int): Boolean = swap(restore, spanEnd, selStart, selEnd)
     fun useRaw(selStart: Int, selEnd: Int): Boolean = swap(rawText ?: return false, spanEnd, selStart, selEnd)
