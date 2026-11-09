@@ -16,7 +16,7 @@ interface Capture {
     var pauseSeconds: Double? get() = null; set(_) {}
     /** Called once per second with the seconds left before the cap, from 15 down to 1. Set before [start]. */
     var countdown: ((Int) -> Unit)? get() = null; set(_) {}
-    /** Seconds the capture may run; it stops one second early. Set before [start]. */
+    /** Seconds the capture may run; it stops one second early. [CaptureLimit.UNLIMITED] never stops or counts down. Set before [start]. */
     var limitSeconds: Int get() = CaptureLimit.CAP_SECONDS; set(_) {}
 }
 
@@ -69,7 +69,7 @@ internal class PcmCapture(
             try {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
                 synchronized(lock) { if (running.get()) input.start() }
-                var silentSamples = 0; var total = 0; var signalled = false; var frames = 0; var announced = 0
+                var silentSamples = 0; var total = 0L; var signalled = false; var frames = 0; var announced = 0
                 val detector = pauseSeconds?.let(::AutoStopDetector)
                 while (running.get()) {
                     var count = 0
@@ -82,7 +82,8 @@ internal class PcmCapture(
                     var peak = 0; var energy = 0.0
                     for (sample in samples) { peak = max(peak, abs(sample.toInt())); energy += sample.toDouble() * sample }
                     silentSamples = if (peak == 0) silentSamples + count else 0
-                    if (silentSamples >= 24000) { error = StatusLine.NO_SIGNAL; break }
+                    // Exact zeros before any signal mean no microphone; after it, a gated or silenced mic is a pause (#381).
+                    if (silentSamples >= 24000 && !signalled) { error = StatusLine.NO_SIGNAL; break }
                     if (peak > 0) signalled = true
                     if (++frames % 5 == 0) level(sqrt(energy / count) / 32768.0)
                     if (signalled) {
@@ -92,7 +93,8 @@ internal class PcmCapture(
                     }
                     total += count
                     if (detector?.feed((sqrt(energy / count) / 32768.0).toFloat(), total / 16000.0) == true) break
-                    val seconds = total / 16000
+                    val seconds = (total / 16000).toInt()
+                    if (limitSeconds == CaptureLimit.UNLIMITED) continue
                     if (seconds >= limitSeconds - CaptureLimit.COUNTDOWN_SECONDS && seconds != announced) { announced = seconds; countdown?.invoke(limitSeconds - seconds) }
                     if (seconds >= limitSeconds - 1) break
                 }

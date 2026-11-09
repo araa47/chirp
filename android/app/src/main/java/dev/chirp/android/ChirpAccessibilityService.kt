@@ -56,7 +56,7 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
     private var overlay: FloatingMicOverlay? = null
     private var focused: AccessibilityNodeInfo? = null
     private var target: FocusedInsertion? = null
-    private var stream: DictationStream? = null
+    private var stream: Dictation? = null
     private var client: okhttp3.OkHttpClient? = null
     private var pendingStart = false
     private var pendingStop = false
@@ -332,8 +332,8 @@ open class ChirpAccessibilityService : AccessibilityService(), FloatingMicOverla
             startForeground(12, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
             val paired = loadPairing() ?: error("Pairing required")
             val network = ChirpNetwork.client(this); client = network
-            val session = DictationStream(
-            deadlines = store.health?.operationDeadlines ?: OperationDeadlines(),
+            val session = dictation(store.continuousListening,
+                deadlines = store.health?.operationDeadlines ?: OperationDeadlines(),
                 transportFactory = { event, failure -> createTransport(network, paired, event, failure) },
                 captureFactory = ::createCapture,
                 changed = { text, event -> changed(text, event, paired) },

@@ -111,7 +111,7 @@ internal class RollingDictation(
     /** A fresh timer per segment, before its transport is made: each utterance logs its own timings. */
     private val deadlines: OperationDeadlines = OperationDeadlines(),
     private val timing: () -> SessionTimer? = { null },
-) : Utterance {
+) : Dictation {
     private inner class Segment {
         lateinit var stream: DictationStream
         var status: DictationStatus = StatusLine.CONNECTING
@@ -132,8 +132,9 @@ internal class RollingDictation(
     /** False while an earlier segment lands and the dictation goes on: no done cue then. */
     override var landingLast = true
         private set
+    private var landedAny = false
 
-    fun start(correction: Boolean, profile: String = "default", instructions: String = "", prompt: String? = null, learned: LearnedPayload? = null) {
+    override fun start(correction: Boolean, profile: String, instructions: String, prompt: String?, learned: LearnedPayload?) {
         check(!live && capture == null)
         live = true
         capture = captureFactory(router::route, { value -> handler.post { if (live && !stopping) level(value) } }, { error ->
@@ -200,7 +201,9 @@ internal class RollingDictation(
             segments.removeFirst()
             val outcome = segment.outcome
             landingLast = segments.isEmpty()
-            if (outcome != null) outcome() else if (segments.isEmpty()) changed(segment.status, null)
+            // A last segment that heard nothing after earlier ones landed is not "Didn't catch that".
+            if (outcome != null) { landedAny = true; outcome() }
+            else if (segments.isEmpty()) changed(if (landedAny && segment.status == StatusLine.NO_SPEECH) StatusLine.INSERTED else segment.status, null)
             val following = segments.firstOrNull() ?: break
             next()
             if (!following.done) { following.raw?.let(correcting); emit(following, following.partial.takeIf { following.raw == null }) }
@@ -215,4 +218,60 @@ internal class RollingDictation(
         capture?.stop(); capture = null
         ended()
     }
+}
+
+/**
+ * "Keep listening until I stop" for an entry point that takes one result: a [RollingDictation] with no length limit, no
+ * pause stop and no countdown, whose segment finals join into one final when the user stops. Partials show the words
+ * already landed followed by the live segment's. An empty or failed middle segment is not news while listening goes on.
+ */
+internal class JoinedDictation(
+    transportFactory: ((ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
+    captureFactory: ((ByteArray) -> Boolean, (Double) -> Unit, (DictationStatus?) -> Unit) -> Capture,
+    private val changed: (DictationStatus, ServerEvent.Partial?) -> Unit,
+    level: (Double) -> Unit,
+    retention: (Boolean) -> Unit,
+    private val final: (ServerEvent.Final) -> Unit,
+    private val ended: () -> Unit,
+    handler: Handler = Handler(Looper.getMainLooper()),
+    private val correcting: (ServerEvent.Correcting) -> Unit = {},
+    private val kept: ((String, DictationStatus) -> Unit)? = null,
+    deadlines: OperationDeadlines = OperationDeadlines(),
+) : Dictation {
+    private val texts = mutableListOf<String>()
+    private val raws = mutableListOf<String>()
+    private var corrected = false
+    private var correctionError: String? = null
+    // Why the dictation ended early (a failed segment), reported with the words already landed.
+    private var reason: DictationStatus? = null
+    private var sequence = 0L
+    private val rolling = RollingDictation(transportFactory, captureFactory, ::relay, level, retention,
+        final = { texts += it.text; raws += it.raw; corrected = corrected || it.corrected; correctionError = correctionError ?: it.correctionError },
+        ended = ::finish, handler = handler,
+        correcting = { correcting(it.copy(raw = join(texts + it.raw))) },
+        kept = { heard, why -> texts += heard; raws += heard; reason = why },
+        pauseSeconds = null, limitSeconds = CaptureLimit.UNLIMITED, deadlines = deadlines)
+    override val stopping get() = rolling.stopping
+    override val polishing get() = rolling.polishing
+
+    override fun start(correction: Boolean, profile: String, instructions: String, prompt: String?, learned: LearnedPayload?) =
+        rolling.start(correction, profile, instructions, prompt, learned)
+    override fun stop() = rolling.stop()
+    override fun cancel() = rolling.cancel()
+
+    private fun relay(status: DictationStatus, partial: ServerEvent.Partial?) {
+        if (partial == null && status.error && texts.isNotEmpty()) { if (status != StatusLine.NO_SPEECH) reason = reason ?: status; return }
+        changed(status, partial?.let { ServerEvent.Partial(++sequence, join(texts + it.text), join(texts + it.stable)) })
+    }
+    private fun finish() {
+        val text = join(texts)
+        try {
+            if (text.isNotEmpty()) {
+                val why = reason
+                if (why != null && kept != null) kept.invoke(text, why)
+                else { final(ServerEvent.Final(text, join(raws), corrected, correctionError)); why?.let { changed(it, null) } }
+            }
+        } finally { ended() }
+    }
+    private fun join(parts: List<String>) = parts.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
 }

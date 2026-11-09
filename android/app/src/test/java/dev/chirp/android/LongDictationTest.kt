@@ -102,6 +102,34 @@ class LongDictationTest {
         assertEquals("Hello. One. two", editor.text); assertEquals(-1, composing().first)
         assertEquals("Connection lost — kept what I heard", strip.status.text.toString())
     }
+    @Test fun `keep listening rolls through silence past ten minutes with no countdown or error, then stops on tap (381)`() {
+        SettingsStore(host).apply { continuousListening = true; stopOnPause = true; pauseSeconds = 1.0 }
+        editor.reset("", 0, 0); host.info.initialSelStart = 0; host.info.initialSelEnd = 0
+        voice.input(host.info, false); voice.toggle(); streams[0].ready()
+        assertNull(capture.pauseSeconds); assertEquals(CaptureLimit.UNLIMITED, capture.limitSeconds)
+        streams[0].partial(1, "one"); advance(16)
+        var readied = 1; var landed = 0
+        repeat(700) {
+            speak(1.0, loud = false)
+            while (readied < streams.size) streams[readied++].ready()
+            // Each cut segment finalizes: the first with its words, every later one empty.
+            while (landed < streams.size - 1 && streams[landed].stops > 0) { final(streams[landed], if (landed == 0) "One." else ""); landed++ }
+            advance(0)
+            assertTrue(voice.active); assertEquals("Listening…", strip.status.text.toString())
+        }
+        assertTrue("${streams.size} segments", streams.size >= 700 / DictationSegmenter.MAX_SEGMENT.toInt())
+        assertEquals("One.", editor.text)
+        voice.toggle(); advance(0)
+        assertEquals(1, streams.last().stops); final(streams.last(), "")
+        assertFalse(voice.active); assertEquals("One.", editor.text)
+        assertNotEquals("Didn't catch that", strip.status.text.toString())
+    }
+    @Test fun `keep listening still cancels at once (381)`() {
+        SettingsStore(host).continuousListening = true
+        twoSegments()
+        strip.cancel.performClick()
+        assertFalse(voice.active); assertTrue(streams.all { it.closed })
+    }
     @Test fun `moving the caret after a hand-off still stops the dictation`() {
         twoSegments(); final(streams[0], "One."); advance(16)
         Selection.setSelection(editor.buffer, 2)

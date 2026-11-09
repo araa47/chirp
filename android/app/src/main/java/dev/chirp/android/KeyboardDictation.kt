@@ -92,6 +92,8 @@ internal class KeyboardDictation(
     private var selectionStart = -1
     private var selectionEnd = -1
     private var insertionStart = -1
+    // Where this dictation's text begins, through every segment of a long one.
+    private var dictationStart = -1
     // The caret left the utterance: stop, stop touching the editor's caret, land the final where it was spoken.
     private var moved = false
     // Where our own commit left the caret when one segment of a long dictation hands over to the next.
@@ -353,7 +355,7 @@ internal class KeyboardDictation(
         historyInfo = info; historyId = null; learnedPayload = LearnedPayload()
         currentStyle = CleanupStyles.profiles(store.health).firstOrNull { it.id == styleOverride } ?: store.style(targetPackage)
         insertionStart = minOf(selectionStart, selectionEnd).takeIf { it >= 0 } ?: minOf(info.initialSelStart, info.initialSelEnd)
-        moved = false; handoff = null
+        moved = false; handoff = null; dictationStart = insertionStart
         composing = compose(connection)
         secondsLeft = null; spokenLeft = null
         text = ""; pressAt = SystemClock.elapsedRealtime(); firstPartial = null; stopAt = null; finalLatency = null
@@ -391,7 +393,9 @@ internal class KeyboardDictation(
                 applying = true
                 try { if (!moved) composing?.partial(ServerEvent.Partial(event.seq, event.raw, "")) } finally { applying = false }
             },
+            // "Keep listening until I stop": no pause stop (autoStopSeconds is null), no 10-minute ceiling and no countdown.
             pauseSeconds = store.autoStopSeconds, countdown = ::countdown,
+            limitSeconds = if (store.continuousListening) CaptureLimit.UNLIMITED else CaptureLimit.ROLLING_SECONDS,
             timing = { SessionTimer(TimingLog(host), { TimingNetworks.current(host) }).also { timer = it } },
             next = { nextSegment(connection) },
             ended = {
@@ -530,11 +534,21 @@ internal class KeyboardDictation(
         if (applying) return
         if (active) {
             if (composingStart >= 0 && start == composingEnd && end == composingEnd) { insertionStart = composingStart; handoff = null }
-            else if ((start != oldStart || end != oldEnd) && handoff != (start to end)) moveAway()
+            else if ((start != oldStart || end != oldEnd) && handoff != (start to end) && !echo(start, end)) moveAway()
         } else if (undo && (start != composing?.selectionStart || end != composing?.selectionEnd)) {
             // forgetUndo cancels the expiry; keep the "cleaned" notice from pinning the row open.
             forgetUndo(); if (notice) handler.postDelayed(expiry, 5000); render()
         }
+    }
+    /**
+     * An editor's late report of our own edit, not the user moving the caret (#381): a caret inside or at the end of this
+     * dictation's text, or where a recent partial left it. Editors report it after the edit, often with no composing region
+     * (or a stale one), so [applying] cannot catch it. A selected range, or a caret before or outside our text, is the user's.
+     */
+    private fun echo(start: Int, end: Int): Boolean {
+        val session = composing ?: return false
+        if (start != end || dictationStart < 0) return false
+        return session.echo(start) || start > dictationStart && start <= maxOf(session.end, handoff?.second ?: -1)
     }
     private fun moveAway() {
         moved = true; gesture.cancel(); partialFrames.clear()

@@ -38,6 +38,16 @@ class AutoStopDetectorTest {
         val fired = feed(d, 0.006f, 0.0, 20.0)
         assertTrue(fired != null && Math.abs(fired - AutoStopDetector.NO_SPEECH_TIMEOUT) < 0.11)
     }
+    @Test fun `quiet speech at Android's calibrated input level counts as speech (381)`() {
+        // VOICE_RECOGNITION is calibrated to about 2500 RMS (0.076) at 90 dB SPL, so speech at 66 dB SPL is about 0.005.
+        val d = AutoStopDetector(2.0)
+        assertNull(feed(d, 0.0003f, 0.0, 0.5)) // a quiet room
+        var t = 0.5
+        repeat(15) { assertNull("stopped while talking at $t s", feed(d, 0.005f, t, t + 0.7)); assertNull(feed(d, 0.0006f, t + 0.7, t + 0.9)); t += 0.9 }
+        // The last loud frame starts 0.25 s before t (each round ends with a 0.2 s dip), so the 2 s pause ends at t + 1.75.
+        val fired = feed(d, 0.0003f, t, t + 5.0)
+        assertTrue("fired at $fired, speech ended at $t", fired != null && Math.abs(fired - (t + 1.75)) < 0.11)
+    }
     @Test fun `never stops before speech even with a long leading silence under the timeout`() {
         val d = AutoStopDetector(1.0)
         assertNull(feed(d, 0.001f, 0.0, 9.9))
