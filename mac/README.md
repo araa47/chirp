@@ -85,6 +85,7 @@ The Mac mini has no built-in microphone. Chirp follows the system default input 
 - **Mode** (Settings → Dictation):
   - **Auto-stop** (default): press once and talk; Chirp stops after a pause (1–5 s of quiet, 2 s by default, judged against the room's noise floor) or when you press again. With nothing said it stops after 10 s.
   - **Hold to talk**: hold the hotkey while you talk, let go to finish. A press shorter than 300 ms is dropped with a "Hold the hotkey while you talk" hint.
+- **Keep listening until I stop** (Settings → Dictation, under Mode; off by default): a dictation ends only when you end it, with the shortcut again (or letting go, in hold to talk), Stop Dictation in the menu, or Esc. Pauses, the 10 s no-speech timeout, the 10-minute limit and a microphone that goes digitally silent after it has carried sound never end it; the HUD shows elapsed time without a limit. Stop after is disabled while it is on. A microphone that is silent from the start still shows "No microphone signal".
 - A modifier on its own only counts when used alone: with another key or a click (⌥←, ⌥-click) it does nothing, and a dictation that press started is dropped. Hold to talk starts once it has been held alone for 200 ms; auto-stop takes a clean tap under 0.5 s. A modifier that is one physical key (Right ⌥, the default, or Right ⌘…) does both in auto-stop: a tap starts a hands-free dictation, a hold talks until let go. The other side's key never counts, so Left ⌥ still types é and ⌥-shortcuts in other apps still work; Right ⌥ + another key, or a click, is not a press.
 - So that the first words are not lost to that 200 ms (or to a tap), a one-key modifier (Right ⌥) opens the microphone on the press itself. Until the press becomes a dictation its audio stays in memory (at most 1 s) and is neither sent nor logged; it is sent first once the dictation starts. On Right ⌥ + another key, or a release that is not a dictation, the microphone closes at once and the audio is dropped. The system's microphone indicator therefore lights briefly for those presses too. ⌥ either side and key shortcuts open the microphone only when the dictation starts.
 
@@ -133,7 +134,7 @@ Settings → Dictation, off by default: a quiet cue when dictation starts and an
 
 ### Silence guard
 
-If the input is digitally silent for 1.5 s you get "No microphone signal" and the session is cancelled.
+If the input is digitally silent for 1.5 s you get "No microphone signal" and the session is cancelled. With Keep listening until I stop that only applies before the microphone has carried any sound; later digital silence is a pause.
 
 ### Clean-up
 
@@ -253,7 +254,7 @@ Live Notes keeps the microphone open for a long session — a meeting, a lecture
 
 ## Long dictation, spoken commands and privacy
 
-Dictation rolls onto a new socket at a pause after 45 seconds (shorter pauses after 70 seconds), or at 90 seconds even without a pause. The microphone stays open, up to **10 minutes** total; the HUD shows elapsed time and that limit. Stop inserts the completed segments in recording order as one transaction, even if their clean-up replies arrive out of order. Escape cancels all sockets before insertion. **Insert raw immediately** and **Use raw** apply to the whole dictation; a failed segment keeps its last raw transcript or partial.
+Dictation rolls onto a new socket at a pause after 45 seconds (shorter pauses after 70 seconds), or at 90 seconds even without a pause. The microphone stays open, up to **10 minutes** total (no limit with Keep listening until I stop); the HUD shows elapsed time and that limit. Stop inserts the completed segments in recording order as one transaction, even if their clean-up replies arrive out of order. Escape cancels all sockets before insertion. **Insert raw immediately** and **Use raw** apply to the whole dictation; a failed segment keeps its last raw transcript or partial.
 
 **Spoken commands** in Settings → Dictation is off by default, as on the phones. With it on, a trailing “new line” or “new paragraph” becomes one or two line breaks. Mentions within a sentence stay unchanged. **Use raw** keeps the original spoken words.
 
@@ -353,7 +354,7 @@ Settings is one window laid out like System Settings: a sidebar with a search fi
 | Page | Contents |
 |---|---|
 | General | Startup: Launch Chirp at login, Always show Chirp in the Dock. Permissions: Microphone and Accessibility status, with a Fix… button only for one that is missing. Setup: Set Up Chirp… |
-| Dictation | Shortcuts: Dictation (presets and Record Shortcut…, plus the fn/🌐 setup note when fn alone is chosen), New note, Notes library, Use raw, Paste again and History, each with Record Shortcut… and Reset. Dictating: Mode (Auto-stop or Hold to talk), Stop after (the auto-stop pause), Microphone (the menu's picker), Word waveform overlay, Spoken commands, Press Return (Off, Always, In chat apps only). Sounds: cues on/off, pack with ▶ previews, volume, the Custom pack's start and stop files. |
+| Dictation | Shortcuts: Dictation (presets and Record Shortcut…, plus the fn/🌐 setup note when fn alone is chosen), New note, Notes library, Use raw, Paste again and History, each with Record Shortcut… and Reset. Dictating: Mode (Auto-stop or Hold to talk), Stop after (the auto-stop pause), Keep listening until I stop, Microphone (the menu's picker), Word waveform overlay, Spoken commands, Press Return (Off, Always, In chat apps only). Sounds: cues on/off, pack with ▶ previews, volume, the Custom pack's start and stop files. |
 | History & privacy | Private session. Dictation history: Keep dictation history (on by default), Keep for (1, 7, 30, 90 days or Forever), Never keep (apps whose dictations are never kept), and how many are kept with Open History… and Clear…. Learn from my edits: the switch (on while history is on) and Show Learned…. What Chirp keeps: Notes stay on this Mac. |
 | Clean-up | Clean up dictated text and the default style; Speed: Keep clean-up ready; Style prompts (the per-style prompt editor); Per-app styles with Test; After clean-up: Insert raw immediately, Show changes after clean-up, Offer Use raw for 5 seconds. |
 | Notes | Library: Open Notes Library, Delete notes older than (Never by default, 1 year, 90 days, 30 days), Recently Deleted (how many, Empty…). Audio: Keep audio with notes (off by default), Allow re-transcribing (on by default), Kept audio (total size, Delete…). Export: Export folder (Choose…, Reset). Smart notes: Structure notes and Auto-reorganize, the defaults for new recordings (the ✦ menu in the Notes window changes them while you record). Speakers: Label speakers, the speaker model (on this Mac or not, with Remove), and Saved voices, a detail page with Remember voices of people I name and Forget. |

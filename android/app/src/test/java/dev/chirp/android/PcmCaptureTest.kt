@@ -71,10 +71,12 @@ class PcmCaptureTest {
         assertFalse(opened); assertTrue(closed)
     }
     /** Endless 16 kHz input: [level] gives each frame's constant sample value, indexed by seconds of audio so far. */
-    private class Endless(val level: (Int) -> Short) : PcmInput {
+    private class Endless(val frameLimit: Int? = null, val level: (Int) -> Short) : PcmInput {
         var frames = 0
+        override val finished get() = frameLimit != null && frames >= frameLimit
         override fun start() = Unit
         override fun read(samples: ShortArray, offset: Int, count: Int): Int {
+            if (finished) return -1
             val value = level(frames * 640 / 16000)
             for (i in offset until offset + count) samples[i] = value
             frames++; return count
@@ -115,6 +117,22 @@ class PcmCaptureTest {
     @Test fun `pause mode never stops before speech and gives up after 10 seconds`() {
         val (sent, error) = run(Endless { 20 }, pause = 1.0)
         assertNull(error); assertTrue("stopped at ${sent / 25.0} s", Math.abs(sent / 25.0 - 10.0) <= 0.1)
+    }
+    @Test fun `digital silence after speech is a pause, not a lost signal (381)`() {
+        // A gated or silenced microphone gives exact zeros mid-dictation, for longer than the 1.5 s no-signal check.
+        val (sent, error) = run(Endless { second -> if (second in 2..5) 0 else 4000 }, limit = 10)
+        assertNull(error); assertEquals(9 * 25, sent)
+    }
+    @Test fun `keep listening runs past every limit with no countdown, through digital silence after speech (381)`() {
+        val left = mutableListOf<Int>()
+        // 700 s: speech, then a gated microphone's exact zeros, then quiet room noise; "When I pause" is off in this mode.
+        val (sent, error) = run(Endless(frameLimit = 700 * 25) { second -> if (second < 2) 4000 else if (second < 400) 0 else 3 },
+            countdown = left, limit = CaptureLimit.UNLIMITED)
+        assertNull(error); assertEquals(700 * 25, sent); assertTrue(left.isEmpty())
+    }
+    @Test fun `digital silence from the start still reports no signal`() {
+        val (sent, error) = run(Endless { 0 })
+        assertEquals(StatusLine.NO_SIGNAL.english(), error); assertEquals(0, sent)
     }
     @Test fun `tap mode ignores pauses`() {
         val (sent, error) = run(Endless { second -> if (second < 3) 4000 else 20 })

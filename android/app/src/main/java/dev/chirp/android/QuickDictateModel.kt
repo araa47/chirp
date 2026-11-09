@@ -30,7 +30,7 @@ internal class QuickDictateModel(
 ) : ViewModel() {
     private val app = context.applicationContext as android.app.Application
     private var client: OkHttpClient? = null
-    private var stream: DictationStream? = null
+    private var stream: Dictation? = null
     private var privateUtterance = false
     var status by mutableStateOf<DictationStatus>(StatusLine.CONNECTING)
         internal set
@@ -71,7 +71,7 @@ internal class QuickDictateModel(
         privateUtterance = PrivateSession.enabled
         partial = ""; stable = ""
         val http = client ?: ChirpNetwork.client(app).also { client = it }
-        val session = DictationStream(
+        val session = dictation(store.continuousListening,
             deadlines = store.health?.operationDeadlines ?: OperationDeadlines(),
             transportFactory = { event, failure -> transportFactory(http, paired, event, failure) },
             captureFactory = { frame, meter, done -> captureFactory(app, frame, meter, done) },

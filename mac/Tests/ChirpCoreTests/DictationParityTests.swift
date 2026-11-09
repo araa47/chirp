@@ -313,6 +313,27 @@ private final class RollingSockets: @unchecked Sendable {
         await session.close()
     }
 
+    /// "Keep listening until I stop": no ceiling. Segments keep rolling under the 120 s cap until the user stops.
+    @Test func keepListeningRollsPastTenMinutesUntilStopped() async throws {
+        let sockets = RollingSockets()
+        let session = RollingDictationSession(correctionTimeout: 5, maxTotal: nil, makeStream: { sockets.make() })
+        await session.open()
+        session.sendAudio(audio(700))
+        #expect(sockets.all.count == 8)
+        session.sendAudio(audio(1))
+        await session.stop()
+        for (index, socket) in sockets.all.enumerated() {
+            await socket.waitForStop()
+            socket.final(index == 3 ? "" : "\(index)")   // a silent middle segment is no error
+        }
+        // Counted once every segment has its stop: a socket's audio arrives ahead of its stop, not at `sendAudio`.
+        #expect(sockets.all.map(\.audioBytes).reduce(0, +) == 701 * 32_000)
+        #expect(sockets.all.allSatisfy { $0.audioBytes <= 90 * 32_000 })
+        let final = try #require(await result(session))
+        #expect(final.text == "0 1 2 4 5 6 7")
+        await session.close()
+    }
+
     @Test func commandOnlyFinalRemainsInsertableAndRawStaysVerbatim() async throws {
         let sockets = RollingSockets()
         let session = RollingDictationSession(correctionTimeout: 5, commands: true, makeStream: { sockets.make() })

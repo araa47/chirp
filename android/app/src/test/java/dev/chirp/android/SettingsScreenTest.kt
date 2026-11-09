@@ -49,7 +49,7 @@ class SettingsScreenTest {
     private val tree = linkedMapOf<SettingsPage?, List<String>>(
         null to listOf("Connection", "How you dictate", "Dictation", "Keyboard", "Feedback & look", "Notes", "Privacy & history", "About"),
         SettingsPage.Connection to listOf("Check connection", "Change pairing", "This device", "Forget pairing", "Use this phone's recogniser"),
-        SettingsPage.Dictation to listOf("Clean-up", "Styles", "Stop dictation", "Spoken commands",
+        SettingsPage.Dictation to listOf("Clean-up", "Styles", "Stop dictation", "Keep listening until I stop", "Spoken commands",
             "Press Send after dictating", "Learn from my edits", "Learned"),
         SettingsPage.HowYouDictate to listOf("Use Chirp Keyboard", "Keep my keyboard", "Other ways to dictate"),
         SettingsPage.Keyboard to listOf("Keyboard look", "Swipe typing", "Hardware keyboard shortcut", "Larger mic on the inner screen",
@@ -101,6 +101,19 @@ class SettingsScreenTest {
         open(SettingsPage.History)
         compose.onNodeWithText("Keep dictation history on this phone").performClick()
         compose.onNodeWithText("History on · keeps 7 days").assertExists()
+    }
+
+    @Test fun `keep listening hides the stop choices and shows in the summary (381)`() {
+        val (state, history, updates) = settingsFixture()
+        show(state, history, updates, initialPage = SettingsPage.Dictation)
+        compose.onNodeWithText("When I pause").assertExists()
+        compose.onNode(hasText("Keep listening until I stop") and hasText("Chirp keeps the microphone on through pauses and long dictations. It stops only when you tap Stop."))
+            .performScrollTo().assertIsOff().performClick()
+        compose.onNode(hasText("Keep listening until I stop") and isToggleable()).assertIsOn()
+        compose.onNodeWithText("When I pause").assertDoesNotExist(); compose.onNodeWithText("When I tap").assertDoesNotExist()
+        assertTrue(SettingsStore(context).continuousListening)
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Clean-up on · keeps listening").assertExists()
     }
 
     @Test fun `the Dictation page has no History group`() {

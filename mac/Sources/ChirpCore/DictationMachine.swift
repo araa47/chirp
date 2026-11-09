@@ -38,9 +38,17 @@ public enum ActivationMode: String, CaseIterable, Sendable {
     }
 
     /// `help`, for a shortcut that is one modifier key (Right ⌥): auto-stop there also lets you hold it to talk.
-    public func help(singleModifierKey: Bool) -> String {
-        guard singleModifierKey, self == .autoStop else { return help }
-        return "Tap once and talk; Chirp stops when you pause, or when you tap again. Or hold the key while you talk and let go to finish."
+    /// `continuous` ("Keep listening until I stop"): auto-stop no longer stops on a pause.
+    public func help(singleModifierKey: Bool, continuous: Bool = false) -> String {
+        switch (self, singleModifierKey, continuous) {
+        case (.holdToTalk, _, _): help
+        case (.autoStop, false, false): help
+        case (.autoStop, false, true): "Press once and talk. Chirp keeps listening until you press again."
+        case (.autoStop, true, false):
+            "Tap once and talk; Chirp stops when you pause, or when you tap again. Or hold the key while you talk and let go to finish."
+        case (.autoStop, true, true):
+            "Tap once and talk; Chirp keeps listening until you tap again. Or hold the key while you talk and let go to finish."
+        }
     }
 }
 
@@ -82,13 +90,15 @@ public enum DictationEffect: Sendable, Equatable {
 }
 
 /// Pure state machine: idle → connecting → listening → finalizing → [correcting →] inserting → idle (+ error).
-/// Auto-stop: a press starts, the next press or `silence` finishes. Hold to talk: the release finishes; a press shorter
+/// Auto-stop: a press starts, the next press or `silence` (unless `continuous`) finishes. Hold to talk: the release finishes; a press shorter
 /// than `tapThreshold` was not meant as dictation and is dropped with a hint.
 public struct DictationMachine: Sendable {
     public static let tapThreshold: TimeInterval = 0.3
     public static let holdHint = "Hold the hotkey while you talk"
 
     public var mode: ActivationMode
+    /// "Keep listening until I stop": a pause (`silence`) never ends the dictation, in either mode.
+    public var continuous = false
     public private(set) var state: DictationState = .idle
     /// Set while the activating key is still down.
     private var pressStart: TimeInterval?
@@ -143,7 +153,7 @@ public struct DictationMachine: Sendable {
             return [.cancel]
 
         case (.listening, .silence):
-            guard mode == .autoStop else { return [] }
+            guard mode == .autoStop, !continuous else { return [] }
             state = .finalizing
             return [.finalize]
 

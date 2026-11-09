@@ -414,6 +414,18 @@ private enum Flags {
         prefs.hotkey = .option
         #expect(Preferences(defaults: defaults).hotkey == .option)
     }
+
+    @Test func keepListeningIsOffByDefaultAndRoundTrips() throws {
+        let suite = "chirp-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(!Preferences(defaults: defaults).continuousListening)
+        Preferences(defaults: defaults).continuousListening = true
+        #expect(Preferences(defaults: defaults).continuousListening)
+        #expect(defaults.bool(forKey: "continuousListening"))
+        Preferences(defaults: defaults).continuousListening = false
+        #expect(!Preferences(defaults: defaults).continuousListening)
+    }
 }
 
 // MARK: recorder and Settings
@@ -440,8 +452,26 @@ private enum Flags {
         #expect(form.silence.selectedItem?.representedObject as? Double == 3)
         #expect(form.hotkey.titleOfSelectedItem == "⌥ Option")
         #expect(form.hotkeyHelp.stringValue.contains("⌥←"))
-        form.showMode(.autoStop, silence: 1.4)
+        form.showMode(.autoStop, silence: 1.4, continuous: false)
         #expect(form.silence.isEnabled && form.silence.selectedItem?.representedObject as? Double == 1.5)
+        #expect(form.keepListening.state == .off)
+    }
+
+    @Test func keepListeningDisablesThePauseAndSaysItKeepsListening() {
+        var s = SettingsState()
+        s.hotkey = .controlOptionSpace
+        s.continuousListening = true
+        let form = SettingsForm(s)
+        #expect(form.keepListening.title == "Keep listening until I stop" && form.keepListening.state == .on)
+        #expect(form.mode.titleOfSelectedItem == "Auto-stop" && !form.silence.isEnabled)
+        #expect(SettingsTab.dictation.keywords.contains("keep listening"))
+        let help = ActivationMode.autoStop.help(singleModifierKey: false, continuous: true)
+        #expect(help == "Press once and talk. Chirp keeps listening until you press again.")
+        #expect(ActivationMode.autoStop.help(singleModifierKey: true, continuous: true).contains("keeps listening until you tap again"))
+        #expect(ActivationMode.holdToTalk.help(singleModifierKey: false, continuous: true) == ActivationMode.holdToTalk.help)
+        #expect(ActivationMode.autoStop.help(singleModifierKey: false) == ActivationMode.autoStop.help)
+        form.showMode(.autoStop, silence: 2, continuous: false)
+        #expect(form.silence.isEnabled && form.keepListening.state == .off)
     }
 
     @Test func theMenuSaysWhenTheHotkeyWaitsForAccessibility() {

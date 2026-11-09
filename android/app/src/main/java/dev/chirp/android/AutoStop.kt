@@ -9,6 +9,8 @@ internal object CaptureLimit {
     const val COUNTDOWN_SECONDS = 15
     /** A keyboard dictation rolls into new utterances at pauses, up to this long in all. */
     const val ROLLING_SECONDS = 600
+    /** "Keep listening until I stop": no limit and no countdown; segments roll until the user stops. */
+    const val UNLIMITED = Int.MAX_VALUE
 }
 
 /**
@@ -40,8 +42,13 @@ internal class AutoStopDetector(private val silence: Double = DEFAULT_SILENCE) {
         /** The pauses offered in settings, in seconds. */
         val CHOICES = listOf(1.0, 1.5, 2.0, 3.0, 5.0)
         const val NO_SPEECH_TIMEOUT = 10.0
-        /** Below this RMS (about −40 dBFS) nothing is speech, however quiet the room. */
-        const val MINIMUM_SPEECH = 0.01f
+        /**
+         * Below this RMS (about −54 dBFS) nothing is speech, however quiet the room. Android calibrates the unprocessed
+         * VOICE_RECOGNITION source to about 2500 RMS (0.076) at 90 dB SPL, so conversation at arm's length (60–70 dB SPL) is
+         * 0.0024–0.0076: the Mac's 0.01, set for its processed input, called that silence and stopped mid-speech (#381).
+         * Room noise stays out through [SPEECH_RATIO].
+         */
+        const val MINIMUM_SPEECH = 0.002f
         /** Speech is this many times the noise floor. */
         const val SPEECH_RATIO = 3f
         fun nearest(seconds: Double) = if (seconds.isFinite()) CHOICES.minByOrNull { abs(it - seconds) }!! else DEFAULT_SILENCE

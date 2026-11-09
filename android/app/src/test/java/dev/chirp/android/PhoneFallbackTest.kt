@@ -123,7 +123,7 @@ class PhoneFallbackTest {
         assertEquals(1, recognizers.size); assertTrue(voice.active); assertTrue(recognizer.listening)
         assertEquals("Computer unavailable · listening on phone", strip.status.text.toString()); assertChip(true)
         assertNull(StatusLine.PHONE_HANDOVER.action)
-        recognizer.final("synthetic"); advance(0)
+        tap(); recognizer.final("synthetic"); advance(0)
         assertEquals("synthetic", host.editor.committed); assertEquals(1, transports)
     }
     @Test fun `no hand-over when off, when the Mac answered over TLS, or after the Mac heard something`() {
@@ -178,7 +178,7 @@ class PhoneFallbackTest {
         assertEquals(listOf(true), recorder.entries.map { it.second })
         voice.beforeEdit(); tap(); recognizer.error(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE); advance(0)
         assertEquals("Phone has no offline speech for this language", strip.status.text.toString()); assertFalse(voice.active)
-        tap(); recognizer.final("   "); advance(0)
+        tap(); tap(); recognizer.final("   "); advance(0)
         assertEquals("Didn't catch that", strip.status.text.toString())
     }
     @Test fun `a recogniser that never finishes is cancelled after the stop deadline`() {
@@ -197,13 +197,48 @@ class PhoneFallbackTest {
         recognizer.final("synthetic"); advance(0)
         assertFalse(voice.active); assertFalse(recognizer.listening); assertEquals(1, recorder.entries.size)
     }
+    @Test fun `tap mode restarts the phone recogniser at its own end of speech and keeps the words (381)`() {
+        keyboard(); macOffline(); tap()
+        recognizer.partial("synthetic one"); advance(16)
+        recognizer.final("synthetic one"); advance(300) // Android's own end-of-speech after a pause
+        assertTrue(voice.active); assertTrue(recognizer.listening)
+        recognizer.error(SpeechRecognizer.ERROR_SPEECH_TIMEOUT); advance(300) // a long quiet stretch
+        assertTrue(voice.active); assertTrue(recognizer.listening)
+        recognizer.error(SpeechRecognizer.ERROR_NO_MATCH); advance(300)
+        assertTrue(voice.active); assertTrue(recognizer.listening)
+        assertEquals("Listening on phone…", strip.status.text.toString())
+        recognizer.partial("two"); advance(16)
+        assertEquals("synthetic one two", host.editor.composing)
+        tap(); recognizer.final("two words"); advance(0)
+        assertFalse(voice.active); assertEquals("synthetic one two words", host.editor.committed)
+        assertEquals(listOf("synthetic one two words" to false), recorder.entries)
+    }
+    @Test fun `keep listening overrides pause mode on the phone, endpoints restart, Stop and Cancel end it (381)`() {
+        SettingsStore(host).apply { stopOnPause = true; pauseSeconds = 1.0; continuousListening = true }
+        keyboard(); macOffline(); tap()
+        assertNull(recognizer.pauseMs)
+        repeat(20) { round ->
+            recognizer.partial("word$round"); advance(16)
+            recognizer.final("word$round"); advance(0)
+            recognizer.error(SpeechRecognizer.ERROR_SPEECH_TIMEOUT); advance(300)
+            assertTrue(voice.active); assertTrue(recognizer.listening)
+            assertEquals("Listening on phone…", strip.status.text.toString())
+        }
+        assertTrue(host.editor.composing.startsWith("word0 word1 ")); assertTrue(host.editor.composing.endsWith(" word19"))
+        // Stop between rounds finishes at once with what was heard; no recogniser callback is needed.
+        recognizer.error(SpeechRecognizer.ERROR_NO_MATCH); tap(); advance(0)
+        assertFalse(voice.active); assertEquals((0 until 20).joinToString(" ") { "word$it" }, host.editor.committed)
+        voice.beforeEdit(); tap(); recognizer.partial("synthetic"); advance(16); recognizer.final("synthetic"); advance(0)
+        strip.cancel.performClick()
+        assertFalse(voice.active); assertEquals(1, recognizer.cancels); advance(1000); assertFalse(recognizer.listening)
+    }
     @Test fun `pause mode passes the chosen pause to the phone recogniser`() {
         SettingsStore(host).apply { stopOnPause = true; pauseSeconds = 3.0 }
         keyboard(); macOffline(); tap()
         assertEquals(3000L, recognizer.pauseMs)
     }
     @Test fun `after a phone dictation the next Mac dictation shows no chip`() {
-        keyboard(); macOffline(); tap(); recognizer.final("synthetic"); advance(5000)
+        keyboard(); macOffline(); tap(); tap(); recognizer.final("synthetic"); advance(5000)
         voice.hidden(); voice.shown(); advance(31000)
         tap(); assertTrue(voice.active); assertEquals(1, recognizers.size); assertChip(false)
     }

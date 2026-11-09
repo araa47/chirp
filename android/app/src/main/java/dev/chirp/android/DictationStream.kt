@@ -3,6 +3,33 @@ package dev.chirp.android
 import android.os.Handler
 import android.os.Looper
 
+/** What an entry point starts and ends: one utterance ([DictationStream]) or a rolling one ([RollingDictation], [JoinedDictation]). */
+internal interface Dictation : Utterance {
+    fun start(correction: Boolean, profile: String = "default", instructions: String = "", prompt: String? = null, learned: LearnedPayload? = null)
+}
+
+/**
+ * The floating mic, Quick dictate and Scratchpad take one result: one utterance under the 120 s cap, or with "Keep
+ * listening until I stop" ([continuous]) a rolling dictation with no limit whose segments join into that one result.
+ */
+internal fun dictation(
+    continuous: Boolean,
+    transportFactory: ((ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
+    captureFactory: ((ByteArray) -> Boolean, (Double) -> Unit, (DictationStatus?) -> Unit) -> Capture,
+    changed: (DictationStatus, ServerEvent.Partial?) -> Unit,
+    level: (Double) -> Unit,
+    retention: (Boolean) -> Unit,
+    final: (ServerEvent.Final) -> Unit,
+    ended: () -> Unit,
+    correcting: (ServerEvent.Correcting) -> Unit = {},
+    kept: ((String, DictationStatus) -> Unit)? = null,
+    pauseSeconds: Double? = null,
+    deadlines: OperationDeadlines = OperationDeadlines(),
+): Dictation =
+    if (continuous) JoinedDictation(transportFactory, captureFactory, changed, level, retention, final, ended, correcting = correcting, kept = kept, deadlines = deadlines)
+    else DictationStream(transportFactory, captureFactory, changed, level, retention, final, ended, correcting = correcting, kept = kept,
+        pauseSeconds = pauseSeconds, deadlines = deadlines)
+
 /** One utterance, no idle connection. Capture completion precedes STOP, including pre-ready stops. */
 internal class DictationStream(
     private val transportFactory: ((ServerEvent) -> Unit, () -> Unit) -> ImeTransport,
@@ -20,7 +47,7 @@ internal class DictationStream(
     private val countdown: (Int) -> Unit = {},
     private val deadlines: OperationDeadlines = OperationDeadlines(),
     private val timing: SessionTimer? = null,
-) {
+) : Dictation {
     private var transport: ImeTransport? = null
     private var capture: Capture? = null
     private var buffer: PreReadyBuffer? = null
@@ -33,14 +60,14 @@ internal class DictationStream(
     private var heard: String? = null
     private var polishingAt = 0L
     private var pendingFinal: Runnable? = null
-    var polishing = false
+    override var polishing = false
         private set
-    var stopping = false
+    override var stopping = false
         private set
     private fun unreachable(timedOut: Boolean = false) = ConnectionFailure.status(transport?.failureKind, timedOut)
     private val timeout = Runnable { fail(if (stopSent) StatusLine.SERVER_SLOW else unreachable(true)) }
 
-    fun start(correction: Boolean, profile: String = "default", instructions: String = "", prompt: String? = null, learned: LearnedPayload? = null) {
+    override fun start(correction: Boolean, profile: String, instructions: String, prompt: String?, learned: LearnedPayload?) {
         check(!live && transport == null)
         live = true
         changed(StatusLine.CONNECTING, null)
@@ -64,7 +91,7 @@ internal class DictationStream(
         capture?.start()
         if (transport?.start(correction, profile, instructions, prompt) != true) fail(unreachable())
     }
-    fun stop() {
+    override fun stop() {
         if (!live || stopping) return
         stopping = true; timing?.stopped()
         changed(StatusLine.FINISHING, null)
@@ -131,7 +158,7 @@ internal class DictationStream(
             else changed(message, null)
         } finally { ended() }
     }
-    fun cancel() { if (live) { timing?.cancelled(); close(true); ended() } }
+    override fun cancel() { if (live) { timing?.cancelled(); close(true); ended() } }
     private fun close(cancel: Boolean) {
         live = false; raw = null; heard = null
         pendingFinal?.let(handler::removeCallbacks); pendingFinal = null
