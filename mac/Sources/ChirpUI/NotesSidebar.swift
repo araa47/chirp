@@ -61,6 +61,11 @@ struct NotesSidebar: View {
         .listStyle(.sidebar)
         .background(SidebarFocusObserver(library: library))
         .scrollContentBackground(.hidden)
+        // The list scrolls under the window's full-size title bar and the search field (its top content inset) and
+        // under Recently Deleted. Without the system material there, scrolled rows showed through behind the traffic
+        // lights and toolbar buttons. Clip to the list's own frame, which already ends at those insets: the sidebar's
+        // `surfaceRaised` still runs under the title bar, and rows stop at the search field however tall the toolbar is.
+        .clipped()
         .overlay { overlay }
         .onDeleteCommand { trashSelection() }
         .onKeyPress(.return) {
